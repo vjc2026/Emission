@@ -1,0 +1,52 @@
+.container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.705)), /* Black overlay with slight opacity */
+    url(https://i.pinimg.com/originals/a3/51/9b/a3519b226385b9b59e734e6dfb9e7b65.jpg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.formContainer {
+  position: relative;
+  padding: 2rem;
+  border: 2px solid rgba(255, 255, 255, 0.2); /* Translucent border */
+  border-radius: 10px;
+  -webkit-backdrop-filter: blur(10px); /* Safari and iOS support */
+  backdrop-filter: blur(10px); /* Blur effect */
+  background-color: rgba(255, 255, 255, 0.05); /* Reduced opacity to avoid white background */
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.stackContainer {
+  text-align: center;
+}
+
+.heading {
+  color: white;
+}
+
+.button {
+  width: 100%;
+  margin-top: 8px;
+  background-color: #008000;
+  color: white;
+  transition: background-color 0.2s ease;
+}
+
+.button:hover {
+  background-color: #1be41b;
+}
+
+.inputField {
+  margin-top: 8px;
+  color: white;
+}

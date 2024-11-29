@@ -1,0 +1,86 @@
+.container {
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+}
+
+.profileCard {
+  text-align: center;
+  border-radius: 8px;
+  padding: 2rem 1.5rem;
+  background-color: #fff;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid #006400; /* DLSU green border */
+}
+
+.profileImage {
+  width: 120px;
+  height: 120px;
+  border: 3px solid #006400; /* DLSU green border */
+  padding: 0.3rem;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 1rem;
+}
+
+.profileName {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #006400; /* DLSU green */
+  margin-top: 0.5rem;
+}
+
+.profileRole {
+  font-size: 1rem;
+  color: #777;
+}
+
+.infoCard {
+  padding: 1.5rem;
+  border-radius: 8px;
+  background-color: #fff;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 2px solid #006400; /* DLSU green border */
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #006400; /* DLSU green */
+  margin: 0.5rem 0 0.3rem;
+}
+
+.infoText {
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.4;
+}
+
+.infoText strong {
+  color: #006400; /* DLSU green */
+  font-weight: 500;
+}
+
+.projectCard {
+  border: 2px solid #006400; /* DLSU green border */
+  background-color: #f0fff0; /* Light green background */
+}
+
+.projectCard:hover {
+  background-color: #e0ffe0; /* Slightly darker green on hover */
+}
+
+.button {
+  background-color: #006400; /* DLSU green */
+  color: #fff;
+}
+
+.button:hover {
+  background-color: #004d00; /* Darker green on hover */
+}
