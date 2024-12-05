@@ -5,7 +5,7 @@ export function TextComponent() {
   const isMobile = useMediaQuery('(max-width: 768px)');  // Determine if screen is mobile
 
   return (
-    <Flex justify="center" align="center" style={{ height: '90vh' }}>
+    <Flex justify="center" align="center" style={{ height: '90vh', padding: isMobile ? '1rem' : '0' }}>
       <Container size="xl" py="xl">
         <Stack gap="xl">
           {/* About the Website Card */}

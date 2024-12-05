@@ -361,18 +361,18 @@ app.put('/update_project/:id', authenticateToken, (req, res) => {
 });
 
 app.post('/user_Update', authenticateToken, (req, res) => {
-  const { projectName, projectDescription, sessionDuration, carbonEmissions, projectStage } = req.body;
+  const { projectName, projectDescription, sessionDuration, carbonEmissions, projectStage, projectId } = req.body;
   const userId = req.user.id; // Get the user ID from the authenticated token
 
   const query = `
     UPDATE user_history 
     SET session_duration = ?, carbon_emit = ?, stage = ?
-    WHERE user_id = ? AND project_name = ? AND status <> 'Complete' 
+    WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?)) AND project_name = ? AND project_description = ? AND status <> 'Complete'
   `;
 
   connection.query(
     query,
-    [sessionDuration, carbonEmissions, projectStage, userId, projectName],
+    [sessionDuration, carbonEmissions, projectStage, projectId, userId, userId, projectName, projectDescription],
     (err, results) => {
       if (err) {
         console.error('Error updating session data in the database:', err);
@@ -394,17 +394,67 @@ app.delete('/delete_project/:id', authenticateToken, (req, res) => {
   const projectId = req.params.id; // Get project ID from request parameters
   const userId = req.user.id; // Get user ID from the authenticated token
 
-  const query = `
-    DELETE FROM user_history WHERE id = ? AND user_id = ?
+  // First, delete related notifications
+  const deleteNotificationsQuery = `
+    DELETE FROM notifications WHERE project_id = ?;
   `;
 
-  connection.query(query, [projectId, userId], (err, results) => {
+  connection.query(deleteNotificationsQuery, [projectId], (err, results) => {
     if (err) {
-      console.error('Error deleting project from the database:', err);
+      console.error('Error deleting notifications from the database:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    res.status(200).json({ message: 'Project deleted successfully' });
+    // Then, delete related project members
+    const deleteProjectMembersQuery = `
+      DELETE FROM project_members WHERE project_id = ?;
+    `;
+
+    connection.query(deleteProjectMembersQuery, [projectId], (err, results) => {
+      if (err) {
+        console.error('Error deleting project members from the database:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      // Finally, delete the project
+      const deleteProjectQuery = `
+        DELETE FROM user_history WHERE id = ? AND user_id = ?;
+      `;
+
+      connection.query(deleteProjectQuery, [projectId, userId], (err, results) => {
+        if (err) {
+          console.error('Error deleting project from the database:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        res.status(200).json({ message: 'Project deleted successfully' });
+      });
+    });
+  });
+});
+
+// Endpoint to archive a project
+app.put('/archive_project/:id', authenticateToken, (req, res) => {
+  const projectId = req.params.id; // Get project ID from request parameters
+  const userId = req.user.id; // Get user ID from the authenticated token
+
+  const archiveProjectQuery = `
+    UPDATE user_history 
+    SET status = 'Archived'
+    WHERE id = ? AND user_id = ?;
+  `;
+
+  connection.query(archiveProjectQuery, [projectId, userId], (err, results) => {
+    if (err) {
+      console.error('Error archiving project in the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.affectedRows > 0) {
+      res.status(200).json({ message: 'Project archived successfully' });
+    } else {
+      res.status(404).json({ error: 'Project not found or you do not have permission to archive this project' });
+    }
   });
 });
 
@@ -425,10 +475,10 @@ app.post('/find_project', authenticateToken, (req, res) => {
   const query = `
     SELECT session_duration, id, status
     FROM user_history
-    WHERE project_name = ? AND project_description = ? AND user_id = ? AND status <> 'Complete' 
+    WHERE project_name = ? AND project_description = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?)) AND status <> 'Complete'
   `;
 
-  connection.query(query, [projectName, projectDescription, userId], (err, results) => {
+  connection.query(query, [projectName, projectDescription, userId, userId], (err, results) => {
     if (err) {
       console.error('Error querying the database:', err);
       return res.status(500).json({ error: 'Database error' });
@@ -480,62 +530,75 @@ app.post('/check_existing_projectname', authenticateToken, (req, res) => {
 
 // Endpoint to calculate carbon emissions for pc personal computer
 app.post('/calculate_emissions', authenticateToken, async (req, res) => {
-  const { sessionDuration } = req.body; // Get session duration from the request body
+  const { sessionDuration, projectId } = req.body; // Get session duration and project ID from the request body
   const userId = req.user.id; // Get user ID from the authenticated token
 
   try {
-      // Fetch user's CPU, GPU, RAM, and PSU details
-      const userQuery = `SELECT cpu, gpu, ram, psu FROM users WHERE id = ?`;
-      connection.query(userQuery, [userId], async (err, userResults) => {
+    // Fetch user's CPU, GPU, RAM, and PSU details
+    const userQuery = `SELECT cpu, gpu, ram, psu FROM users WHERE id = ?`;
+    connection.query(userQuery, [userId], async (err, userResults) => {
+      if (err) {
+        console.error('Error fetching user details:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (userResults.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const { cpu, gpu, ram, psu } = userResults[0];
+
+      // Fetch CPU, GPU, and RAM wattage
+      const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
+      const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
+      const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+
+      if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+        const cpuData = await cpuResponse.json();
+        const gpuData = await gpuResponse.json();
+        const ramData = await ramResponse.json();
+
+        const cpuWattUsage = cpuData.avg_watt_usage;
+        const gpuWattUsage = gpuData.avg_watt_usage;
+        const ramWattUsage = ramData.avg_watt_usage;
+
+        // Add PSU wattage
+        const psuWattUsage = psu; // Assuming 'psu' in the database stores the wattage directly
+
+        // Calculate total power consumption (in kWh)
+        const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage + psuWattUsage;
+        const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
+
+        // Define carbon intensity (kg CO2/kWh)
+        const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
+
+        // Calculate carbon emissions
+        const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
+
+        // Update the project with the calculated emissions
+        const updateProjectQuery = `
+          UPDATE user_history 
+          SET carbon_emit = carbon_emit + ?
+          WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
+        `;
+
+        connection.query(updateProjectQuery, [carbonEmissions, projectId, userId, userId], (err, results) => {
           if (err) {
-              console.error('Error fetching user details:', err);
-              return res.status(500).json({ error: 'Database error' });
+            console.error('Error updating project emissions:', err);
+            return res.status(500).json({ error: 'Database error' });
           }
 
-          if (userResults.length === 0) {
-              return res.status(404).json({ error: 'User not found' });
-          }
-
-          const { cpu, gpu, ram, psu } = userResults[0];
-
-          // Fetch CPU, GPU, and RAM wattage
-          const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
-
-          if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-              const cpuData = await cpuResponse.json();
-              const gpuData = await gpuResponse.json();
-              const ramData = await ramResponse.json();
-
-              const cpuWattUsage = cpuData.avg_watt_usage;
-              const gpuWattUsage = gpuData.avg_watt_usage;
-              const ramWattUsage = ramData.avg_watt_usage;
-
-              // Add PSU wattage
-              const psuWattUsage = psu; // Assuming 'psu' in the database stores the wattage directly
-
-              // Calculate total power consumption (in kWh)
-              const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage + psuWattUsage;
-              const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
-
-              // Define carbon intensity (kg CO2/kWh)
-              const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
-
-              // Calculate carbon emissions
-              const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
-
-              res.status(200).json({ carbonEmissions });
-          } else {
-              return res.status(500).json({ error: 'Error fetching wattage data' });
-          }
-      });
+          res.status(200).json({ carbonEmissions });
+        });
+      } else {
+        return res.status(500).json({ error: 'Error fetching wattage data' });
+      }
+    });
   } catch (error) {
-      console.error('Error calculating carbon emissions:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error calculating carbon emissions:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
 
 // Check CPU watt usage for pc personal computer
 app.get('/cpu_usage', (req, res) => {
@@ -577,56 +640,70 @@ app.get('/gpu_usage', (req, res) => {
 
 // Endpoint to calculate carbon emissions for mobile or laptop
 app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
-  const { sessionDuration } = req.body; // Get session duration from the request body
+  const { sessionDuration, projectId } = req.body; // Get session duration and project ID from the request body
   const userId = req.user.id; // Get user ID from the authenticated token
 
   try {
-      // Fetch user's CPU and GPU details
-      const userQuery = `SELECT cpu, gpu, ram FROM users WHERE id = ?`;
-      connection.query(userQuery, [userId], async (err, userResults) => {
+    // Fetch user's CPU and GPU details
+    const userQuery = `SELECT cpu, gpu, ram FROM users WHERE id = ?`;
+    connection.query(userQuery, [userId], async (err, userResults) => {
+      if (err) {
+        console.error('Error fetching user details:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (userResults.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const { cpu, gpu, ram } = userResults[0];
+
+      // Fetch CPU and GPU wattage
+      const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
+      const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
+      const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+
+      if (cpuResponse.ok && gpuResponse.ok) {
+        const cpuData = await cpuResponse.json();
+        const gpuData = await gpuResponse.json();
+        const ramData = await ramResponse.json();
+
+        const cpuWattUsage = cpuData.watts;
+        const gpuWattUsage = gpuData.watts;
+        const ramWattUsage = ramData.avg_watt_usage;
+
+        // Calculate total power consumption (in kWh)
+        const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage;
+        const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
+
+        // Define carbon intensity (kg CO2/kWh)
+        const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
+
+        // Calculate carbon emissions
+        const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
+
+        // Update the project with the calculated emissions
+        const updateProjectQuery = `
+          UPDATE user_history 
+          SET carbon_emit = carbon_emit + ?
+          WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
+        `;
+
+        connection.query(updateProjectQuery, [carbonEmissions, projectId, userId, userId], (err, results) => {
           if (err) {
-              console.error('Error fetching user details:', err);
-              return res.status(500).json({ error: 'Database error' });
+            console.error('Error updating project emissions:', err);
+            return res.status(500).json({ error: 'Database error' });
           }
 
-          if (userResults.length === 0) {
-              return res.status(404).json({ error: 'User not found' });
-          }
-
-          const { cpu, gpu, ram} = userResults[0];
-
-          // Fetch CPU and GPU wattage
-          const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
-
-          if (cpuResponse.ok && gpuResponse.ok) {
-              const cpuData = await cpuResponse.json();
-              const gpuData = await gpuResponse.json();
-              const ramData = await ramResponse.json();
-
-              const cpuWattUsage = cpuData.watts;
-              const gpuWattUsage = gpuData.watts;
-              const ramWattUsage = ramData.avg_watt_usage;
-
-              // Calculate total power consumption (in kWh)
-              const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage;
-              const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
-
-              // Define carbon intensity (kg CO2/kWh)
-              const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
-
-              // Calculate carbon emissions
-              const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
-
-              res.status(200).json({ carbonEmissions });
-          } else {
-              return res.status(500).json({ error: 'Error fetching wattage data' });
-          }
-      });
+          res.status(200).json({ carbonEmissions });
+        });
+      } else {
+        return res.status(500).json({ error: 'Error fetching wattage data' });
+      }
+    });
   } catch (error) {
-      console.error('Error calculating carbon emissions:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error calculating carbon emissions:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -1388,5 +1465,39 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch project members' });
     }
     res.json({ members: results });
+  });
+});
+
+app.get('/user_project_display_combined', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const userProjectsQuery = `
+    SELECT id, organization, project_name, project_description, session_duration, carbon_emit, stage, status 
+    FROM user_history 
+    WHERE user_id = ? AND status NOT IN ('Complete', 'Archived')
+  `;
+
+  const invitedProjectsQuery = `
+    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, uh.session_duration, uh.carbon_emit, uh.stage, uh.status 
+    FROM user_history uh
+    JOIN project_members pm ON uh.id = pm.project_id
+    WHERE pm.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
+  `;
+
+  connection.query(userProjectsQuery, [userId], (err, userProjects) => {
+    if (err) {
+      console.error('Error querying user projects:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    connection.query(invitedProjectsQuery, [userId], (err, invitedProjects) => {
+      if (err) {
+        console.error('Error querying invited projects:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      const combinedProjects = [...userProjects, ...invitedProjects];
+      res.status(200).json({ projects: combinedProjects });
+    });
   });
 });

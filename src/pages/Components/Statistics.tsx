@@ -82,7 +82,7 @@ export function StatisticsComponent() {
                     <Text fw={500} style={{ fontSize: isMobile ? 'sm' : 'md' }}>
                       Project Title: {project.project_name}
                     </Text>
-                    <Badge color={project.status === "In-Progress" ? "yellow" : "green"} variant="light">
+                    <Badge color={project.status === "In-Progress" ? "yellow" : project.status === "Archived" ? "red" : "green"} variant="light">
                       Project {project.status}
                     </Badge>
                     </Group>

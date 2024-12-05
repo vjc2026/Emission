@@ -11,6 +11,7 @@ import {
   Modal,
   Button,
   Flex,
+  Select,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
@@ -37,6 +38,7 @@ export function HELPComponent() {
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [modalOpened, setModalOpened] = useState(false);
+  const [filter, setFilter] = useState<string>('All');
   const isMobile = useMediaQuery('(max-width: 768px)');
 
   useEffect(() => {
@@ -117,6 +119,10 @@ export function HELPComponent() {
     setSelectedProject(project);
     setModalOpened(true);
   };
+
+  const filteredProjects = filter === 'All' 
+    ? projects.filter(project => project.status.toLowerCase() !== 'archived') 
+    : projects.filter(project => project.status.toLowerCase() === filter.toLowerCase());
 
   return (
     <Flex justify="center" align="center" style={{ minHeight: '100vh', width: '100%' }}>
@@ -227,13 +233,26 @@ export function HELPComponent() {
           Your Projects
         </Title>
   
+        <Select
+          value={filter}
+          onChange={(value) => value && setFilter(value)}
+          data={[
+            { value: 'All', label: 'All' },
+            { value: 'In-Progress', label: 'In-Progress' },
+            { value: 'Complete', label: 'Complete' },
+            { value: 'Archived', label: 'Archived' },
+          ]}
+          placeholder="Filter by status"
+          style={{ marginBottom: '1rem' }}
+        />
+  
         <Grid gutter={isMobile ? 'sm' : 'xl'} style={{ width: '100%' }}>
-          {projects.length === 0 ? (
+          {filteredProjects.length === 0 ? (
             <Grid.Col>
               <Text size="lg" ta="center">No projects found.</Text>
             </Grid.Col>
           ) : (
-            projects.map((project) => (
+            filteredProjects.map((project) => (
               <Grid.Col span={isMobile ? 12 : 4} key={project.id}>
                 <Card
                   shadow="sm"
@@ -305,26 +324,27 @@ export function HELPComponent() {
               <Button
                 color="red"
                 size={isMobile ? 'md' : 'lg'}
+                disabled={selectedProject.status.toLowerCase() === 'archived'}
                 onClick={async () => {
                   const token = localStorage.getItem('token');
                   try {
-                    const response = await fetch(`http://localhost:5000/delete_project/${selectedProject.id}`, {
-                      method: 'DELETE',
+                    const response = await fetch(`http://localhost:5000/archive_project/${selectedProject.id}`, {
+                      method: 'PUT',
                       headers: { Authorization: `Bearer ${token}` },
                     });
                     if (response.ok) {
                       setModalOpened(false);
                       setProjects(projects.filter((p) => p.id !== selectedProject.id));
                     } else {
-                      setError('Failed to delete project');
+                      setError('Failed to archive project');
                     }
                   } catch (err) {
-                    console.error('Error deleting project:', err);
-                    setError('An error occurred while deleting the project');
+                    console.error('Error archiving project:', err);
+                    setError('An error occurred while archiving the project');
                   }
                 }}
               >
-                Delete Project
+                Archive Project
               </Button>
             </Stack>
           )}

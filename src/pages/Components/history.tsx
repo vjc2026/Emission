@@ -31,6 +31,7 @@ export function HistoryComponent() {
   const [loading, setLoading] = useState<boolean>(true);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
   const [projectStage, setProjectStage] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -86,14 +87,45 @@ export function HistoryComponent() {
   const fetchUserProjects = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/user_projects?email=${email}`, {
+      const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setProjects(data.projects);
+        interface Project {
+          id: number;
+          project_name: string;
+          project_description: string;
+          session_duration: number;
+          carbon_emit: number;
+          stage: string;
+          status: string;
+        }
+
+        interface UserProjectsResponse {
+          projects: Project[];
+          carbon_emit: number;
+        }
+
+        interface Project {
+          id: number;
+          project_name: string;
+          project_description: string;
+          session_duration: number;
+          carbon_emit: number;
+          stage: string;
+          status: string;
+        }
+
+        interface UserProjectsResponse {
+          projects: Project[];
+          carbon_emit: number;
+        }
+
+        const activeProjects: Project[] = (data as UserProjectsResponse).projects.filter(project => project.status !== 'Archived');
+        setProjects(activeProjects);
         setcarbonEmit(data.carbon_emit);
       } else {
         const result = await response.json();
@@ -135,8 +167,10 @@ export function HistoryComponent() {
 
        if (existingProject) {
           setSessionDuration(existingProject.session_duration || 0);
+          setSelectedProjectId(existingProject.project_id);
        } else {
           setSessionDuration(0);
+          setSelectedProjectId(null);
        }
  
        const startTime = Date.now();
@@ -165,7 +199,8 @@ export function HistoryComponent() {
       projectDescription, 
       sessionDuration, 
       organization,
-      projectStage
+      projectStage,
+      projectId: selectedProjectId
     };
 
     try {
@@ -192,7 +227,7 @@ export function HistoryComponent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ sessionDuration }), 
+        body: JSON.stringify({ sessionDuration, projectId: selectedProjectId }), 
       });
 
       if (!emissionsResponse.ok) {
@@ -323,6 +358,7 @@ useEffect(() => {
       setProjectDescription(projectToEdit.project_description);
       setProjectStage(projectToEdit.projectStage);
       setEditableProject(projectToEdit);
+      setSelectedProjectId(projectToEdit.id);
       setIsModalOpen(true);
     }
   };
