@@ -135,7 +135,7 @@ const DeviceForm: React.FC = () => {
               <Anchor c="dimmed" size="sm" className={classes.control}>
                 <Center inline>
                   <IconArrowLeft style={{ width: rem(12), color: 'white', height: rem(12) }} stroke={1.5} />
-                  <Box onClick={() => router.push('/register')} ml={5} style={{ color: 'white' }}>
+                  <Box onClick={() => router.push('/Register')} ml={5} style={{ color: 'white' }}>
                     Go Back
                   </Box>
                 </Center>
