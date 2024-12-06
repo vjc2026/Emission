@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Router from 'next/router';
-import { AppShell, Burger, Flex, Button, UnstyledButton, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal } from '@mantine/core';
+import { AppShell, Burger, Flex, Button, UnstyledButton, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, Anchor } from '@mantine/core';
 import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout } from '@tabler/icons-react';
 import ButtonComponent from './Components/Button';
 import TextComponent from './Components/Text';
@@ -21,6 +21,11 @@ const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) 
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
   const router = useRouter();
+
+  const handleTest = () => {
+    router.push('/Components/TEST');
+};
+
 
   useEffect(() => {
     // Simulate async token check
@@ -162,6 +167,11 @@ const MainContent: React.FC = () => {
     setModalOpened(false);
   };
 
+  const handleTest = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>): void => {
+    event.preventDefault();
+    router.push('/Components/TEST');
+  };
+
   return (
     <AppShell
       header={{ height: 70 }}
@@ -202,6 +212,9 @@ const MainContent: React.FC = () => {
                   </ActionIcon>
                 </Indicator>
               </Menu.Target>
+              <Anchor component="button" onClick={handleTest} style={{ color: 'white' }} size="sm">
+              TestPage
+            </Anchor>
               <Menu.Dropdown>
                 {notifications.length > 0 ? (
                   notifications.map((notification, index) => (

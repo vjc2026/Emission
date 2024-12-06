@@ -1501,3 +1501,28 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
     });
   });
 });
+
+// Endpoint to fetch carbon emissions data for the last two days
+app.get('/carbon-emissions', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const query = `
+    SELECT SUM(carbon_emit) as total_emissions, DATE(created_at) as date
+    FROM user_history
+    WHERE user_id = ? AND created_at >= CURDATE() - INTERVAL 2 DAY
+    GROUP BY DATE(created_at)
+  `;
+
+  console.log('Executing query:', query);
+  console.log('With parameters:', [userId]);
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error', details: err.message });
+    }
+
+    console.log('Query results:', results);
+    res.status(200).json({ emissions: results });
+  });
+});

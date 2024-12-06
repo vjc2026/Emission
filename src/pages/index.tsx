@@ -55,6 +55,10 @@ const LoginPage: React.FC = () => {
     router.push('/ForgotPasswordPage');
   };
 
+  const handleTest = () => {
+    router.push('/Components/TEST');
+};
+
   const refreshToken = async () => {
     try {
       const token = localStorage.getItem('token');
