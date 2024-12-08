@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Textarea, Button, Group, Text, Card, Title, Divider, Grid } from '@mantine/core'; // Import Mantine components
 import styles from './CodeCalculator.module.css';
 import axios from 'axios'; // Import axios for making HTTP requests
@@ -8,6 +8,19 @@ export default function CodeCalculator() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState('');
   const [result, setResult] = useState<any>(null); // State to store the result
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      let dots = 0;
+      interval = setInterval(() => {
+        setStatus(`Calculating${'.'.repeat(dots % 5)}`);
+        dots++;
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handlePaste = () => {
     navigator.clipboard.readText().then(text => setCode(text));
@@ -28,25 +41,31 @@ export default function CodeCalculator() {
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0] || null;
     if (!uploadedFile) return;
-  
-    const formData = new FormData();
-    formData.append('file', uploadedFile);
-  
-    try {
-      const response = await axios.post('http://127.0.0.1:5001/image-to-code', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      setCode(response.data.code);
-      setStatus('Code extracted from image successfully');
-    } catch (error) {
-      setStatus('Error extracting code from image');
-      console.error(error);
-    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const byteArray = new Uint8Array(reader.result as ArrayBuffer);
+      const formData = new FormData();
+      formData.append('file', new Blob([byteArray], { type: uploadedFile.type }), uploadedFile.name);
+
+      try {
+        const response = await axios.post('http://127.0.0.1:5001/image-to-code', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        setCode(response.data.code);
+        setStatus('Code extracted from image successfully');
+      } catch (error) {
+        setStatus('Error extracting code from image');
+        console.error(error);
+      }
+    };
+    reader.readAsArrayBuffer(uploadedFile);
   };
 
   const handleOptimize = async () => {
+    setLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:5001/optimize', {
         code: code
@@ -61,7 +80,14 @@ export default function CodeCalculator() {
     } catch (error) {
       setStatus('Error optimizing code');
       console.error(error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleClearResults = () => {
+    setResult(null);
+    setStatus('');
   };
 
   return (
@@ -84,6 +110,7 @@ export default function CodeCalculator() {
             <input type="file" hidden onChange={handleImageUpload} />
           </Button>
           <Button onClick={handleOptimize}>Optimize</Button>
+          <Button onClick={handleClearResults} color="yellow">Clear Results</Button>
         </div>
       </div>
       <Text mt="sm" className={styles.status}>{status}</Text>

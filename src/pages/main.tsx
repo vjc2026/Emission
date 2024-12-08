@@ -23,11 +23,6 @@ const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) 
   const token = localStorage.getItem('token');
   const router = useRouter();
 
-  const handleTest = () => {
-    router.push('/Components/TEST');
-};
-
-
   useEffect(() => {
     // Simulate async token check
     setTimeout(() => {
@@ -35,7 +30,7 @@ const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) 
         router.push('/');  // Redirect to login if no token
       }
       setLoading(false);
-    }, 1000); // Simulate delay or async operation
+    }, ); // Simulate delay or async operation
   }, [token, history]);
 
   if (loading) {

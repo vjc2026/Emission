@@ -153,9 +153,9 @@ export function HELPComponent() {
                   <Image
                     src={`${user.profile_image}`}
                     alt="Profile Image"
-                    width={isMobile ? 100 : 150}
-                    height={isMobile ? 100 : 150}
-                    radius="xl"
+                    width={64} // 2x2 in pixels
+                    height={64} // 2x2 in pixels
+                    radius="50%" // Make it circular
                     mx="auto"
                     mb="md"
                   />
