@@ -94,7 +94,7 @@ export function HELPComponent() {
     const fetchUserProjects = async (_email: string) => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch('http://localhost:5000/all_user_projects', {
+        const response = await fetch('http://localhost:5000/profile_display_projects', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });

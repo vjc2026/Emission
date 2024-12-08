@@ -295,6 +295,39 @@ app.get('/user_projects', authenticateToken, (req, res) => {
 });
 
 app.get('/all_user_projects', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const query = `
+    SELECT project_name, SUM(carbon_emit) as total_emissions
+    FROM user_history
+    WHERE user_id = ?
+    GROUP BY project_name
+  `;
+
+  console.log('Executing query:', query);
+  console.log('With parameters:', [userId]);
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error', details: err.message });
+    }
+
+    console.log('Query results:', results);
+
+    // Calculate highest and lowest emissions
+    if (results.length > 0) {
+      const emissions = results.map(r => r.total_emissions);
+      const highestEmission = Math.max(...emissions);
+      const lowestEmission = Math.min(...emissions);
+      res.status(200).json({ projects: results, highestEmission, lowestEmission });
+    } else {
+      res.status(200).json({ projects: results, highestEmission: null, lowestEmission: null });
+    }
+  });
+});
+
+app.get('/profile_display_projects', authenticateToken, (req, res) => {
   const userId = req.user.id; // Get the user ID from the authenticated token
 
   const query = `
@@ -1523,6 +1556,15 @@ app.get('/carbon-emissions', authenticateToken, (req, res) => {
     }
 
     console.log('Query results:', results);
-    res.status(200).json({ emissions: results });
+
+    // Calculate highest and lowest emissions
+    if (results.length > 0) {
+      const emissions = results.map(r => r.total_emissions);
+      const highestEmission = Math.max(...emissions);
+      const lowestEmission = Math.min(...emissions);
+      res.status(200).json({ emissions: results, highestEmission, lowestEmission });
+    } else {
+      res.status(200).json({ emissions: results, highestEmission: null, lowestEmission: null });
+    }
   });
 });
