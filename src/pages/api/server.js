@@ -976,8 +976,8 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
       const { ram, motherboard, psu } = user;
 
       // Queries for avg_watt_usage for both CPU and GPU
-      const cpuQuery = `SELECT manufacturer, series, model, avg_watt_usage FROM cpusm WHERE model = ?`;
-      const gpuQuery = `SELECT manufacturer, series, model, avg_watt_usage FROM gpusm WHERE model = ?`;
+      const cpuQuery = `SELECT generation, model, cpu_watts FROM cpusm WHERE model = ?`;
+      const gpuQuery = `SELECT manufacturer, model, gpu_watts FROM gpusm WHERE model = ?`;
 
       connection.query(cpuQuery, [cpu], (err, cpuResults) => {
         if (err) {
@@ -994,13 +994,13 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
           // Create the specifications object
           const specifications = {
             CPU: cpuResults.length > 0 
-              ? `${cpuResults[0].manufacturer} ${cpuResults[0].series} ${cpuResults[0].model}`
+              ? `${cpuResults[0].generation} ${cpuResults[0].model}`
               : cpu,
             GPU: gpuResults.length > 0 
-              ? `${gpuResults[0].manufacturer} ${gpuResults[0].series} ${gpuResults[0].model}`
+              ? `${gpuResults[0].manufacturer} ${gpuResults[0].model}`
               : gpu,
-            CPU_avg_watt_usage: cpuResults[0]?.avg_watt_usage || null,
-            GPU_avg_watt_usage: gpuResults[0]?.avg_watt_usage || null,
+            cpu_watts: cpuResults[0]?.cpu_watts || null,
+            gpu_watts: gpuResults[0]?.gpu_watts || null,
             RAM: ram,
             motherboard: motherboard,
             PSU: psu

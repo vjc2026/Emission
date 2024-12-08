@@ -29,6 +29,8 @@ export function HELPComponent() {
       RAM: string;
       CPU_avg_watt_usage: number | null;
       GPU_avg_watt_usage: number | null;
+      cpu_watts: number | null;
+      gpu_watts: number | null;
     };
   } | null>(null);
 
@@ -193,7 +195,7 @@ export function HELPComponent() {
                         <strong>GPU:</strong> {user?.specifications?.GPU || 'N/A'}
                       </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>GPU Average Watt Usage:</strong> {user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W
+                        <strong>GPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.gpu_watts ?? 'N/A' : user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W
                       </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
                         <strong>CPU:</strong> {user?.specifications?.CPU || 'N/A'}
@@ -201,7 +203,7 @@ export function HELPComponent() {
                     </Grid.Col>
                     <Grid.Col span={isMobile ? 12 : 6}>
                       <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>CPU Average Watt Usage:</strong> {user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W
+                        <strong>CPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.cpu_watts ?? 'N/A' : user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W
                       </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
                         <strong>Motherboard:</strong> {user?.specifications?.motherboard || 'N/A'}
