@@ -11,6 +11,7 @@ import UserSpecs from './Components/UserSpecs';
 import '@mantine/core/styles.css';
 import StatisticsComponent from './Components/Statistics';
 import { useRouter } from 'next/router';
+import CodeCalculator from './Components/CodeCalculator';
 
 // DLSU Colors
 const dlsuGreen = '#006F3C';
@@ -313,6 +314,23 @@ const MainContent: React.FC = () => {
           >
             Projects Session Tracker
           </Button>
+          <Button
+            leftSection={<IconHistory size={20} />}
+            variant={currentComponent === 'component5' ? 'filled' : 'light'}
+            onClick={() => setCurrentComponent('component5')}
+            fullWidth
+            styles={{
+              root: {
+                backgroundColor: currentComponent === 'component5' ? dlsuGreen : undefined,
+                '&:hover': {
+                  backgroundColor: dlsuLightGreen,
+                },
+                color: currentComponent === 'component5' ? 'white' : dlsuGreen,
+              },
+            }}
+          >
+           Code Optimizer
+          </Button>
         </Box>
       </AppShell.Navbar>
 
@@ -322,6 +340,7 @@ const MainContent: React.FC = () => {
           {currentComponent === 'component2' && <ButtonComponent />}
           {currentComponent === 'component3' && <StatisticsComponent />}
           {currentComponent === 'component4' && <History />}
+          {currentComponent === 'component5' && <CodeCalculator />}
         </Paper>
       </AppShell.Main>
       <Modal
@@ -353,6 +372,7 @@ const App: React.FC = () => {
       <Route path="/history" element={<ProtectedRoute element={<History />} />} />
       <Route path="/test" element={<ProtectedRoute element={<TEST />} />} />
       <Route path="/user-specs" element={<ProtectedRoute element={<UserSpecs />} />} />
+      <Route path="/code-calculator" element={<ProtectedRoute element={<CodeCalculator />} />} />
     </Routes>
   );
 };
