@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Router from 'next/router';
 import { AppShell, Burger, Flex, Button, UnstyledButton, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, Anchor } from '@mantine/core';
-import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout } from '@tabler/icons-react';
+import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout, Icon3dCubeSphereOff, Icon3dCubeSphere } from '@tabler/icons-react';
 import ButtonComponent from './Components/Button';
 import TextComponent from './Components/Text';
 import History from './Components/history';
+import Dashboard from './Components/Dashboard';
 import TEST from './Components/TEST';
 import UserSpecs from './Components/UserSpecs';
 import '@mantine/core/styles.css';
@@ -293,7 +294,7 @@ const MainContent: React.FC = () => {
             Statistics
           </Button>
           <Button
-            leftSection={<IconHistory size={20} />}
+            leftSection={<IconDashboard size={20} />}
             variant={currentComponent === 'component4' ? 'filled' : 'light'}
             onClick={() => setCurrentComponent('component4')}
             fullWidth
@@ -307,7 +308,7 @@ const MainContent: React.FC = () => {
               },
             }}
           >
-            Projects Session Tracker
+            Dashboard
           </Button>
           <Button
             leftSection={<IconHistory size={20} />}
@@ -324,6 +325,23 @@ const MainContent: React.FC = () => {
               },
             }}
           >
+           Projects Session Tracker
+          </Button>
+          <Button
+            leftSection={<Icon3dCubeSphere size={20} />}
+            variant={currentComponent === 'component6' ? 'filled' : 'light'}
+            onClick={() => setCurrentComponent('component6')}
+            fullWidth
+            styles={{
+              root: {
+                backgroundColor: currentComponent === 'component6' ? dlsuGreen : undefined,
+                '&:hover': {
+                  backgroundColor: dlsuLightGreen,
+                },
+                color: currentComponent === 'component6' ? 'white' : dlsuGreen,
+              },
+            }}
+          >
            Code Optimizer
           </Button>
         </Box>
@@ -334,8 +352,9 @@ const MainContent: React.FC = () => {
           {currentComponent === 'component1' && <TextComponent />}
           {currentComponent === 'component2' && <ButtonComponent />}
           {currentComponent === 'component3' && <StatisticsComponent />}
-          {currentComponent === 'component4' && <History />}
-          {currentComponent === 'component5' && <CodeCalculator />}
+          {currentComponent === 'component4' && <Dashboard />}
+          {currentComponent === 'component5' && <History />}
+          {currentComponent === 'component6' && <CodeCalculator />}
         </Paper>
       </AppShell.Main>
       <Modal
@@ -368,6 +387,7 @@ const App: React.FC = () => {
       <Route path="/test" element={<ProtectedRoute element={<TEST />} />} />
       <Route path="/user-specs" element={<ProtectedRoute element={<UserSpecs />} />} />
       <Route path="/code-calculator" element={<ProtectedRoute element={<CodeCalculator />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard/>} />} />
     </Routes>
   );
 };

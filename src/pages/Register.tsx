@@ -13,11 +13,14 @@ import {
   FileInput,
   Avatar,
   Tooltip,
+  Modal,
 } from '@mantine/core';
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import classes from './Register.module.css';
 import { IconArrowLeft } from '@tabler/icons-react';
+import Cropper from 'react-easy-crop';
+import { getCroppedImg } from '../utils/cropImage';
 
 const RegisterPage: React.FC = () => {
   const router = useRouter();
@@ -34,6 +37,10 @@ const RegisterPage: React.FC = () => {
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(
     typeof query.profilePicturePreview === 'string' ? query.profilePicturePreview : null
   );
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<CroppedAreaPixels | null>(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
 
   const handleLogin = () => {
     router.push('/');
@@ -150,10 +157,46 @@ const RegisterPage: React.FC = () => {
       const reader = new FileReader();
       reader.onload = () => {
         setProfilePicturePreview(reader.result as string);
+        setCropModalOpen(true);
       };
       reader.readAsDataURL(compressedFile);
     } else {
       setProfilePicturePreview(null);
+    }
+  };
+
+  interface CroppedArea {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+
+  interface CroppedAreaPixels {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+
+  const handleCropComplete = (croppedArea: CroppedArea, croppedAreaPixels: CroppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const handleCropImage = async () => {
+    if (profilePicture && croppedAreaPixels) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const croppedImage = await getCroppedImg(reader.result as string, croppedAreaPixels);
+        setProfilePicture(croppedImage);
+        const reader2 = new FileReader();
+        reader2.onload = () => {
+          setProfilePicturePreview(reader2.result as string);
+          setCropModalOpen(false);
+        };
+        reader2.readAsDataURL(croppedImage);
+      };
+      reader.readAsDataURL(profilePicture);
     }
   };
 
@@ -280,6 +323,29 @@ const RegisterPage: React.FC = () => {
           </Group>
         </div>
       </Container>
+      <Modal
+        opened={cropModalOpen}
+        onClose={() => setCropModalOpen(false)}
+        title="Crop your profile picture"
+        size="lg"
+        centered
+      >
+        <div style={{ position: 'relative', height: '400px' }}>
+          <Cropper
+            image={profilePicturePreview || undefined}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={handleCropComplete}
+            style={{ containerStyle: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } }}
+          />
+        </div>
+        <Button onClick={handleCropImage} color="green" fullWidth mt="xl">
+          Crop Image
+        </Button>
+      </Modal>
     </div>
   );
 };

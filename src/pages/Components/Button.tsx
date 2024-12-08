@@ -12,6 +12,8 @@ import {
   Button,
   Flex,
   Select,
+  SimpleGrid,
+  Skeleton,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
@@ -127,51 +129,33 @@ export function HELPComponent() {
     : projects.filter(project => project.status.toLowerCase() === filter.toLowerCase());
 
   return (
-    <Flex justify="center" align="center" style={{ minHeight: '100vh', width: '100%' }}>
-      <Container
-        size="xl"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          margin: '2rem auto',
-          padding: isMobile ? '1rem' : '2rem',
-          width: '100%',
-          maxWidth: '1400px',
-        }}
-      >
-        <Grid gutter={isMobile ? 'sm' : 'xl'} style={{ width: '100%' }}>
-          {/* Profile Column */}
-          <Grid.Col span={isMobile ? 12 : 3}>
-            <Card
-              shadow="sm"
-              padding={isMobile ? 'md' : 'xl'}
-              style={{ backgroundColor: '#006747', color: 'white', borderRadius: '10px' }}
-            >
-              <Stack align="center" gap="md">
-                {user && user.profile_image && (
-                  <Image
-                    src={`${user.profile_image}`}
-                    alt="Profile Image"
-                    width={64} // 2x2 in pixels
-                    height={64} // 2x2 in pixels
-                    radius="50%" // Make it circular
-                    mx="auto"
-                    mb="md"
-                  />
-                )}
-                <Text c="white" ta="center" style={{ fontWeight: 600, fontSize: isMobile ? '18px' : '24px' }}>
-                  {user?.name || 'N/A'}
-                </Text>
-                <Text c="white" style={{ fontSize: isMobile ? '14px' : '18px' }}>
-                  {user?.organization || 'N/A'}
-                </Text>
-              </Stack>
-            </Card>
-          </Grid.Col>
-  
-          {/* Profile Details Column */}
-          <Grid.Col span={isMobile ? 12 : 9}>
+    <Container my="md">
+      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
+        <Card
+          shadow="sm"
+          padding={isMobile ? 'md' : 'xl'}
+          style={{ backgroundColor: '#006747', color: 'white', borderRadius: '10px' }}
+        >
+          <Stack align="center" gap="md">
+            {user && user.profile_image && (
+              <Image
+                src={`${user.profile_image}`}
+                alt="Profile Image"
+                mx="auto"
+                mb="md"
+                radius={50}
+              />
+            )}
+            <Text c="white" ta="center" style={{ fontWeight: 600, fontSize: isMobile ? '18px' : '24px' }}>
+              {user?.name || 'N/A'}
+            </Text>
+            <Text c="white" style={{ fontSize: isMobile ? '14px' : '18px' }}>
+              {user?.organization || 'N/A'}
+            </Text>
+          </Stack>
+        </Card>
+        <Grid gutter="md">
+          <Grid.Col>
             <Card
               shadow="sm"
               padding={isMobile ? 'md' : 'xl'}
@@ -184,7 +168,6 @@ export function HELPComponent() {
                 <Stack gap="md">
                   <Title order={4}>Organization</Title>
                   <Text size={isMobile ? 'md' : 'lg'}>{user?.organization || 'N/A'}</Text>
-  
                   <Title order={3}>User Device Specifications</Title>
                   <Grid>
                     <Grid.Col span={isMobile ? 12 : 6}>
@@ -192,27 +175,15 @@ export function HELPComponent() {
                         <strong>Device Using:</strong> {deviceType || 'N/A'}
                       </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>GPU:</strong> {user?.specifications?.GPU || 'N/A'}
-                      </Text>
-                      <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>GPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.gpu_watts ?? 'N/A' : user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W
-                      </Text>
-                      <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>CPU:</strong> {user?.specifications?.CPU || 'N/A'}
+                        <strong>PSU/Charger Watts:</strong> {user?.specifications?.PSU || 'N/A'}
                       </Text>
                     </Grid.Col>
                     <Grid.Col span={isMobile ? 12 : 6}>
-                      <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>CPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.cpu_watts ?? 'N/A' : user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W
-                      </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
                         <strong>Motherboard:</strong> {user?.specifications?.motherboard || 'N/A'}
                       </Text>
                       <Text size={isMobile ? 'md' : 'lg'}>
                         <strong>RAM:</strong> {user?.specifications?.RAM || 'N/A'}
-                      </Text>
-                      <Text size={isMobile ? 'md' : 'lg'}>
-                        <strong>PSU/Charger Watts:</strong> {user?.specifications?.PSU || 'N/A'}
                       </Text>
                     </Grid.Col>
                   </Grid>
@@ -220,139 +191,167 @@ export function HELPComponent() {
               )}
             </Card>
           </Grid.Col>
+          <Grid.Col span={isMobile ? 12 : 6}>
+          <Card
+              shadow="sm"
+              padding={isMobile ? 'md' : 'xl'}
+              style={{ backgroundColor: '#ffffff', color: '#333', borderRadius: '10px' }}
+            >
+          <Text size={isMobile ? 'md' : 'lg'}>
+                        <strong>GPU:</strong> {user?.specifications?.GPU || 'N/A'}
+                      </Text>
+                      <Text size={isMobile ? 'md' : 'lg'}>
+                        <strong>GPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.gpu_watts ?? 'N/A' : user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W
+                      </Text>
+                      </Card>
+          </Grid.Col>
+          <Grid.Col span={isMobile ? 12 : 6}>
+          <Card
+              shadow="sm"
+              padding={isMobile ? 'md' : 'xl'}
+              style={{ backgroundColor: '#ffffff', color: '#333', borderRadius: '10px' }}
+            >
+          <Text size={isMobile ? 'md' : 'lg'}>
+                        <strong>CPU:</strong> {user?.specifications?.CPU || 'N/A'}
+                      </Text>
+                      <Text size={isMobile ? 'md' : 'lg'}>
+                        <strong>CPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? user?.specifications?.cpu_watts ?? 'N/A' : user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W
+                      </Text>
+                      </Card>
+          </Grid.Col>
         </Grid>
+      </SimpleGrid>
   
-        <Title
-          order={2}
-          style={{
-            color: '#006747',
-            fontWeight: 600,
-            textAlign: 'center',
-            margin: '2rem 0',
-            fontSize: isMobile ? '24px' : '32px',
-          }}
-        >
-          Your Projects
-        </Title>
+      <Title
+        order={2}
+        style={{
+          color: '#006747',
+          fontWeight: 600,
+          textAlign: 'center',
+          margin: '2rem 0',
+          fontSize: isMobile ? '24px' : '32px',
+        }}
+      >
+        Your Projects
+      </Title>
   
-        <Select
-          value={filter}
-          onChange={(value) => value && setFilter(value)}
-          data={[
-            { value: 'All', label: 'All' },
-            { value: 'In-Progress', label: 'In-Progress' },
-            { value: 'Complete', label: 'Complete' },
-            { value: 'Archived', label: 'Archived' },
-          ]}
-          placeholder="Filter by status"
-          style={{ marginBottom: '1rem' }}
-        />
+      <Select
+        value={filter}
+        onChange={(value) => value && setFilter(value)}
+        data={[
+          { value: 'All', label: 'All' },
+          { value: 'In-Progress', label: 'In-Progress' },
+          { value: 'Complete', label: 'Complete' },
+          { value: 'Archived', label: 'Archived' },
+        ]}
+        placeholder="Filter by status"
+        style={{ marginBottom: '1rem' }}
+      />
   
-        <Grid gutter={isMobile ? 'sm' : 'xl'} style={{ width: '100%' }}>
-          {filteredProjects.length === 0 ? (
-            <Grid.Col>
-              <Text size="lg" ta="center">No projects found.</Text>
-            </Grid.Col>
-          ) : (
-            filteredProjects.map((project) => (
-              <Grid.Col span={isMobile ? 12 : 4} key={project.id}>
-                <Card
-                  shadow="sm"
-                  padding="lg"
-                  style={{
-                    cursor: 'pointer',
-                    borderColor: '#006747',
-                    borderWidth: 2,
-                    borderRadius: '10px',
-                    transition: 'all 0.3s ease',
-                    height: '100%',
-                  }}
-                  onClick={() => handleProjectClick(project)}
-                >
-                  <Text fw={700} size={isMobile ? 'lg' : 'xl'} mb="md" style={{ color: '#006747' }}>
-                    Project Title: {project.project_name}
-                  </Text>
-                  <Text size={isMobile ? 'md' : 'lg'}>
-                    <strong>Stage:</strong> {project.stage.length > 35 ? `${project.stage.substring(0, 35)}...` : project.stage}
-                  </Text>
-                  <Text size={isMobile ? 'md' : 'lg'}>
-                    <strong>Status:</strong> {project.status}
-                  </Text>
-                </Card>
-              </Grid.Col>
-            ))
-          )}
-        </Grid>
-  
-        <Modal
-          opened={modalOpened}
-          onClose={() => setModalOpened(false)}
-          title="Project Details"
-          size="xl"
-          styles={{
-            root: { backgroundColor: '#f5f5f5' },
-            content: {
-              maxWidth: '90%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              padding: isMobile ? '1rem' : '2rem',
-            },
-            title: {
-              color: '#006747',
-              fontSize: isMobile ? '20px' : '24px',
-            },
-          }}
-        >
-          {selectedProject && (
-            <Stack gap="lg">
-              <Text size={isMobile ? 'xl' : '2xl'} fw={700}>
-                {selectedProject.project_name}
-              </Text>
-              <Text size={isMobile ? 'md' : 'lg'}>
-                <strong>Description:</strong> {selectedProject.project_description}
-              </Text>
-              <Text size={isMobile ? 'md' : 'lg'}>
-                <strong>Status:</strong> {selectedProject.status}
-              </Text>
-              <Text size={isMobile ? 'md' : 'lg'}>
-                <strong>Stage:</strong> {selectedProject.stage}
-              </Text>
-              <Text size={isMobile ? 'md' : 'lg'}>
-                <strong>Carbon Emissions:</strong> {selectedProject.carbon_emit} kg CO2e
-              </Text>
-              <Text size={isMobile ? 'md' : 'lg'}>
-                <strong>Session Duration:</strong> {selectedProject.session_duration} seconds
-              </Text>
-              <Button
-                color="red"
-                size={isMobile ? 'md' : 'lg'}
-                disabled={selectedProject.status.toLowerCase() === 'archived'}
-                onClick={async () => {
-                  const token = localStorage.getItem('token');
-                  try {
-                    const response = await fetch(`http://localhost:5000/archive_project/${selectedProject.id}`, {
-                      method: 'PUT',
-                      headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (response.ok) {
-                      setModalOpened(false);
-                      setProjects(projects.filter((p) => p.id !== selectedProject.id));
-                    } else {
-                      setError('Failed to archive project');
-                    }
-                  } catch (err) {
-                    console.error('Error archiving project:', err);
-                    setError('An error occurred while archiving the project');
-                  }
+      <Grid gutter={isMobile ? 'sm' : 'xl'} style={{ width: '100%' }}>
+        {filteredProjects.length === 0 ? (
+          <Grid.Col>
+            <Text size="lg" ta="center">No projects found.</Text>
+          </Grid.Col>
+        ) : (
+          filteredProjects.map((project) => (
+            <Grid.Col span={isMobile ? 12 : 4} key={project.id}>
+              <Card
+                shadow="sm"
+                padding="lg"
+                style={{
+                  cursor: 'pointer',
+                  borderColor: '#006747',
+                  borderWidth: 2,
+                  borderRadius: '10px',
+                  transition: 'all 0.3s ease',
+                  height: '100%',
                 }}
+                onClick={() => handleProjectClick(project)}
               >
-                Archive Project
-              </Button>
-            </Stack>
-          )}
-        </Modal>
-      </Container>
-    </Flex>
+                <Text fw={700} size={isMobile ? 'lg' : 'xl'} mb="md" style={{ color: '#006747' }}>
+                  Project Title: {project.project_name}
+                </Text>
+                <Text size={isMobile ? 'md' : 'lg'}>
+                  <strong>Stage:</strong> {project.stage.length > 35 ? `${project.stage.substring(0, 35)}...` : project.stage}
+                </Text>
+                <Text size={isMobile ? 'md' : 'lg'}>
+                  <strong>Status:</strong> {project.status}
+                </Text>
+              </Card>
+            </Grid.Col>
+          ))
+        )}
+      </Grid>
+  
+      <Modal
+        opened={modalOpened}
+        onClose={() => setModalOpened(false)}
+        title="Project Details"
+        size="xl"
+        styles={{
+          root: { backgroundColor: '#f5f5f5' },
+          content: {
+            maxWidth: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            padding: isMobile ? '1rem' : '2rem',
+          },
+          title: {
+            color: '#006747',
+            fontSize: isMobile ? '20px' : '24px',
+          },
+        }}
+      >
+        {selectedProject && (
+          <Stack gap="lg">
+            <Text size={isMobile ? 'xl' : '2xl'} fw={700}>
+              {selectedProject.project_name}
+            </Text>
+            <Text size={isMobile ? 'md' : 'lg'}>
+              <strong>Description:</strong> {selectedProject.project_description}
+            </Text>
+            <Text size={isMobile ? 'md' : 'lg'}>
+              <strong>Status:</strong> {selectedProject.status}
+            </Text>
+            <Text size={isMobile ? 'md' : 'lg'}>
+              <strong>Stage:</strong> {selectedProject.stage}
+            </Text>
+            <Text size={isMobile ? 'md' : 'lg'}>
+              <strong>Carbon Emissions:</strong> {selectedProject.carbon_emit} kg CO2e
+            </Text>
+            <Text size={isMobile ? 'md' : 'lg'}>
+              <strong>Session Duration:</strong> {selectedProject.session_duration} seconds
+            </Text>
+            <Button
+              color="red"
+              size={isMobile ? 'md' : 'lg'}
+              disabled={selectedProject.status.toLowerCase() === 'archived'}
+              onClick={async () => {
+                const token = localStorage.getItem('token');
+                try {
+                  const response = await fetch(`http://localhost:5000/archive_project/${selectedProject.id}`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  if (response.ok) {
+                    setModalOpened(false);
+                    setProjects(projects.filter((p) => p.id !== selectedProject.id));
+                  } else {
+                    setError('Failed to archive project');
+                  }
+                } catch (err) {
+                  console.error('Error archiving project:', err);
+                  setError('An error occurred while archiving the project');
+                }
+              }}
+            >
+              Archive Project
+            </Button>
+          </Stack>
+        )}
+      </Modal>
+    </Container>
   );
 }
 
