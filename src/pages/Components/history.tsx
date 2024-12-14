@@ -39,6 +39,10 @@ export function HistoryComponent() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [timer, setTimer] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteProjectId, setInviteProjectId] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const formatDuration = (duration: number) => {
@@ -518,6 +522,22 @@ useEffect(() => {
     }
   };
 
+  const handleOpenInviteModal = (projectId: number) => {
+    setInviteProjectId(projectId);
+    setIsInviteModalOpen(true);
+  };
+
+  const handleSendInvite = () => {
+    if (inviteEmail && inviteMessage && inviteProjectId !== null) {
+      handleInviteUser(inviteEmail, inviteProjectId, inviteMessage);
+      setIsInviteModalOpen(false);
+      setInviteEmail('');
+      setInviteMessage('');
+    } else {
+      alert('Please fill in all fields.');
+    }
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     if (isSessionActive) {
@@ -640,13 +660,7 @@ useEffect(() => {
                 }}>
                 Complete Stage
                 </Button>
-                <Button size="xs" onClick={() => {
-                  const recipientEmail = prompt('Enter the email of the user to invite:');
-                  const message = prompt('Enter your invitation message:');
-                  if (recipientEmail && message) {
-                    handleInviteUser(recipientEmail, project.id, message);
-                  }
-                }} style={{ backgroundColor: '#006400', color: '#fff' }}>
+                <Button size="xs" onClick={() => handleOpenInviteModal(project.id)} className={styles.inviteButton}>
                   Invite
                 </Button>
                 </Group>
@@ -784,7 +798,27 @@ useEffect(() => {
         </Group>
       </Modal>
 
-
+      <Modal opened={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} title="Invite User to Project">
+        <TextInput
+          label="Recipient Email"
+          placeholder="Enter the email of the user to invite"
+          value={inviteEmail}
+          onChange={(e) => setInviteEmail(e.target.value)}
+          style={{ width: '100%' }}
+          required
+        />
+        <TextInput
+          label="Invitation Message"
+          placeholder="Enter your invitation message"
+          value={inviteMessage}
+          onChange={(e) => setInviteMessage(e.target.value)}
+          style={{ width: '100%' }}
+          required
+        />
+        <Group align="right" mt="md">
+          <Button onClick={handleSendInvite} style={{ backgroundColor: '#006400', color: '#fff' }}>Send Invitation</Button>
+        </Group>
+      </Modal>
       
     </Container>
   );

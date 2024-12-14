@@ -600,26 +600,21 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
       const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
 
       if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-        const cpuData = await cpuResponse.json();
-        const gpuData = await gpuResponse.json();
-        const ramData = await ramResponse.json();
+        const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
+        const { avg_watt_usage: gpuWattUsage } = await gpuResponse.json();
+        const { avg_watt_usage: ramWattUsage } = await ramResponse.json();
 
-        const cpuWattUsage = cpuData.avg_watt_usage;
-        const gpuWattUsage = gpuData.avg_watt_usage;
-        const ramWattUsage = ramData.avg_watt_usage;
+        const psuWattUsage = Number(psu); // Convert psuWattUsage to number
 
-        // Add PSU wattage
-        const psuWattUsage = psu; // Assuming 'psu' in the database stores the wattage directly
+        // Ensure wattage values are numbers
+        const totalWattUsage = Number(cpuWattUsage) + Number(gpuWattUsage) + Number(ramWattUsage) + psuWattUsage;
 
-        // Calculate total power consumption (in kWh)
-        const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage + psuWattUsage;
-        const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
+        // Calculate energy used (in watt-hours)
+        const sessionDurationSeconds = Number(sessionDuration);
+        const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
 
-        // Define carbon intensity (kg CO2/kWh)
-        const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
+        const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
 
-        // Calculate carbon emissions
-        const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
 
         // Update the project with the calculated emissions
         const updateProjectQuery = `
@@ -710,26 +705,22 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
       const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
 
       if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-        const cpuData = await cpuResponse.json();
-        const gpuData = await gpuResponse.json();
-        const ramData = await ramResponse.json();
+        const { watts: cpuWattUsage } = await cpuResponse.json();
+        const { gpu_watts: gpuWattUsage } = await gpuResponse.json();
+        const { avg_watt_usage: ramWattUsage } = await ramResponse.json();
 
-        const cpuWattUsage = cpuData.watts || 0;
-        const gpuWattUsage = gpuData.watts || 0;
-        const ramWattUsage = ramData.avg_watt_usage || 0;
+        // Convert psuWattUsage to number if applicable
+        const psuWattUsage = Number(psu);
 
-        // Add PSU wattage
-        const psuWattUsage = psu; // Assuming 'psu' in the database stores the wattage directly
+        // Ensure wattage values are numbers
+        const totalWattUsage = Number(cpuWattUsage) + Number(gpuWattUsage) + Number(ramWattUsage) + psuWattUsage;
 
-        // Calculate total power consumption (in kWh)
-        const totalWattUsage = cpuWattUsage + gpuWattUsage + ramWattUsage + psuWattUsage;
-        const totalEnergyUsed = (totalWattUsage * sessionDuration) / 3600; // kWh
+        // Calculate energy used (in watt-hours)
+        const sessionDurationSeconds = Number(sessionDuration);
+        const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
 
-        // Define carbon intensity (kg CO2/kWh)
-        const CARBON_INTENSITY = 0.475; // Example value, adjust based on your region
+        const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
 
-        // Calculate carbon emissions
-        const carbonEmissions = totalEnergyUsed * CARBON_INTENSITY; // in kg CO2e
 
         if (isNaN(carbonEmissions)) {
           return res.status(500).json({ error: 'Error calculating carbon emissions' });
