@@ -135,11 +135,11 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
   const profilePicture = req.file ? req.file.filename : null;
 
   const userQuery = `
-    INSERT INTO users (name, email, password, organization, profile_image)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO users (name, email, password, organization, profile_image, current_device_id)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  connection.query(userQuery, [name, email, password, organization, profilePicture], (err, results) => {
+  connection.query(userQuery, [name, email, password, organization, profilePicture, null], (err, results) => {
     if (err) {
       console.error('Error inserting data into the users table:', err);
       return res.status(500).json({ error: 'Database error' });
@@ -168,7 +168,7 @@ app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
   const userQuery = `
-    SELECT id, name, email FROM users WHERE email = ? AND password = ?
+    SELECT id, name, email, current_device_id FROM users WHERE email = ? AND password = ?
   `;
 
   connection.query(userQuery, [email, password], (err, results) => {
@@ -182,7 +182,7 @@ app.post('/login', (req, res) => {
       const token = jwt.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
       const deviceQuery = `
-        SELECT device, cpu, gpu, ram, capacity, motherboard, psu FROM user_devices WHERE user_id = ?
+        SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu FROM user_devices WHERE user_id = ?
       `;
 
       connection.query(deviceQuery, [user.id], (err, deviceResults) => {
@@ -191,7 +191,52 @@ app.post('/login', (req, res) => {
           return res.status(500).json({ error: 'Database error' });
         }
 
-        res.status(200).json({ message: 'Login successful', token, userId: user.id, name: user.name, email: user.email, devices: deviceResults });
+        const currentDevice = deviceResults.find(device => device.id === user.current_device_id);
+
+        if (currentDevice) {
+          // Fetch average watt usage for CPU and GPU
+          const cpuQuery = 'SELECT avg_watt_usage FROM cpus WHERE model = ?';
+          const gpuQuery = 'SELECT avg_watt_usage FROM gpus WHERE model = ?';
+
+          connection.query(cpuQuery, [currentDevice.cpu], (err, cpuResult) => {
+            if (err) {
+              console.error('Error querying CPU database:', err);
+              return res.status(500).json({ error: 'Database error' });
+            }
+
+            currentDevice.cpuAvgWattUsage = cpuResult[0]?.avg_watt_usage || null;
+
+            connection.query(gpuQuery, [currentDevice.gpu], (err, gpuResult) => {
+              if (err) {
+                console.error('Error querying GPU database:', err);
+                return res.status(500).json({ error: 'Database error' });
+              }
+
+              currentDevice.gpuAvgWattUsage = gpuResult[0]?.avg_watt_usage || null;
+
+              // Send response with current device including watt usage
+              res.status(200).json({
+                message: 'Login successful',
+                token,
+                userId: user.id,
+                name: user.name,
+                email: user.email,
+                devices: deviceResults,
+                currentDevice
+              });
+            });
+          });
+        } else {
+          res.status(200).json({
+            message: 'Login successful',
+            token,
+            userId: user.id,
+            name: user.name,
+            email: user.email,
+            devices: deviceResults,
+            currentDevice: null
+          });
+        }
       });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -576,64 +621,78 @@ app.post('/check_existing_projectname', authenticateToken, (req, res) => {
 
 // Endpoint to calculate carbon emissions for pc personal computer
 app.post('/calculate_emissions', authenticateToken, async (req, res) => {
-  const { sessionDuration, projectId } = req.body; // Get session duration and project ID from the request body
-  const userId = req.user.id; // Get user ID from the authenticated token
+  const { sessionDuration, projectId } = req.body;
+  const userId = req.user.id;
 
   try {
-    // Fetch user's CPU, GPU, RAM, and PSU details
-    const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE user_id = ?`;
-    connection.query(userQuery, [userId], async (err, userResults) => {
+    // Fetch user's current device ID
+    const deviceIdQuery = `SELECT current_device_id FROM users WHERE id = ?`;
+    connection.query(deviceIdQuery, [userId], (err, deviceIdResults) => {
       if (err) {
-        console.error('Error fetching user details:', err);
+        console.error('Error fetching current device ID:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      if (userResults.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
+      if (deviceIdResults.length === 0 || !deviceIdResults[0].current_device_id) {
+        return res.status(404).json({ error: 'Current device not set' });
       }
 
-      const { cpu, gpu, ram, psu } = userResults[0];
+      const currentDeviceId = deviceIdResults[0].current_device_id;
 
-      // Fetch CPU, GPU, and RAM wattage
-      const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
-      const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
-      const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+      // Fetch current device details
+      const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE id = ?`;
+      connection.query(userQuery, [currentDeviceId], async (err, userResults) => {
+        if (err) {
+          console.error('Error fetching user details:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
 
-      if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-        const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
-        const { avg_watt_usage: gpuWattUsage } = await gpuResponse.json();
-        const { avg_watt_usage: ramWattUsage } = await ramResponse.json();
+        if (userResults.length === 0) {
+          return res.status(404).json({ error: 'User device information not found' });
+        }
 
-        const psuWattUsage = Number(psu); // Convert psuWattUsage to number
+        const { cpu, gpu, ram, psu } = userResults[0];
 
-        // Ensure wattage values are numbers
-        const totalWattUsage = Number(cpuWattUsage) + Number(gpuWattUsage) + Number(ramWattUsage) + psuWattUsage;
+        // Fetch CPU, GPU, and RAM wattage
+        const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
+        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
 
-        // Calculate energy used (in watt-hours)
-        const sessionDurationSeconds = Number(sessionDuration);
-        const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
+        if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+          const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
+          const { avg_watt_usage: gpuWattUsage } = await gpuResponse.json();
+          const { avg_watt_usage: ramWattUsage } = await ramResponse.json();
 
-        const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
+          const psuWattUsage = Number(psu);
 
+          // Ensure wattage values are numbers
+          const totalWattUsage = Number(cpuWattUsage) + Number(gpuWattUsage) + Number(ramWattUsage) + psuWattUsage;
 
-        // Update the project with the calculated emissions
-        const updateProjectQuery = `
-          UPDATE user_history 
-          SET carbon_emit = carbon_emit + ?
-          WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
-        `;
+          // Calculate energy used (in watt-hours)
+          const sessionDurationSeconds = Number(sessionDuration);
+          const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
 
-        connection.query(updateProjectQuery, [carbonEmissions, projectId, userId, userId], (err, results) => {
-          if (err) {
-            console.error('Error updating project emissions:', err);
-            return res.status(500).json({ error: 'Database error' });
-          }
+          const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
 
-          res.status(200).json({ carbonEmissions });
-        });
-      } else {
-        return res.status(500).json({ error: 'Error fetching wattage data' });
-      }
+          // Update the project with the calculated emissions
+          const updateProjectQuery = `
+            UPDATE user_history 
+            SET carbon_emit = carbon_emit + ?
+            WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
+          `;
+
+          connection.query(updateProjectQuery, [carbonEmissions, projectId, userId, userId], (err, results) => {
+            if (err) {
+              console.error('Error updating project emissions:', err);
+              return res.status(500).json({ error: 'Database error' });
+            }
+
+            res.status(200).json({ carbonEmissions });
+          });
+        } else {
+          return res.status(500).json({ error: 'Error fetching wattage data' });
+        }
+      });
     });
   } catch (error) {
     console.error('Error calculating carbon emissions:', error);
@@ -681,69 +740,79 @@ app.get('/gpu_usage', (req, res) => {
 
 // Endpoint to calculate carbon emissions for mobile or laptop
 app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
-  const { sessionDuration, projectId } = req.body; // Get session duration and project ID from the request body
-  const userId = req.user.id; // Get user ID from the authenticated token
+  const { sessionDuration, projectId } = req.body;
+  const userId = req.user.id;
 
   try {
-    // Fetch user's CPU, GPU, RAM, and PSU details from user_devices table
-    const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE user_id = ?`;
-    connection.query(userQuery, [userId], async (err, userResults) => {
+    // Fetch user's current device ID
+    const deviceIdQuery = `SELECT current_device_id FROM users WHERE id = ?`;
+    connection.query(deviceIdQuery, [userId], (err, deviceIdResults) => {
       if (err) {
-        console.error('Error fetching user details:', err);
+        console.error('Error fetching current device ID:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      if (userResults.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
+      if (deviceIdResults.length === 0 || !deviceIdResults[0].current_device_id) {
+        return res.status(404).json({ error: 'Current device not set' });
       }
 
-      const { cpu, gpu, ram, psu } = userResults[0];
+      const currentDeviceId = deviceIdResults[0].current_device_id;
 
-      // Fetch CPU and GPU wattage
-      const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
-      const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
-      const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
-
-      if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-        const { watts: cpuWattUsage } = await cpuResponse.json();
-        const { gpu_watts: gpuWattUsage } = await gpuResponse.json();
-        const { avg_watt_usage: ramWattUsage } = await ramResponse.json();
-
-        // Convert psuWattUsage to number if applicable
-        const psuWattUsage = Number(psu);
-
-        // Ensure wattage values are numbers
-        const totalWattUsage = Number(cpuWattUsage) + Number(gpuWattUsage) + Number(ramWattUsage) + psuWattUsage;
-
-        // Calculate energy used (in watt-hours)
-        const sessionDurationSeconds = Number(sessionDuration);
-        const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
-
-        const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
-
-
-        if (isNaN(carbonEmissions)) {
-          return res.status(500).json({ error: 'Error calculating carbon emissions' });
+      // Fetch current device details
+      const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE id = ?`;
+      connection.query(userQuery, [currentDeviceId], async (err, userResults) => {
+        if (err) {
+          console.error('Error fetching user details:', err);
+          return res.status(500).json({ error: 'Database error' });
         }
 
-        // Update the project with the calculated emissions
-        const updateProjectQuery = `
-          UPDATE user_history 
-          SET carbon_emit = carbon_emit + ?
-          WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
-        `;
+        if (userResults.length === 0) {
+          return res.status(404).json({ error: 'User device information not found' });
+        }
 
-        connection.query(updateProjectQuery, [carbonEmissions, projectId, userId, userId], (err, results) => {
-          if (err) {
-            console.error('Error updating project emissions:', err);
-            return res.status(500).json({ error: 'Database error' });
-          }
+        const { cpu, gpu, ram, psu } = userResults[0];
 
-          res.status(200).json({ carbonEmissions });
-        });
-      } else {
-        return res.status(500).json({ error: 'Error fetching wattage data' });
-      }
+        // Fetch CPU, GPU, and RAM wattage from mobile tables
+        const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
+        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+
+        if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+          const cpuData = await cpuResponse.json();
+          const gpuData = await gpuResponse.json();
+          const ramData = await ramResponse.json();
+
+          const cpuWattage = cpuData.avg_watt_usage;
+          const gpuWattage = gpuData.avg_watt_usage;
+          const ramWattage = ramData.avg_watt_usage;
+
+          // Calculate total wattage
+          const totalWattage = cpuWattage + gpuWattage + ramWattage;
+
+          // Calculate carbon emissions
+          const carbonEmissions = (totalWattage * sessionDuration) / 1000; // Adjust calculation as needed
+
+          // Update the project with the new carbon emissions and session duration
+          const updateQuery = `
+            UPDATE user_history
+            SET session_duration = session_duration + ?, carbon_emit = carbon_emit + ?
+            WHERE id = ? AND user_id = ?
+          `;
+
+          connection.query(updateQuery, [sessionDuration, carbonEmissions, projectId, userId], (err, updateResults) => {
+            if (err) {
+              console.error('Error updating project data:', err);
+              return res.status(500).json({ error: 'Database error' });
+            }
+
+            res.status(200).json({ message: 'Carbon emissions calculated successfully', carbonEmissions });
+          });
+
+        } else {
+          console.error('Error fetching wattage data from server');
+          res.status(500).json({ error: 'Error fetching wattage data from server' });
+        }
+      });
     });
   } catch (error) {
     console.error('Error calculating carbon emissions:', error);
@@ -754,7 +823,7 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
 // Check CPU watt usage for mobile or laptop
 app.get('/cpum_usage', (req, res) => {
   const { model } = req.query;
-  const query = 'SELECT cpu_watts FROM cpusm WHERE model = ?';
+  const query = 'SELECT cpu_watts AS avg_watt_usage FROM cpusm WHERE model = ?';
   
   connection.query(query, [model], (err, results) => {
     if (err) {
@@ -763,9 +832,9 @@ app.get('/cpum_usage', (req, res) => {
     }
     
     if (results.length > 0) {
-      res.status(200).json({ watts: results[0].watts });
+      res.status(200).json({ avg_watt_usage: results[0].avg_watt_usage });
     } else {
-      res.status(404).json({ error: 'CPUm not found' });
+      res.status(404).json({ error: 'CPU not found' });
     }
   });
 });
@@ -773,7 +842,7 @@ app.get('/cpum_usage', (req, res) => {
 // Check GPU watt usage for mobile or laptop
 app.get('/gpum_usage', (req, res) => {
   const { model } = req.query;
-  const query = 'SELECT gpu_watts FROM gpusm WHERE model = ?';
+  const query = 'SELECT gpu_watts AS avg_watt_usage FROM gpusm WHERE model = ?';
   
   connection.query(query, [model], (err, results) => {
     if (err) {
@@ -782,7 +851,7 @@ app.get('/gpum_usage', (req, res) => {
     }
     
     if (results.length > 0) {
-      res.status(200).json({ gpu_watts: results[0].gpu_watts });
+      res.status(200).json({ avg_watt_usage: results[0].avg_watt_usage });
     } else {
       res.status(404).json({ error: 'GPU not found' });
     }
@@ -890,7 +959,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
   const { email } = req.user;
 
   const userQuery = `
-    SELECT id, name, email, organization, profile_image
+    SELECT id, name, email, organization, profile_image, current_device_id
     FROM users 
     WHERE email = ?
   `;
@@ -907,12 +976,12 @@ app.get('/displayuser', authenticateToken, (req, res) => {
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
-        SELECT device, cpu, gpu, ram, capacity, motherboard, psu 
+        SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu 
         FROM user_devices 
-        WHERE user_id = ?
+        WHERE user_id = ? AND id = ?
       `;
 
-      connection.query(deviceQuery, [user.id], (err, deviceResults) => {
+      connection.query(deviceQuery, [user.id, user.current_device_id], (err, deviceResults) => {
         if (err) {
           console.error('Error querying the user_devices table:', err);
           return res.status(500).json({ error: 'Database error' });
@@ -927,9 +996,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
             motherboard: device.motherboard,
             PSU: device.psu,
             CPU_avg_watt_usage: null,
-            GPU_avg_watt_usage: null,
-            cpu_watts: null,
-            gpu_watts: null
+            GPU_avg_watt_usage: null
           };
 
           // Fetch wattage for CPU and GPU
@@ -956,7 +1023,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
                 specifications.GPU_avg_watt_usage = gpuResults[0].avg_watt_usage;
               }
 
-              res.status(200).json({ user: { ...user, specifications } });
+              res.status(200).json({ user: { ...user, specifications }, currentDevice: device });
             });
           });
         } else {
@@ -974,7 +1041,7 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
   const { email } = req.user;
 
   const userQuery = `
-    SELECT id, name, email, organization, profile_image
+    SELECT id, name, email, organization, profile_image, current_device_id
     FROM users 
     WHERE email = ?
   `;
@@ -991,12 +1058,12 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
-        SELECT device, cpu, gpu, ram, capacity, motherboard, psu 
+        SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu 
         FROM user_devices 
-        WHERE user_id = ?
+        WHERE user_id = ? AND id = ?
       `;
 
-      connection.query(deviceQuery, [user.id], (err, deviceResults) => {
+      connection.query(deviceQuery, [user.id, user.current_device_id], (err, deviceResults) => {
         if (err) {
           console.error('Error querying the user_devices table:', err);
           return res.status(500).json({ error: 'Database error' });
@@ -1038,7 +1105,7 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
                 specifications.gpu_watts = gpuResults[0].gpu_watts;
               }
 
-              res.status(200).json({ user: { ...user, specifications } });
+              res.status(200).json({ user: { ...user, specifications }, currentDevice: device });
             });
           });
         } else {
@@ -1055,19 +1122,36 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
 app.get('/checkDeviceType', authenticateToken, (req, res) => {
   const userId = req.user.id; // Get user ID from the authenticated token
 
-  const query = `SELECT device FROM user_devices WHERE user_id = ?`;
+  // First, get the current_device_id from the users table
+  const getCurrentDeviceIdQuery = `SELECT current_device_id FROM users WHERE id = ?`;
 
-  connection.query(query, [userId], (err, results) => {
+  connection.query(getCurrentDeviceIdQuery, [userId], (err, result) => {
     if (err) {
-      console.error('Error querying device type from database:', err);
+      console.error('Error querying current_device_id from database:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    if (results.length > 0) {
-      const deviceType = results[0].device;
-      res.status(200).json({ deviceType }); // Return the device type (Laptop or Personal Computer)
+    if (result.length > 0 && result[0].current_device_id) {
+      const currentDeviceId = result[0].current_device_id;
+
+      // Now, fetch the device type from user_devices using current_device_id
+      const getDeviceQuery = `SELECT device FROM user_devices WHERE id = ?`;
+
+      connection.query(getDeviceQuery, [currentDeviceId], (err, deviceResult) => {
+        if (err) {
+          console.error('Error querying device type from database:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (deviceResult.length > 0) {
+          const deviceType = deviceResult[0].device;
+          res.status(200).json({ deviceType }); // Return the device type
+        } else {
+          res.status(404).json({ error: 'Device not found' });
+        }
+      });
     } else {
-      res.status(404).json({ error: 'Device not found' });
+      res.status(404).json({ error: 'Current device not set' });
     }
   });
 });
@@ -1601,5 +1685,84 @@ app.get('/carbon-emissions', authenticateToken, (req, res) => {
     } else {
       res.status(200).json({ emissions: results, highestEmission: null, lowestEmission: null });
     }
+  });
+});
+
+// Endpoint to add a new device
+app.post('/addDevice', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { device, cpu, gpu, ram, capacity, motherboard, psu } = req.body;
+
+  if (!device || !cpu || !gpu || !ram || !capacity || !motherboard || !psu) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  const query = `
+    INSERT INTO user_devices (user_id, device, cpu, gpu, ram, capacity, motherboard, psu)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  connection.query(query, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, results) => {
+    if (err) {
+      console.error('Error inserting data into the user_devices table:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Device added successfully' });
+  });
+});
+
+// Endpoint to set the current device for the user
+app.put('/setCurrentDevice', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { deviceId } = req.body;
+
+  const query = `
+    UPDATE users
+    SET current_device_id = ?
+    WHERE id = ?
+  `;
+
+  connection.query(query, [deviceId, userId], (err, results) => {
+    if (err) {
+      console.error('Error updating current device:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Current device updated successfully' });
+  });
+});
+
+// Endpoint to fetch user's devices
+app.get('/user_devices', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const query = `
+    SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu
+    FROM user_devices
+    WHERE user_id = ?
+  `;
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const currentDeviceQuery = `
+      SELECT current_device_id
+      FROM users
+      WHERE id = ?
+    `;
+
+    connection.query(currentDeviceQuery, [userId], (err, deviceResults) => {
+      if (err) {
+        console.error('Error querying the database:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      const currentDeviceId = deviceResults.length > 0 ? deviceResults[0].current_device_id : null;
+      res.status(200).json({ devices: results, currentDeviceId });
+    });
   });
 });

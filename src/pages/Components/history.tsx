@@ -43,6 +43,7 @@ export function HistoryComponent() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteProjectId, setInviteProjectId] = useState<number | null>(null);
+  const [currentDevice, setCurrentDevice] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const formatDuration = (duration: number) => {
@@ -140,6 +141,31 @@ export function HistoryComponent() {
       setError('An error occurred while fetching user projects.');
     }
   };
+
+  useEffect(() => {
+    const fetchCurrentDevice = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        const response = await fetch('http://localhost:5000/checkDeviceType', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+  
+        if (response.ok) {
+          const { deviceType } = await response.json();
+          setCurrentDevice(deviceType);
+        } else {
+          const result = await response.json();
+          setError(result.error || 'Failed to fetch current device.');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        setError('An error occurred while fetching current device.');
+      }
+    };
+  
+    fetchCurrentDevice();
+  }, []);
 
   const startSession = async () => {
     if (isTimerRunning) return;
@@ -598,6 +624,9 @@ useEffect(() => {
 
           <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
             Current Duration: {formatDuration(sessionDuration)}
+          </Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
+            Current Device: {currentDevice || 'N/A'}
           </Text>
           <Button onClick={() => setIsCreateModalOpen(true)} style={{ backgroundColor: '#006400', color: '#fff'}}>
             Create Project
