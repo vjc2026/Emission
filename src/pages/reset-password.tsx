@@ -5,7 +5,7 @@ import classes from './reset-password.module.css';
 import { useRouter } from 'next/router';
 
 const ResetPassword: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [newPassword, setNewPassword] = useState('');
@@ -38,7 +38,7 @@ const ResetPassword: React.FC = () => {
         setMessage(data.message);
         setError('');
         setTimeout(() => {
-          navigate('/', { replace: true });
+          router.push('/');
         }, 3000);
       } else {
         setError(data.error);
