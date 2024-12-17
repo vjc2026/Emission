@@ -9,7 +9,6 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
-const bcrypt = require('bcrypt'); // Add bcrypt for password hashing
 
 const path = require('path');
 const app = express();
@@ -18,9 +17,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environme
 
 let totpSecrets = {};
 
-// Use MySQL connection pooling
-const connection = mysql.createPool({
-  connectionLimit: 10, // Adjust the limit as needed
+// Create MySQL connection
+const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -28,7 +26,14 @@ const connection = mysql.createPool({
   port: process.env.DB_PORT,
 });
 
-// Remove connection.connect(), pooling manages connections automatically
+connection.connect((err) => {
+  if (err) {
+    console.error('Error connecting to MySQL:', err);
+    return;
+  }
+  console.log('Connected to MySQL database');
+});
+
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -38,12 +43,33 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+
 // Use cors middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Ensure the uploads directory exists on startup
+
+
+  app.post('/check-email', (req, res) => {
+    const { email } = req.body;
+    const query = 'SELECT * FROM users WHERE email = ?'; // Replace 'users' with your table name
+  
+    connection.query(query, [email], (err, results) => {
+      if (err) {
+        console.error('Error checking email:', err);
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+  
+      if (results.length > 0) {
+        return res.json({ exists: true });
+      } else {
+        return res.json({ exists: false });
+      }
+    });
+  });
+
+  // Ensure the uploads directory exists on startup
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true }); // Create the directory if it doesn't exist
@@ -85,64 +111,56 @@ app.post('/upload', upload.single('profileImage'), (req, res) => {
 // Serve the uploads folder
 app.use('/uploads', express.static(uploadsDir));
 
-// Remove duplicate '/check-email' route
-app.post('/check-email', (req, res) => {
-  const { email } = req.body;
-  const query = 'SELECT * FROM users WHERE email = ?'; // Replace 'users' with your table name
-
-  connection.query(query, [email], (err, results) => {
-    if (err) {
-      console.error('Error checking email:', err);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
-
-    if (results.length > 0) {
-      return res.json({ exists: true });
-    } else {
-      return res.json({ exists: false });
-    }
+  app.post('/check-email', (req, res) => {
+    const { email } = req.body;
+    const query = 'SELECT * FROM users WHERE email = ?'; // Replace 'users' with your table name
+  
+    connection.query(query, [email], (err, results) => {
+      if (err) {
+        console.error('Error checking email:', err);
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+  
+      if (results.length > 0) {
+        return res.json({ exists: true });
+      } else {
+        return res.json({ exists: false });
+      }
+    });
   });
-});
 
 // Endpoint to insert user data into the MySQL database
-app.post('/register', upload.single('profilePicture'), async (req, res) => {
+app.post('/register', upload.single('profilePicture'), (req, res) => {
   const { name, email, password, organization, device, cpu, gpu, ram, capacity, motherboard, psu } = req.body;
   const profilePicture = req.file ? req.file.filename : null;
 
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+  const userQuery = `
+    INSERT INTO users (name, email, password, organization, profile_image, current_device_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
 
-    const userQuery = `
-      INSERT INTO users (name, email, password, organization, profile_image, current_device_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+  connection.query(userQuery, [name, email, password, organization, profilePicture, null], (err, results) => {
+    if (err) {
+      console.error('Error inserting data into the users table:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const userId = results.insertId;
+    const deviceQuery = `
+      INSERT INTO user_devices (user_id, device, cpu, gpu, ram, capacity, motherboard, psu)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(userQuery, [name, email, hashedPassword, organization, profilePicture, null], (err, results) => {
+    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
       if (err) {
-        console.error('Error inserting data into the users table:', err);
+        console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const userId = results.insertId;
-      const deviceQuery = `
-        INSERT INTO user_devices (user_id, device, cpu, gpu, ram, capacity, motherboard, psu)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
-        if (err) {
-          console.error('Error inserting data into the user_devices table:', err);
-          return res.status(500).json({ error: 'Database error' });
-        }
-
-        const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
-        res.status(200).json({ message: 'User registered successfully', profileImageUrl });
-      });
+      const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
+      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
     });
-  } catch (err) {
-    console.error('Error hashing password:', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
+  });
 });
 
 // Login endpoint
@@ -150,10 +168,10 @@ app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
   const userQuery = `
-    SELECT id, name, email, password, current_device_id FROM users WHERE email = ?
+    SELECT id, name, email, current_device_id FROM users WHERE email = ? AND password = ?
   `;
 
-  connection.query(userQuery, [email], async (err, results) => {
+  connection.query(userQuery, [email, password], (err, results) => {
     if (err) {
       console.error('Error querying the database:', err);
       return res.status(500).json({ error: 'Database error' });
@@ -161,71 +179,65 @@ app.post('/login', (req, res) => {
 
     if (results.length > 0) {
       const user = results[0];
+      const token = jwt.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
-      const match = await bcrypt.compare(password, user.password); // Compare hashed passwords
-      if (match) {
-        const token = jwt.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      const deviceQuery = `
+        SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu FROM user_devices WHERE user_id = ?
+      `;
 
-        const deviceQuery = `
-          SELECT id, device, cpu, gpu, ram, capacity, motherboard, psu FROM user_devices WHERE user_id = ?
-        `;
+      connection.query(deviceQuery, [user.id], (err, deviceResults) => {
+        if (err) {
+          console.error('Error querying the user_devices table:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
 
-        connection.query(deviceQuery, [user.id], (err, deviceResults) => {
-          if (err) {
-            console.error('Error querying the user_devices table:', err);
-            return res.status(500).json({ error: 'Database error' });
-          }
+        const currentDevice = deviceResults.find(device => device.id === user.current_device_id);
 
-          const currentDevice = deviceResults.find(device => device.id === user.current_device_id);
+        if (currentDevice) {
+          // Fetch average watt usage for CPU and GPU
+          const cpuQuery = 'SELECT avg_watt_usage FROM cpus WHERE model = ?';
+          const gpuQuery = 'SELECT avg_watt_usage FROM gpus WHERE model = ?';
 
-          if (currentDevice) {
-            // Fetch average watt usage for CPU and GPU
-            const cpuQuery = 'SELECT avg_watt_usage FROM cpus WHERE model = ?';
-            const gpuQuery = 'SELECT avg_watt_usage FROM gpus WHERE model = ?';
+          connection.query(cpuQuery, [currentDevice.cpu], (err, cpuResult) => {
+            if (err) {
+              console.error('Error querying CPU database:', err);
+              return res.status(500).json({ error: 'Database error' });
+            }
 
-            connection.query(cpuQuery, [currentDevice.cpu], (err, cpuResult) => {
+            currentDevice.cpuAvgWattUsage = cpuResult[0]?.avg_watt_usage || null;
+
+            connection.query(gpuQuery, [currentDevice.gpu], (err, gpuResult) => {
               if (err) {
-                console.error('Error querying CPU database:', err);
+                console.error('Error querying GPU database:', err);
                 return res.status(500).json({ error: 'Database error' });
               }
 
-              currentDevice.cpuAvgWattUsage = cpuResult[0]?.avg_watt_usage || null;
+              currentDevice.gpuAvgWattUsage = gpuResult[0]?.avg_watt_usage || null;
 
-              connection.query(gpuQuery, [currentDevice.gpu], (err, gpuResult) => {
-                if (err) {
-                  console.error('Error querying GPU database:', err);
-                  return res.status(500).json({ error: 'Database error' });
-                }
-
-                currentDevice.gpuAvgWattUsage = gpuResult[0]?.avg_watt_usage || null;
-
-                // Send response with current device including watt usage
-                res.status(200).json({
-                  message: 'Login successful',
-                  token,
-                  userId: user.id,
-                  name: user.name,
-                  email: user.email,
-                  devices: deviceResults,
-                  currentDevice
-                });
+              // Send response with current device including watt usage
+              res.status(200).json({
+                message: 'Login successful',
+                token,
+                userId: user.id,
+                name: user.name,
+                email: user.email,
+                devices: deviceResults,
+                currentDevice
               });
             });
-          } else {
-            res.status(200).json({
-              message: 'Login successful',
-              token,
-              userId: user.id,
-              name: user.name,
-              email: user.email,
-              devices: deviceResults,
-              currentDevice: null
-            });
-          }
-        });
-      } else {
-        res.status(401).json({ error: 'Invalid credentials' });
-      }
+          });
+        } else {
+          res.status(200).json({
+            message: 'Login successful',
+            token,
+            userId: user.id,
+            name: user.name,
+            email: user.email,
+            devices: deviceResults,
+            currentDevice: null
+          });
+        }
+      });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -287,22 +299,38 @@ app.get('/user', authenticateToken, (req, res) => {
   });
 });
 
-app.post('/user_history', authenticateToken, async (req, res) => {
+app.post('/user_history', authenticateToken, (req, res) => {
   const { organization, projectName, projectDescription, sessionDuration, carbonEmit, projectStage, status } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.id; // Get the user ID from the authenticated token
 
-  try {
-    const query = `
-      INSERT INTO user_history (user_id, organization, project_name, project_description, session_duration, carbon_emit, stage, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    await connection.promise().query(query, [userId, organization, projectName, projectDescription, sessionDuration, carbonEmit, projectStage, status]);
+  // Log the data being inserted
+  console.log('Inserting session data:', {
+    userId,
+    organization,
+    projectName,
+    projectDescription,
+    sessionDuration,
+    carbonEmit,
+    projectStage, // Log the new field
+    status
+  });
+
+  const query = `
+    INSERT INTO user_history (user_id, organization, project_name, project_description, session_duration, carbon_emit, stage, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  connection.query(query, [userId, organization, projectName, projectDescription, sessionDuration, carbonEmit, projectStage, status], (err, results) => {
+    if (err) {
+      console.error('Error inserting session data into the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
     res.status(200).json({ message: 'Session recorded successfully' });
-  } catch (err) {
-    console.error('Error inserting session data into the database:', err);
-    res.status(500).json({ error: 'Database error' });
-  }
+  });
 });
+
+
 
 // Endpoint to fetch user's projects
 app.get('/user_projects', authenticateToken, (req, res) => {
@@ -450,6 +478,7 @@ app.post('/user_Update', authenticateToken, (req, res) => {
     }
   );
 });
+
 
 // Endpoint to delete a project
 app.delete('/delete_project/:id', authenticateToken, (req, res) => {
@@ -1197,6 +1226,7 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
   });
 });
 
+
 app.get('/organization_projects', authenticateToken, (req, res) => {
   const { organization } = req.query;
 
@@ -1387,13 +1417,10 @@ app.post('/resetpassword', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     const email = decoded.email;
 
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
     // Update the password in the database
     connection.query(
       'UPDATE users SET password = ? WHERE email = ?',
-      [hashedPassword, email],
+      [newPassword, email],
       (err, result) => {
         if (err) {
           console.error('Error updating password:', err);
@@ -1413,6 +1440,7 @@ app.post('/resetpassword', async (req, res) => {
     return res.status(500).json({ error: 'Invalid or expired token.' });
   }
 });
+
 
 // Send project invitation
 app.post('/send-invitation', authenticateToken, (req, res) => {
