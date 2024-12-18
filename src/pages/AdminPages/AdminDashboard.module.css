@@ -1,0 +1,83 @@
+.dashboard {
+  padding: 20px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.projectList {
+  margin-top: 20px;
+}
+
+.projectList ul {
+  list-style: none;
+  padding: 0;
+}
+
+.projectList li {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.projectList li span {
+  flex: 1;
+}
+
+.projectList li button {
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.projectList li button:hover {
+  background-color: #ff1a1a;
+}
+
+.th {
+  padding: 0;
+  height: 40px; /* Reduce the height for table header cells */
+  white-space: nowrap; /* Prevent text wrapping */
+  font-size: 0.8em; /* Further adjust font size to fit text */
+}
+
+.control {
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm); /* Reduce padding */
+  @mixin hover {
+    background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  }
+}
+
+.icon {
+  width: 21px;
+  height: 21px;
+  border-radius: 21px;
+}
+
+.selectedRow {
+  background-color: #f0f0f0;
+}
+
+.statusInProgress {
+  color: orange;
+}
+
+.statusComplete {
+  color: green;
+}
+
+.scrollableCell {
+  overflow-x: hidden;
+  max-width: 100px; /* Reduce the max-width to make the scrollable area smaller */
+}
+
+.scrollableCell:hover {
+  overflow-x: auto;
+}

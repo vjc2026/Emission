@@ -1,0 +1,18 @@
+.container {
+  display: flex;
+  height: 100vh;
+  background-color: #044202; /* Light grey background */
+}
+
+.main {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #ffffff; /* White background for main content */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  display: flex; /* Add this line */
+  flex-direction: column; /* Add this line */
+  justify-content: flex-start; /* Add this line */
+  align-items: flex-start; /* Add this line */
+  transition: margin-left 0.3s; /* Add transition for smooth resizing */
+}

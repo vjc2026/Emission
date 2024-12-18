@@ -258,6 +258,20 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Middleware to authenticate admin
+const authenticateAdmin = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err || user.role !== 'admin') return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
 // Endpoint to fetch user's name and email after login
 app.get('/user', authenticateToken, (req, res) => {
   const userId = req.user.id;
@@ -1764,5 +1778,156 @@ app.get('/user_devices', authenticateToken, (req, res) => {
       const currentDeviceId = deviceResults.length > 0 ? deviceResults[0].current_device_id : null;
       res.status(200).json({ devices: results, currentDeviceId });
     });
+  });
+});
+
+// ALL admin endpoints
+
+// View all the users projects
+app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
+  const query = `
+    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, uh.session_duration, uh.carbon_emit, uh.stage, uh.status, uh.created_at, u.email AS owner
+    FROM user_history uh
+    JOIN users u ON uh.user_id = u.id
+    ORDER BY uh.created_at DESC
+  `;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ projects: results }); // Send back all projects with owner email
+  });
+});
+
+// Endpoint to get all users Admin only
+app.get('/all_users', authenticateAdmin, (req, res) => {
+  const query = 'SELECT id, name, email, organization FROM users';
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ users: results });
+  });
+});
+
+// Endpoint to create an admin token
+app.post('/admin_login', (req, res) => {
+  const { email, password } = req.body;
+
+  const query = `
+    SELECT id, name, email FROM admin WHERE email = ? AND password = ?
+  `;
+
+  connection.query(query, [email, password], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.length > 0) {
+      const admin = results[0]; // Get the first admin record
+      const token = jwt.sign({ email: admin.email, id: admin.id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+      res.status(200).json({ message: 'Admin login successful', token, adminId: admin.id, name: admin.name, email: admin.email });
+    } else {
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  });
+});
+
+// Endpoint to delete a project by ID (admin only)
+app.delete('/admin/delete_project/:id', authenticateAdmin, (req, res) => {
+  const projectId = req.params.id;
+
+  const query = `DELETE FROM user_history WHERE id = ?`;
+
+  connection.query(query, [projectId], (err, results) => {
+    if (err) {
+      console.error('Error deleting project from the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.affectedRows > 0) {
+      res.status(200).json({ message: 'Project deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'Project not found' });
+    }
+  });
+});
+
+// Endpoint to fetch emission data for admin view
+app.get('/emission_data', authenticateAdmin, (req, res) => {
+  const viewBy = req.query.viewBy || 'organization';
+
+  let query;
+  if (viewBy === 'individual') {
+    query = `
+      SELECT u.name, u.email AS user, u.organization, SUM(uh.carbon_emit) AS total_carbon_emit
+      FROM user_history uh
+      JOIN users u ON uh.user_id = u.id
+      GROUP BY u.name, u.email, u.organization
+    `;
+  } else {
+    query = `
+      SELECT u.organization, u.name, u.email AS user, SUM(uh.carbon_emit) AS total_carbon_emit
+      FROM user_history uh
+      JOIN users u ON uh.user_id = u.id
+      GROUP BY u.organization, u.name, u.email
+    `;
+  }
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ emissionData: results });
+  });
+});
+
+// Endpoint to delete a user by ID (admin only)
+app.delete('/delete_user/:id', authenticateAdmin, (req, res) => {
+  const userId = req.params.id;
+
+  const query = `DELETE FROM users WHERE id = ?`;
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error deleting user from the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.affectedRows > 0) {
+      res.status(200).json({ message: 'User deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  });
+});
+
+// Endpoint to fetch project members for each project (admin only)
+app.get('/project_members/:projectId', authenticateAdmin, (req, res) => {
+  const projectId = req.params.projectId;
+
+  const query = `
+    SELECT u.name, u.email, pm.role, pm.joined_at
+    FROM project_members pm
+    JOIN users u ON pm.user_id = u.id
+    WHERE pm.project_id = ?
+  `;
+
+  connection.query(query, [projectId], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ members: results });
   });
 });

@@ -1,0 +1,101 @@
+.navbar {
+  height: 100vh;
+  width: 250px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background-color: #044202; /* DLSU-D green */
+  color: #ffffff;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: width 0.3s; /* Add transition for smooth resizing */
+}
+
+.minimized {
+  width: 100px; /* Width when minimized */
+}
+
+.navbarMain {
+  flex: 1;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.footer {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 14px;
+  color: #ffffff;
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  cursor: pointer; /* Add this line */
+}
+
+.minimizedLink {
+  justify-content: right; /* Center icon when minimized */
+}
+
+.link:hover {
+  background-color: #036b52;
+  color: #ffffff;
+}
+
+.linkIcon {
+  margin-right: 10px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer; /* Add this line */
+}
+
+.link[data-active] {
+  background-color: #036b52;
+  color: #ffffff;
+}
+
+.link[data-active] .linkIcon {
+  color: #ffffff;
+}
+
+.navList {
+  list-style: none;
+  padding: 0;
+}
+
+.navItem {
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
+.navItem a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.navItem a:hover {
+  text-decoration: underline;
+}
+
+.toggleButton {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 20px;
+  align-self: flex-end; /* Align to the right when not minimized */
+}
+
+.minimized .toggleButton {
+  align-self: center; /* Center when minimized */
+}

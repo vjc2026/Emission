@@ -1,23 +1,26 @@
 import {
   TextInput,
   PasswordInput,
-  Checkbox,
   Button,
   Title,
   Text,
   Anchor,
   Group,
   Container,
+  Modal,
 } from '@mantine/core';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import classes from './Login.module.css';
 
-
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminModalOpened, setAdminModalOpened] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -34,7 +37,7 @@ const LoginPage: React.FC = () => {
       });
 
       const result = await response.json();
-   
+
       if (response.ok) {
         localStorage.setItem('token', result.token);
         router.push('/main');
@@ -47,6 +50,34 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleAdminLogin = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/admin_login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: adminUsername,
+          password: adminPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        setAdminError(result.error || 'Admin login failed');
+        return;
+      }
+
+      const result = await response.json();
+      localStorage.setItem('token', result.token);
+      router.push('/AdminPages/AdminDashboard');
+    } catch (error) {
+      console.error('Error:', error);
+      setAdminError('An error occurred. Please try again later.');
+    }
+  };
+
   const handleRegister = () => {
     router.push('/Register');
   };
@@ -55,9 +86,9 @@ const LoginPage: React.FC = () => {
     router.push('/ForgotPasswordPage');
   };
 
-  const handleTest = () => {
-    router.push('/Components/TEST');
-};
+  const handleAdminPage = () => {
+    setAdminModalOpened(true);
+  };
 
   const refreshToken = async () => {
     try {
@@ -118,12 +149,14 @@ const LoginPage: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
           <Group justify="space-between" mt="lg">
-            <Checkbox label="Remember me" style={{ color: 'white' }} />
+            <Anchor component="button" onClick={handleAdminPage} style={{ color: 'green' }} size="sm">
+              Admin Page
+            </Anchor>
             <Anchor component="button" onClick={handleForgotPassword} style={{ color: 'green' }} size="sm">
               Forgot password?
             </Anchor>
           </Group>
-          {error && <Text color="red" size="sm" ta="center" mt="md">{error}</Text>}
+          {error && <Text c="red" size="sm" ta="center" mt="md">{error}</Text>}
           <Button fullWidth mt="xl" color="green" onClick={handleLogin}>
             Sign in
           </Button>
@@ -131,6 +164,32 @@ const LoginPage: React.FC = () => {
       </div>
 
       <div className={classes.right}></div>
+
+      <Modal
+        opened={adminModalOpened}
+        onClose={() => setAdminModalOpened(false)}
+        title="Admin Login"
+      >
+        <TextInput
+          label="Admin Email"
+          placeholder="Enter your admin email"
+          required
+          value={adminUsername}
+          onChange={(e) => setAdminUsername(e.target.value)}
+        />
+        <PasswordInput
+          label="Admin Password"
+          placeholder="Enter your admin password"
+          required
+          mt="md"
+          value={adminPassword}
+          onChange={(e) => setAdminPassword(e.target.value)}
+        />
+        {adminError && <Text c="red" size="sm" ta="center" mt="md">{adminError}</Text>}
+        <Button fullWidth mt="xl" color="green" onClick={handleAdminLogin}>
+          Admin Sign in
+        </Button>
+      </Modal>
     </div>
   );
 };
