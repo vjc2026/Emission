@@ -361,26 +361,6 @@ useEffect(() => {
     }
   };
 
-  const handleDeleteProject = async (projectId: number) => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch(`http://localhost:5000/delete_project/${projectId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        fetchUserProjects(user?.email!); 
-      } else {
-        const result = await response.json();
-        setError(result.error || 'Failed to delete project.');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setError('An error occurred while deleting the project.');
-    }
-  };
-
   const handleEditProject = (projectId: number) => {
     const projectToEdit = projects.find((p) => p.id === projectId);
     if (projectToEdit) {
@@ -669,14 +649,6 @@ useEffect(() => {
               </Button>
                 <Button size="xs" onClick={() => handleEditProject(project.id)} style={{ backgroundColor: '#006400', color: '#fff' }}>
                 Edit
-                </Button>
-                <Button size="xs" color="red" onClick={() => {
-                setProjectName('');
-                setProjectDescription('');
-                setProjectStage('');
-                handleDeleteProject(project.id);
-                }}>
-                Delete
                 </Button>
                 <Button 
                 size="xs" 

@@ -800,11 +800,11 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
           const gpuWattage = gpuData.avg_watt_usage;
           const ramWattage = ramData.avg_watt_usage;
 
-          // Calculate total wattage
+          /// Calculate total wattage
           const totalWattage = cpuWattage + gpuWattage + ramWattage;
 
           // Calculate carbon emissions
-          const carbonEmissions = (totalWattage * sessionDuration) / 1000; // Adjust calculation as needed
+          const carbonEmissions = ((totalWattage * sessionDuration) / 3600) * 0.475; // Assuming 0.475 kg CO2 per kWh
 
           // Update the project with the new carbon emissions and session duration
           const updateQuery = `
@@ -1841,22 +1841,67 @@ app.post('/admin_login', (req, res) => {
 });
 
 // Endpoint to delete a project by ID (admin only)
+// Endpoint to delete a project by ID (admin only)
 app.delete('/admin/delete_project/:id', authenticateAdmin, (req, res) => {
   const projectId = req.params.id;
 
-  const query = `DELETE FROM user_history WHERE id = ?`;
+  // Begin transaction to ensure atomic operations
+  connection.beginTransaction(err => {
+    if (err) return res.status(500).json({ error: 'Transaction error' });
 
-  connection.query(query, [projectId], (err, results) => {
-    if (err) {
-      console.error('Error deleting project from the database:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
+    // 1. Delete related notifications
+    connection.query(
+      `DELETE FROM notifications WHERE project_id = ?`,
+      [projectId],
+      (err, notifResults) => {
+        if (err) {
+          return connection.rollback(() => {
+            res.status(500).json({ error: 'Error deleting notifications' });
+          });
+        }
 
-    if (results.affectedRows > 0) {
-      res.status(200).json({ message: 'Project deleted successfully' });
-    } else {
-      res.status(404).json({ error: 'Project not found' });
-    }
+        // 2. Delete related project members
+        connection.query(
+          `DELETE FROM project_members WHERE project_id = ?`,
+          [projectId],
+          (err, memberResults) => {
+            if (err) {
+              return connection.rollback(() => {
+                res.status(500).json({ error: 'Error deleting project members' });
+              });
+            }
+
+            // 3. Finally delete the project
+            connection.query(
+              `DELETE FROM user_history WHERE id = ?`,
+              [projectId],
+              (err, projectResults) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    res.status(500).json({ error: 'Error deleting project' });
+                  });
+                }
+
+                // Commit the transaction
+                connection.commit(err => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      res.status(500).json({ error: 'Commit error' });
+                    });
+                  }
+
+                  if (projectResults.affectedRows > 0) {
+                    res.status(200).json({ message: 'Project deleted successfully' });
+                  } else {
+                    res.status(404).json({ error: 'Project not found' });
+                  }
+                });
+              }
+            );
+          }
+        );
+      }
+    );
   });
 });
 
@@ -1895,19 +1940,43 @@ app.get('/emission_data', authenticateAdmin, (req, res) => {
 app.delete('/delete_user/:id', authenticateAdmin, (req, res) => {
   const userId = req.params.id;
 
-  const query = `DELETE FROM users WHERE id = ?`;
+  // Begin transaction
+  connection.beginTransaction(err => {
+    if (err) return res.status(500).json({ error: 'Transaction error' });
 
-  connection.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error('Error deleting user from the database:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
+    // 1. Delete notifications where the user is the recipient
+    connection.query(
+      `DELETE FROM notifications WHERE recipient_id = ?`,
+      [userId],
+      (err, notifResults) => {
+        if (err) {
+          return connection.rollback(() => {
+            res.status(500).json({ error: 'Error deleting notifications' });
+          });
+        }
 
-    if (results.affectedRows > 0) {
-      res.status(200).json({ message: 'User deleted successfully' });
-    } else {
-      res.status(404).json({ error: 'User not found' });
-    }
+        // 2. Delete user
+        connection.query(
+          `DELETE FROM users WHERE id = ?`,
+          [userId],
+          (err, userResults) => {
+            if (err) {
+              return connection.rollback(() => {
+                res.status(500).json({ error: 'Error deleting user from the database' });
+              });
+            }
+            connection.commit(err => {
+              if (err) {
+                return connection.rollback(() => {
+                  res.status(500).json({ error: 'Commit error' });
+                });
+              }
+              res.status(200).json({ message: 'User deleted successfully' });
+            });
+          }
+        );
+      }
+    );
   });
 });
 
@@ -1929,5 +1998,102 @@ app.get('/project_members/:projectId', authenticateAdmin, (req, res) => {
     }
 
     res.status(200).json({ members: results });
+  });
+});
+
+// Combined endpoint to fetch device details and calculate carbon emissions for comparison
+app.get('/compare_devices', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const query = 
+    `SELECT id, device, cpu, gpu, ram, psu
+    FROM user_devices
+    WHERE user_id = ?`
+  ;
+  connection.query(query, [userId], async (err, results) => {
+    if (err) {
+      console.error('Error fetching devices:', err);
+      return res.status(500).json({ error: 'Error fetching devices' });
+    }
+    
+    // ===== NEW ENDPOINT CODE (unchanged) =====
+    // Endpoint to fetch device details and calculate carbon emissions for comparison
+    // new
+    const newEmissions = results.map(row => ({
+      deviceId: row.id,
+      deviceType: row.device,
+      carbonEmissions: 0, // Replace with actual calculation if needed
+      specifications: [
+        `CPU: ${row.cpu}`,
+        `GPU: ${row.gpu}`,
+        `RAM: ${row.ram}`,
+        `PSU: ${row.psu}`
+      ]
+    }));
+    // ===== END NEW ENDPOINT CODE =====
+    
+    // ===== OLD ENDPOINT CODE (unchanged) =====
+    // Endpoint to fetch device details and calculate carbon emissions for comparison
+    // old
+    const devices = results;
+    const oldEmissions = [];
+    
+    for (const device of devices) {
+      const { id, device: deviceType, cpu, gpu, ram, psu } = device;
+      let cpuWattage, gpuWattage, ramWattage;
+    
+      try {
+        if (deviceType === 'Laptop') {
+          const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
+          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+    
+          if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+            cpuWattage = (await cpuResponse.json()).avg_watt_usage;
+            gpuWattage = (await gpuResponse.json()).avg_watt_usage;
+            ramWattage = (await ramResponse.json()).avg_watt_usage;
+          } else {
+            throw new Error('Error fetching wattage data for laptop');
+          }
+        } else {
+          const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
+          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+    
+          if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+            cpuWattage = (await cpuResponse.json()).avg_watt_usage;
+            gpuWattage = (await gpuResponse.json()).avg_watt_usage;
+            ramWattage = (await ramResponse.json()).avg_watt_usage;
+          } else {
+            throw new Error('Error fetching wattage data for PC');
+          }
+        }
+    
+        const psuWattage = Number(psu);
+        const totalWattage = Number(cpuWattage) + Number(gpuWattage) + Number(ramWattage) + psuWattage;
+        const sessionDurationSeconds = 5;
+        const totalEnergyUsed = (totalWattage / 3600) * sessionDurationSeconds;
+        const carbonEmissions = totalEnergyUsed * 0.475;
+    
+        oldEmissions.push({ deviceId: id, deviceType, carbonEmissions });
+      } catch (error) {
+        console.error('Error calculating carbon emissions:', error);
+        return res.status(500).json({ error: 'Error calculating carbon emissions' });
+      }
+    }
+    // ===== END OLD ENDPOINT CODE =====
+    
+    // ===== COMBINE THE RESULTS =====
+    // For each device, merge the specification info (from newEmissions) with the calculated carbon emissions (from oldEmissions)
+    const combinedEmissions = newEmissions.map(newEmission => {
+      const correspondingOld = oldEmissions.find(oldEmission => oldEmission.deviceId === newEmission.deviceId);
+      return { 
+        deviceId: newEmission.deviceId, 
+        deviceType: newEmission.deviceType,
+        carbonEmissions: correspondingOld ? correspondingOld.carbonEmissions : newEmission.carbonEmissions,
+        specifications: newEmission.specifications
+      };
+    });
+    
+    res.status(200).json({ emissions: combinedEmissions });
   });
 });

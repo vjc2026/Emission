@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Router from 'next/router';
 import { AppShell, Burger, Flex, Button, UnstyledButton, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, Anchor } from '@mantine/core';
-import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout, Icon3dCubeSphereOff, Icon3dCubeSphere } from '@tabler/icons-react';
+import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout, Icon3dCubeSphereOff, Icon3dCubeSphere, IconEngine, IconAccessPoint } from '@tabler/icons-react';
 import ButtonComponent from './Components/Button';
 import TextComponent from './Components/Text';
 import History from './Components/history';
 import Dashboard from './Components/Dashboard';
+import Compare from './Components/Compare';
 import TEST from './Components/TEST';
 import UserSpecs from './Components/UserSpecs';
 import '@mantine/core/styles.css';
@@ -209,9 +210,6 @@ const MainContent: React.FC = () => {
                   </ActionIcon>
                 </Indicator>
               </Menu.Target>
-              <Anchor component="button" onClick={handleTest} style={{ color: 'white' }} size="sm">
-              TestPage
-            </Anchor>
               <Menu.Dropdown>
                 {notifications.length > 0 ? (
                   notifications.map((notification, index) => (
@@ -260,7 +258,6 @@ const MainContent: React.FC = () => {
       >
         <Box style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%' }}>
           <Button
-            leftSection={<IconDashboard size={20} />}
             variant={currentComponent === 'component1' ? 'filled' : 'light'}
             onClick={() => setCurrentComponent('component1')}
             fullWidth
@@ -308,7 +305,7 @@ const MainContent: React.FC = () => {
               },
             }}
           >
-            Dashboard
+            Team Projects
           </Button>
           <Button
             leftSection={<IconHistory size={20} />}
@@ -344,6 +341,23 @@ const MainContent: React.FC = () => {
           >
            Code Optimizer
           </Button>
+          <Button
+            leftSection={<IconAccessPoint size={20} />}
+            variant={currentComponent === 'component7' ? 'filled' : 'light'}
+            onClick={() => setCurrentComponent('component7')}
+            fullWidth
+            styles={{
+              root: {
+                backgroundColor: currentComponent === 'component7' ? dlsuGreen : undefined,
+                '&:hover': {
+                  backgroundColor: dlsuLightGreen,
+                },
+                color: currentComponent === 'component7' ? 'white' : dlsuGreen,
+              },
+            }}
+          >
+           Compare Devices
+          </Button>
         </Box>
       </AppShell.Navbar>
 
@@ -355,6 +369,7 @@ const MainContent: React.FC = () => {
           {currentComponent === 'component4' && <Dashboard />}
           {currentComponent === 'component5' && <History />}
           {currentComponent === 'component6' && <CodeCalculator />}
+          {currentComponent === 'component7' && <Compare />}
         </Paper>
       </AppShell.Main>
       <Modal
@@ -378,18 +393,18 @@ const MainContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  
- 
-  return (
-    <Routes>
-      <Route path="/main" element={<ProtectedRoute element={<MainContent />} />} />
-      <Route path="/history" element={<ProtectedRoute element={<History />} />} />
-      <Route path="/test" element={<ProtectedRoute element={<TEST />} />} />
-      <Route path="/user-specs" element={<ProtectedRoute element={<UserSpecs />} />} />
-      <Route path="/code-calculator" element={<ProtectedRoute element={<CodeCalculator />} />} />
-      <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard/>} />} />
-    </Routes>
-  );
+  const [token, setToken] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    setToken(storedToken);
+    if (!storedToken) {
+      router.push('/');
+    }
+  }, []);
+
+  return token ? <MainContent /> : null;
 };
 
 export default App;
