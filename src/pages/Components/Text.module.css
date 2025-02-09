@@ -75,21 +75,18 @@
 
 .taskAssignees {
   display: flex;
-  gap: 5px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 90vh;
+  color: var(--mantine-color-white);
+  text-align: center;
+  padding: calc(var(--mantine-spacing-xl) * 1.5);
 }
 
-.assignee {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
-.assignee img {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  object-fit: cover;
+.heroTitle {
+  font-size: 64px;
+  font-weight: 700;
 }
 
 .completed {
