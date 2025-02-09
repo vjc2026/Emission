@@ -53,8 +53,15 @@ const MainContent: React.FC = () => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<{ id: string; message: string; sender_name: string } | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [newNotificationCount, setNewNotificationCount] = useState(0);
   const router = useRouter();
   const [active, setActive] = useState(router.pathname);
+
+  // Add filtering for unread notifications
+  const unreadNotifications = notifications.filter(
+    (notification) =>
+      notification.status !== 'read' && notification.status !== 'Marked as read'
+  );
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -93,14 +100,28 @@ const MainContent: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setNotifications(data.notifications);
+          // Update notification badge count
+          setNewNotificationCount(prev => data.notifications.length > prev ? 
+            data.notifications.length - prev : 
+            0
+          );
         }
       } catch (error) {
         console.error('Error fetching notifications:', error);
       }
     };
 
+    // Initial fetch
     fetchUserData();
     fetchNotifications();
+
+    // Set up polling for notifications
+    const notificationPollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 5000); // Check every 5 seconds
+
+    // Cleanup interval on unmount
+    return () => clearInterval(notificationPollInterval);
   }, []);
 
   const handleLogout = () => {
@@ -155,6 +176,31 @@ const MainContent: React.FC = () => {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ response: 'rejected' }),
+        });
+
+        if (response.ok) {
+          // ...existing success handling...
+        } else {
+          // ...existing error handling...
+        }
+      } catch (error) {
+        console.error('Error responding to invitation:', error);
+      }
+    }
+    setModalOpened(false);
+  };
+
+  const handleRead = async () => {
+    if (selectedNotification) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/invitations/${selectedNotification.id}/respond`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ response: 'Marked as read' }),
         });
 
         if (response.ok) {
@@ -240,15 +286,26 @@ const MainContent: React.FC = () => {
         <Group align="md">
           <Menu shadow="md" width={300}>
             <Menu.Target>
-              <Indicator label={notifications.length} size={16} color="red">
+              <Indicator label={unreadNotifications.length} size={16} color="red">
+                {unreadNotifications.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 3,
+                    right: 3,
+                    width: 8,
+                    height: 8,
+                    backgroundColor: 'orange',
+                    borderRadius: '50%'
+                  }} />
+                )}
                 <ActionIcon variant="transparent">
                   <IconBell size={24} color="white" />
                 </ActionIcon>
               </Indicator>
             </Menu.Target>
             <Menu.Dropdown>
-              {notifications.length > 0 ? (
-                notifications.map((notification, index) => (
+              {unreadNotifications.length > 0 ? (
+                unreadNotifications.map((notification, index) => (
                   <Menu.Item key={index} onClick={() => handleOpenModal(notification)}>
                     <Text fw={500}>{notification.message}</Text>
                     <Text size="xs" color="dimmed">From: {notification.sender_name}</Text>
@@ -323,6 +380,7 @@ const MainContent: React.FC = () => {
             <Group align="apart" mt="md">
               <Button color="green" onClick={handleAccept}>Accept</Button>
               <Button color="red" onClick={handleIgnore}>Ignore</Button>
+              <Button color="yellow" onClick={handleRead}>Marked as Read</Button>
             </Group>
           </>
         )}
