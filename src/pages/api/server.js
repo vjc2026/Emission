@@ -1940,43 +1940,31 @@ app.get('/emission_data', authenticateAdmin, (req, res) => {
 app.delete('/delete_user/:id', authenticateAdmin, (req, res) => {
   const userId = req.params.id;
 
-  // Begin transaction
   connection.beginTransaction(err => {
-    if (err) return res.status(500).json({ error: 'Transaction error' });
-
-    // 1. Delete notifications where the user is the recipient
-    connection.query(
-      `DELETE FROM notifications WHERE recipient_id = ?`,
-      [userId],
-      (err, notifResults) => {
-        if (err) {
-          return connection.rollback(() => {
-            res.status(500).json({ error: 'Error deleting notifications' });
-          });
-        }
-
-        // 2. Delete user
-        connection.query(
-          `DELETE FROM users WHERE id = ?`,
-          [userId],
-          (err, userResults) => {
-            if (err) {
-              return connection.rollback(() => {
-                res.status(500).json({ error: 'Error deleting user from the database' });
-              });
-            }
-            connection.commit(err => {
-              if (err) {
-                return connection.rollback(() => {
-                  res.status(500).json({ error: 'Commit error' });
-                });
-              }
-              res.status(200).json({ message: 'User deleted successfully' });
-            });
-          }
-        );
+    if (err) {
+      return res.status(500).json({ error: 'Transaction initiation failed' });
+    }
+    connection.query("DELETE FROM user_devices WHERE user_id = ?", [userId], (err, result) => {
+      if (err) {
+        return connection.rollback(() => res.status(500).json({ error: 'Failed to delete user devices' }));
       }
-    );
+      connection.query("DELETE FROM user_history WHERE user_id = ?", [userId], (err, result) => {
+        if (err) {
+          return connection.rollback(() => res.status(500).json({ error: 'Failed to delete user history' }));
+        }
+        connection.query("DELETE FROM users WHERE id = ?", [userId], (err, result) => {
+          if (err) {
+            return connection.rollback(() => res.status(500).json({ error: 'Failed to delete user' }));
+          }
+          connection.commit(err => {
+            if (err) {
+              return connection.rollback(() => res.status(500).json({ error: 'Transaction commit failed' }));
+            }
+            res.status(200).json({ message: 'User and related projects deleted successfully' });
+          });
+        });
+      });
+    });
   });
 });
 
