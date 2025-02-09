@@ -42,7 +42,7 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
   return (
     <Table.Th className={classes.th}>
       <UnstyledButton onClick={onSort} className={classes.control}>
-        <Group direction="column" align="center" spacing={0}> {/* Change direction to column and add spacing */}
+        <Group position="column" align="center" spacing={0}> {/* Change direction to column and add spacing */}
           <Text fw={500} fz="sm">
             {children}
           </Text>

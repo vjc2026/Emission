@@ -34,7 +34,13 @@ import styles from './Components/Main.module.css';
 const dlsuGreen = '#006F3C';
 const dlsuLightGreen = '#008C4C';
 
-const data = [
+const primaryData = [
+  { link: '/main', label: 'All Projects', icon: IconDashboard },
+  { link: '/main', label: 'My Projects', icon: IconUser },
+  { link: '/main', label: 'Joined Projects', icon: IconAccessPoint },
+];
+
+const secondaryData = [
   { link: '/main', label: 'Dashboard', icon: IconBell },
   { link: '/main', label: 'Statistics', icon: IconChartBar },
   { link: '/main', label: 'Team Projects', icon: IconDashboard },
@@ -53,6 +59,7 @@ const MainContent: React.FC = () => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<{ id: string; message: string; sender_name: string } | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isSecondaryMinimized, setIsSecondaryMinimized] = useState(false);
   const router = useRouter();
   const [active, setActive] = useState(router.pathname);
 
@@ -178,7 +185,12 @@ const MainContent: React.FC = () => {
     setIsMinimized(!isMinimized);
   };
 
-  const links = data.map((item) => (
+  const toggleSecondaryNavbar = () => {
+    setIsSecondaryMinimized(!isSecondaryMinimized);
+  };
+
+  //First NavBar
+  const primaryLinks = primaryData.map((item) => (
     <Link href={item.link} key={item.label}>
       <div
         className={`${styles.link} ${isMinimized ? styles.minimizedLink : ''}`}
@@ -186,23 +198,14 @@ const MainContent: React.FC = () => {
         onClick={() => {
           setActive(item.link);
           switch (item.label) {
-            case 'Dashboard':
+            case 'All Projects':
               setCurrentComponent('component1');
               break;
-            case 'Statistics':
+            case 'My Projects':
+              setCurrentComponent('component2');
+              break;
+            case 'Joined Projects':
               setCurrentComponent('component3');
-              break;
-            case 'Team Projects':
-              setCurrentComponent('component4');
-              break;
-            case 'Projects Session Tracker':
-              setCurrentComponent('component5');
-              break;
-            case 'Code Optimizer':
-              setCurrentComponent('component6');
-              break;
-            case 'Compare Devices':
-              setCurrentComponent('component7');
               break;
             default:
               setCurrentComponent('component1');
@@ -212,6 +215,44 @@ const MainContent: React.FC = () => {
       >
         <item.icon className={styles.linkIcon} stroke={1.5} />
         {!isMinimized && <span>{item.label}</span>}
+      </div>
+    </Link>
+  ));
+
+  const secondaryLinks = secondaryData.map((item) => (
+    <Link href={item.link} key={item.label}>
+      <div
+        className={`${styles.link} ${isSecondaryMinimized ? styles.minimizedLink : ''}`}
+        data-active={router.pathname === item.link || undefined}
+        onClick={() => {
+          setActive(item.link);
+          switch (item.label) {
+            case 'Dashboard':
+              setCurrentComponent('component4');
+              break;
+            case 'Statistics':
+              setCurrentComponent('component5');
+              break;
+            case 'Team Projects':
+              setCurrentComponent('component6');
+              break;
+            case 'Projects Session Tracker':
+              setCurrentComponent('component7');
+              break;
+            case 'Code Optimizer':
+              setCurrentComponent('component8');
+              break;
+            case 'Compare Devices':
+              setCurrentComponent('component9');
+              break;
+            default:
+              setCurrentComponent('component4');
+              break;
+          }
+        }}
+      >
+        <item.icon className={styles.linkIcon} stroke={1.5} />
+        {!isSecondaryMinimized && <span>{item.label}</span>}
       </div>
     </Link>
   ));
@@ -288,13 +329,22 @@ const MainContent: React.FC = () => {
             {isMinimized ? <IconChevronRight /> : <IconChevronLeft />}
           </button>
           <div className={styles.navbarMain}>
-            {links}
+            {primaryLinks}
           </div>
           <div className={styles.footer}>
             <div className={styles.link} onClick={handleLogout}>
               <IconLogout className={styles.linkIcon} stroke={1.5} />
               {!isMinimized && <span>Logout</span>}
             </div>
+          </div>
+        </nav>
+
+        <nav className={`${styles.navbar} ${isSecondaryMinimized ? styles.minimized : ''}`}>
+          <button className={styles.toggleButton} onClick={toggleSecondaryNavbar}>
+            {isSecondaryMinimized ? <IconChevronRight /> : <IconChevronLeft />}
+          </button>
+          <div className={styles.navbarMain}>
+            {secondaryLinks}
           </div>
         </nav>
 
@@ -307,6 +357,8 @@ const MainContent: React.FC = () => {
             {currentComponent === 'component5' && <History />}
             {currentComponent === 'component6' && <CodeCalculator />}
             {currentComponent === 'component7' && <Compare />}
+            {currentComponent === 'component8' && <TextComponent />}
+            {currentComponent === 'component9' && <Dashboard />}
           </Paper>
         </main>
       </div>
