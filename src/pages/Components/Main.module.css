@@ -1,0 +1,145 @@
+/* Navbar styles */
+.navbar {
+  height: calc(100vh - 70px); /* adjusted height to account for header */
+  width: 280px; /* Increased width */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background-color: #044202; /* DLSU-D green */
+  color: #ffffff;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: width 0.3s ease-in-out; /* Smoother transition */
+}
+
+.minimized {
+  width: 100px; /* Width when minimized */
+}
+
+.navbarMain {
+  flex: 1;
+}
+
+.footer {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid #ffffff; /* Darker border */
+}
+
+/* Link styles */
+.link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 15px; /* Slightly larger font */
+  color: #ffffff;
+  padding: 12px 15px; /* Increased padding */
+  border-radius: 8px; /* More rounded corners */
+  font-weight: 500;
+  margin-bottom: 8px; /* Reduced margin */
+  transition: background-color 0.3s ease; /* Smooth background transition */
+}
+
+.minimizedLink {
+  justify-content: right; /* Center icon when minimized */
+}
+
+.link:hover {
+  background-color: #036b52;
+  color: #ffffff;
+}
+
+.linkActive {
+  background-color: #333; /* Active link background */
+  color: #ffffff;
+}
+
+.linkIcon {
+  margin-right: 12px; /* Increased icon margin */
+  width: 22px; /* Slightly larger icon */
+  height: 22px;
+  color: #ffffff; /* Light gray icon color */
+  transition: color 0.3s ease; /* Smooth icon color transition */
+}
+
+.linkActive .linkIcon {
+  color: #ffffff; /* Active icon color */
+}
+
+/* Toggle button styles */
+.toggleButton {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 24px; /* Larger font size */
+  align-self: flex-end; /* Align to the right when not minimized */
+  transition: transform 0.3s ease; /* Smooth rotation */
+}
+
+.toggleButton:hover {
+  transform: rotate(90deg); /* Rotate on hover */
+}
+
+.toggleButtonMinimized {
+  align-self: center; /* Center when minimized */
+}
+
+/* Main content styles */
+.mainContent {
+  flex: 1;
+  padding: 30px; /* Increased padding */
+  overflow-y: auto;
+  background-color: #25262b; /* Darker background */
+  color: #ffffff;
+  border-radius: 12px; /* Rounded corners */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+}
+
+/* Header styles */
+.header {
+  background: #1a1a1b; /* Dark background */
+  padding: 15px 20px; /* Increased padding */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 70px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Add shadow */
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.headerTitle {
+  color: #ffffff;
+  font-size: 24px; /* Larger font size */
+  font-weight: 700;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Notification styles */
+.notificationBadge {
+  background-color: #e44d26; /* Red notification color */
+  color: #ffffff;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 10px;
+}
+
+/* Avatar styles */
+.avatar {
+  border: 2px solid #ffffff;
+  transition: transform 0.3s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.1);
+}

@@ -1,0 +1,76 @@
+/* Copy of AdminNavbar.module.css */
+.navbar {
+  height: 100vh;
+  width: 250px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background-color: #044202; /* DLSU-D green */
+  color: #ffffff;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  transition: width 0.3s;
+}
+
+.minimized {
+  width: 100px;
+}
+
+.navbarMain {
+  flex: 1;
+}
+
+.footer {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 14px;
+  color: #ffffff;
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.minimizedLink {
+  justify-content: right;
+}
+
+.link:hover {
+  background-color: #036b52;
+}
+
+.linkIcon {
+  margin-right: 10px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.link[data-active] {
+  background-color: #036b52;
+}
+
+.link[data-active] .linkIcon {
+  color: #ffffff;
+}
+
+.toggleButton {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 20px;
+  align-self: flex-end;
+}
+
+.minimized .toggleButton {
+  align-self: center;
+}

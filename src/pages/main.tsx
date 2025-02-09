@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
-import Router from 'next/router';
-import { AppShell, Burger, Flex, Button, UnstyledButton, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, Anchor } from '@mantine/core';
-import { IconBell, IconDashboard, IconUser, IconChartBar, IconHistory, IconLogout, Icon3dCubeSphereOff, Icon3dCubeSphere, IconEngine, IconAccessPoint } from '@tabler/icons-react';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
+import {
+  IconBell,
+  IconDashboard,
+  IconUser,
+  IconChartBar,
+  IconHistory,
+  IconLogout,
+  Icon3dCubeSphereOff,
+  Icon3dCubeSphere,
+  IconEngine,
+  IconAccessPoint,
+  IconChevronLeft,
+  IconChevronRight,
+} from '@tabler/icons-react';
+import {
+  Flex, Button, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, UnstyledButton
+} from '@mantine/core';
 import ButtonComponent from './Components/Button';
 import TextComponent from './Components/Text';
 import History from './Components/history';
@@ -12,37 +27,24 @@ import TEST from './Components/TEST';
 import UserSpecs from './Components/UserSpecs';
 import '@mantine/core/styles.css';
 import StatisticsComponent from './Components/Statistics';
-import { useRouter } from 'next/router';
 import CodeCalculator from './Components/CodeCalculator';
+import styles from './Components/Main.module.css';
 
 // DLSU Colors
 const dlsuGreen = '#006F3C';
 const dlsuLightGreen = '#008C4C';
 
-// ProtectedRoute component to restrict access based on token
-const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
-  const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem('token');
-  const router = useRouter();
-
-  useEffect(() => {
-    // Simulate async token check
-    setTimeout(() => {
-      if (!token) {
-        router.push('/');  // Redirect to login if no token
-      }
-      setLoading(false);
-    }, ); // Simulate delay or async operation
-  }, [token, history]);
-
-  if (loading) {
-    return <Loader />;
-  }
-
-  return token ? element : null;
-};
+const data = [
+  { link: '/main', label: 'Dashboard', icon: IconBell },
+  { link: '/main', label: 'Statistics', icon: IconChartBar },
+  { link: '/main', label: 'Team Projects', icon: IconDashboard },
+  { link: '/main', label: 'Projects Session Tracker', icon: IconHistory },
+  { link: '/main', label: 'Code Optimizer', icon: Icon3dCubeSphere },
+  { link: '/main', label: 'Compare Devices', icon: IconAccessPoint },
+];
 
 const MainContent: React.FC = () => {
+  // ...existing state declarations...
   const [opened, setOpened] = useState(false);
   const [currentComponent, setCurrentComponent] = useState<string>('component1');
   const [userData, setUserData] = useState<{ name: string; organization: string; profile_image: string | null }>({ name: '', organization: '', profile_image: null });
@@ -50,6 +52,9 @@ const MainContent: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<{ id: string; message: string; sender_name: string } | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const router = useRouter();
+  const [active, setActive] = useState(router.pathname);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -98,7 +103,6 @@ const MainContent: React.FC = () => {
     fetchNotifications();
   }, []);
 
-  const router = useRouter();
   const handleLogout = () => {
     localStorage.removeItem('token');
     router.push('/');
@@ -129,9 +133,9 @@ const MainContent: React.FC = () => {
         });
 
         if (response.ok) {
-          // Handle successful response
+          // ...existing success handling...
         } else {
-          // Handle error response
+          // ...existing error handling...
         }
       } catch (error) {
         console.error('Error responding to invitation:', error);
@@ -154,9 +158,9 @@ const MainContent: React.FC = () => {
         });
 
         if (response.ok) {
-          // Handle successful response
+          // ...existing success handling...
         } else {
-          // Handle error response
+          // ...existing error handling...
         }
       } catch (error) {
         console.error('Error responding to invitation:', error);
@@ -170,208 +174,143 @@ const MainContent: React.FC = () => {
     router.push('/Components/TEST');
   };
 
+  const toggleNavbar = () => {
+    setIsMinimized(!isMinimized);
+  };
+
+  const links = data.map((item) => (
+    <Link href={item.link} key={item.label}>
+      <div
+        className={`${styles.link} ${isMinimized ? styles.minimizedLink : ''}`}
+        data-active={router.pathname === item.link || undefined}
+        onClick={() => {
+          setActive(item.link);
+          switch (item.label) {
+            case 'Dashboard':
+              setCurrentComponent('component1');
+              break;
+            case 'Statistics':
+              setCurrentComponent('component3');
+              break;
+            case 'Team Projects':
+              setCurrentComponent('component4');
+              break;
+            case 'Projects Session Tracker':
+              setCurrentComponent('component5');
+              break;
+            case 'Code Optimizer':
+              setCurrentComponent('component6');
+              break;
+            case 'Compare Devices':
+              setCurrentComponent('component7');
+              break;
+            default:
+              setCurrentComponent('component1');
+              break;
+          }
+        }}
+      >
+        <item.icon className={styles.linkIcon} stroke={1.5} />
+        {!isMinimized && <span>{item.label}</span>}
+      </div>
+    </Link>
+  ));
+
   return (
-    <AppShell
-      header={{ height: 70 }}
-      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-      padding="md"
-    >
-      <AppShell.Header
-        style={{
-          background: dlsuGreen,
-          borderBottom: 'none',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        }}
-      >
-        <Flex justify="space-between" align="center" style={{ padding: '10px 20px', height: '100%' }}>
-          <Burger
-            opened={opened}
-            onClick={() => setOpened(!opened)}
-            hiddenFrom="sm"
-            size="sm"
-            color="white"
+    <>
+      {/* New Header */}
+      <header style={{
+        background: dlsuGreen,
+        padding: '10px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        height: '70px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <img
+            src="https://i.ibb.co/5KcMwkj/with-bg-Icon.jpg"
+            alt="Website Icon"
+            style={{ width: '50px', height: '50px', borderRadius: '50%' }}
           />
-          <Flex align="center" gap="md">
-            <img
-              src="https://i.ibb.co/5KcMwkj/with-bg-Icon.jpg"
-              alt="Website Icon"
-              style={{ width: '50px', height: '50px', borderRadius: '50%' }}
-            />
-            <Text size="xl" fw={700} c="white">
-              Emission Sense
-            </Text>
-          </Flex>
-          <Group>
-            <Menu shadow="md" width={300}>
-              <Menu.Target>
-                <Indicator label={notifications.length} size={16} color="red">
-                  <ActionIcon variant="transparent">
-                    <IconBell size={24} color="white" />
-                  </ActionIcon>
-                </Indicator>
-              </Menu.Target>
-              <Menu.Dropdown>
-                {notifications.length > 0 ? (
-                  notifications.map((notification, index) => (
-                    <Menu.Item key={index} onClick={() => handleOpenModal(notification)}>
-                      <Text fw={500}>{notification.message}</Text>
-                      <Text size="xs" color="dimmed">From: {notification.sender_name}</Text>
-                    </Menu.Item>
-                  ))
-                ) : (
-                  <Menu.Item>No notifications</Menu.Item>
-                )}
-              </Menu.Dropdown>
-            </Menu>
-            <Menu shadow="md" width={200}>
-              <Menu.Target>
-                <Avatar
-                  src={userData.profile_image}
-                  radius="xl"
-                  size="md"
-                  styles={{
-                    root: {
-                      border: '1px solid white',
-                      '&:hover': {
-                        transform: 'scale(1.05)',
-                      },
-                    },
-                  }}
-                />
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item ta="center" onClick={() => setCurrentComponent('component2')}>Your Profile</Menu.Item>
-                <Menu.Item ta="center" onClick={handleLogout}>Logout</Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </Group>
-        </Flex>
-      </AppShell.Header>
+          <Text size="xl" fw={700} style={{ color: 'white' }}>
+            Emission Sense
+          </Text>
+        </div>
+        <Group align="md">
+          <Menu shadow="md" width={300}>
+            <Menu.Target>
+              <Indicator label={notifications.length} size={16} color="red">
+                <ActionIcon variant="transparent">
+                  <IconBell size={24} color="white" />
+                </ActionIcon>
+              </Indicator>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {notifications.length > 0 ? (
+                notifications.map((notification, index) => (
+                  <Menu.Item key={index} onClick={() => handleOpenModal(notification)}>
+                    <Text fw={500}>{notification.message}</Text>
+                    <Text size="xs" color="dimmed">From: {notification.sender_name}</Text>
+                  </Menu.Item>
+                ))
+              ) : (
+                <Menu.Item>No notifications</Menu.Item>
+              )}
+            </Menu.Dropdown>
+          </Menu>
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <Avatar
+                src={userData.profile_image}
+                radius="xl"
+                size="md"
+                styles={{
+                  root: {
+                    border: '1px solid white',
+                    '&:hover': { transform: 'scale(1.05)' },
+                  },
+                }}
+              />
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item ta="center" onClick={() => setCurrentComponent('component2')}>Your Profile</Menu.Item>
+              <Menu.Item ta="center" onClick={handleLogout}>Logout</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </header>
 
-      <AppShell.Navbar
-        p="md"
-        style={{
-          background: 'white',
-          borderRight: 'none',
-          boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-        }}
-      >
-        <Box style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%' }}>
-          <Button
-            variant={currentComponent === 'component1' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component1')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component1' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component1' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-            Dashboard
-          </Button>
-          <Button
-            leftSection={<IconChartBar size={20} />}
-            variant={currentComponent === 'component3' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component3')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component3' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component3' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-            Statistics
-          </Button>
-          <Button
-            leftSection={<IconDashboard size={20} />}
-            variant={currentComponent === 'component4' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component4')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component4' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component4' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-            Team Projects
-          </Button>
-          <Button
-            leftSection={<IconHistory size={20} />}
-            variant={currentComponent === 'component5' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component5')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component5' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component5' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-           Projects Session Tracker
-          </Button>
-          <Button
-            leftSection={<Icon3dCubeSphere size={20} />}
-            variant={currentComponent === 'component6' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component6')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component6' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component6' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-           Code Optimizer
-          </Button>
-          <Button
-            leftSection={<IconAccessPoint size={20} />}
-            variant={currentComponent === 'component7' ? 'filled' : 'light'}
-            onClick={() => setCurrentComponent('component7')}
-            fullWidth
-            styles={{
-              root: {
-                backgroundColor: currentComponent === 'component7' ? dlsuGreen : undefined,
-                '&:hover': {
-                  backgroundColor: dlsuLightGreen,
-                },
-                color: currentComponent === 'component7' ? 'white' : dlsuGreen,
-              },
-            }}
-          >
-           Compare Devices
-          </Button>
-        </Box>
-      </AppShell.Navbar>
+      {/* Container for Sidebar and Main Content */}
+      <div style={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
+        <nav className={`${styles.navbar} ${isMinimized ? styles.minimized : ''}`}>
+          <button className={styles.toggleButton} onClick={toggleNavbar}>
+            {isMinimized ? <IconChevronRight /> : <IconChevronLeft />}
+          </button>
+          <div className={styles.navbarMain}>
+            {links}
+          </div>
+          <div className={styles.footer}>
+            <div className={styles.link} onClick={handleLogout}>
+              <IconLogout className={styles.linkIcon} stroke={1.5} />
+              {!isMinimized && <span>Logout</span>}
+            </div>
+          </div>
+        </nav>
 
-      <AppShell.Main>
-        <Paper>
-          {currentComponent === 'component1' && <TextComponent />}
-          {currentComponent === 'component2' && <ButtonComponent />}
-          {currentComponent === 'component3' && <StatisticsComponent />}
-          {currentComponent === 'component4' && <Dashboard />}
-          {currentComponent === 'component5' && <History />}
-          {currentComponent === 'component6' && <CodeCalculator />}
-          {currentComponent === 'component7' && <Compare />}
-        </Paper>
-      </AppShell.Main>
+        <main style={{ flex: 1, padding: '20px', overflowY: 'auto', height: 'calc(100vh - 70px)' }}>
+          <Paper>
+            {currentComponent === 'component1' && <TextComponent />}
+            {currentComponent === 'component2' && <ButtonComponent />}
+            {currentComponent === 'component3' && <StatisticsComponent />}
+            {currentComponent === 'component4' && <Dashboard />}
+            {currentComponent === 'component5' && <History />}
+            {currentComponent === 'component6' && <CodeCalculator />}
+            {currentComponent === 'component7' && <Compare />}
+          </Paper>
+        </main>
+      </div>
+
       <Modal
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
@@ -388,11 +327,12 @@ const MainContent: React.FC = () => {
           </>
         )}
       </Modal>
-    </AppShell>
+    </>
   );
 };
 
 const App: React.FC = () => {
+  // ...existing token and redirect logic...
   const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 

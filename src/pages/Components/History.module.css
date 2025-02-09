@@ -1,104 +1,188 @@
 .container {
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 30px;
+  background-color: #f7f9fc;
+  border-radius: 15px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.banner {
+  background: linear-gradient(135deg, #4a90e2 0%, #50a1f0 100%);
+  color: #fff;
   padding: 20px;
-  background-color: #f9f9f9;
   border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+  text-align: center;
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 3rem;
   text-align: center;
-  margin-bottom: 20px;
-  color: #333;
-  font-family: 'Arial', sans-serif;
+  margin-bottom: 30px;
+  color: #34495e;
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
 .errorText {
-  color: red;
-  font-weight: bold;
+  color: #e74c3c;
+  font-weight: 500;
   margin-bottom: 20px;
   text-align: center;
+  padding: 15px;
+  background-color: #f8d7da;
+  border-radius: 8px;
 }
 
 .historyTitle {
-  font-size: 1.8rem;
-  color: #444;
-  margin-top: 30px;
+  font-size: 2.2rem;
+  color: #34495e;
+  margin-top: 40px;
   text-align: center;
+  border-bottom: 2px solid #bdc3c7;
+  padding-bottom: 10px;
 }
 
 .projectCard {
-  padding: 20px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  margin-top: 15px;
-  background-color: #fff;
-  transition: transform 0.2s;
+  padding: 25px;
+  border: 1px solid #ecf0f1;
+  border-radius: 12px;
+  margin-top: 20px;
+  background-color: #fdfefe;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
 .projectCard:hover {
-  transform: scale(1.02);
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
 .projectName {
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: #222;
-  margin-bottom: 5px;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
 }
 
 .projectDescription {
-  font-size: 1.1rem;
-  color: #555;
-  margin-bottom: 10px;
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.5;
 }
 
 .historyDetails {
-  font-size: 1rem;
-  color: #666;
+  font-size: 1.1rem;
+  color: #777;
+  margin-bottom: 8px;
 }
 
 .buttonGroup {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .projectStageDropdown {
-  margin-top: 10px;
+  margin-top: 15px;
 }
 
 .button {
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, color 0.3s;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  border: none;
+  outline: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .button:hover {
-  background-color: #006400;
+  background-color: #27ae60;
   color: #fff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
 .floatingHelpButton {
   position: fixed;
   bottom: 30px;
-  right: 100px;
+  right: 30px;
   z-index: 1000;
-  background-color: #1d72b8;
+  background-color: #3498db;
   color: white;
   border: none;
   border-radius: 50%;
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s, transform 0.3s;
+  font-size: 1.5rem;
 }
 
 .floatingHelpButton:hover {
-  background-color: #155d8a;
+  background-color: #2980b9;
   cursor: pointer;
+  transform: scale(1.1);
+}
+
+/* Media queries for responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+    margin: 10px auto;
+  }
+
+  .title {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+  }
+
+  .historyTitle {
+    font-size: 2rem;
+    margin-top: 30px;
+  }
+
+  .projectCard {
+    padding: 15px;
+  }
+
+  .projectName {
+    font-size: 1.4rem;
+  }
+
+  .projectDescription {
+    font-size: 1.1rem;
+  }
+
+  .historyDetails {
+    font-size: 1rem;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .button {
+    padding: 10px 20px;
+    font-size: 1rem;
+  }
+
+  .floatingHelpButton {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+    bottom: 20px;
+    right: 20px;
+  }
 }

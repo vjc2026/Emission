@@ -1,197 +1,66 @@
-import {
-  TextInput,
-  PasswordInput,
-  Button,
-  Title,
-  Text,
-  Anchor,
-  Group,
-  Container,
-  Modal,
-} from '@mantine/core';
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import classes from './Login.module.css';
+import React from 'react';
+import { Button, Container, Grid, Title, Text, Card, Stack } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { useRouter } from 'next/router'; // added import
+import styles from './Landing.module.css';
+import { HowItWorks } from '../LandingComponents/HowItWorks';
+import { Testimonials } from '../LandingComponents/Testimonials';
+import ClientRequest from '../LandingComponents/ClientRequest';
 
-const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminError, setAdminError] = useState('');
-  const [adminModalOpened, setAdminModalOpened] = useState(false);
-  const router = useRouter();
-
-  const handleLogin = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: username,
-          password: password,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem('token', result.token);
-        router.push('/main');
-      } else {
-        setError(result.error || 'Login failed');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setError('An error occurred. Please try again later.');
-    }
-  };
-
-  const handleAdminLogin = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/admin_login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: adminUsername,
-          password: adminPassword,
-        }),
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        setAdminError(result.error || 'Admin login failed');
-        return;
-      }
-
-      const result = await response.json();
-      localStorage.setItem('token', result.token);
-      router.push('/AdminPages/AdminDashboard');
-    } catch (error) {
-      console.error('Error:', error);
-      setAdminError('An error occurred. Please try again later.');
-    }
-  };
-
-  const handleRegister = () => {
-    router.push('/Register');
-  };
-
-  const handleForgotPassword = () => {
-    router.push('/ForgotPasswordPage');
-  };
-
-  const handleAdminPage = () => {
-    setAdminModalOpened(true);
-  };
-
-  const refreshToken = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await fetch('http://localhost:5000/refresh-token', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-      }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-    }
-  };
-
-  useEffect(() => {
-    const refreshInterval = setInterval(refreshToken, 5 * 60 * 1000); // 5 minutes
-    return () => clearInterval(refreshInterval);
-  }, []);
+const LandingPage: React.FC = () => {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const router = useRouter(); // added router
 
   return (
-    <div className={classes.container}>
-      <div className={classes.left}>
-        <Container size={420} my={40}>
-          <Title ta="center" className={classes.title} style={{ color: 'white' }}>
-            Welcome back!
-          </Title>
-          <Text c="dimmed" size="sm" ta="center" mt={5}>
-            Do not have an account yet?{' '}
-            <Anchor size="sm" component="button" style={{ color: 'green' }} onClick={handleRegister}>
-              Create account
-            </Anchor>
-          </Text>
-
-          <TextInput
-            style={{ color: 'white' }}
-            label="Email"
-            placeholder="Enter your email"
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <PasswordInput
-            style={{ color: 'white' }}
-            label="Password"
-            placeholder="Enter your password"
-            required
-            mt="md"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <Group justify="space-between" mt="lg">
-            <Anchor component="button" onClick={handleAdminPage} style={{ color: 'green' }} size="sm">
-              Admin Page
-            </Anchor>
-            <Anchor component="button" onClick={handleForgotPassword} style={{ color: 'green' }} size="sm">
-              Forgot password?
-            </Anchor>
-          </Group>
-          {error && <Text c="red" size="sm" ta="center" mt="md">{error}</Text>}
-          <Button fullWidth mt="xl" color="green" onClick={handleLogin}>
-            Sign in
-          </Button>
-        </Container>
+    <>
+      <div className={styles.hero}>
+        <Title className={styles.heroTitle}>Welcome to EmissionSense</Title>
+        <Text className={styles.heroSubtitle}>
+          Track, manage and reduce your carbon footprint
+        </Text>
+        <Button
+          size={isMobile ? 'md' : 'lg'}
+          mt="xl"
+          onClick={() => router.push('/Login')} // added onClick
+        >
+          Get Started
+        </Button>
       </div>
 
-      <div className={classes.right}></div>
-
-      <Modal
-        opened={adminModalOpened}
-        onClose={() => setAdminModalOpened(false)}
-        title="Admin Login"
-      >
-        <TextInput
-          label="Admin Email"
-          placeholder="Enter your admin email"
-          required
-          value={adminUsername}
-          onChange={(e) => setAdminUsername(e.target.value)}
-        />
-        <PasswordInput
-          label="Admin Password"
-          placeholder="Enter your admin password"
-          required
-          mt="md"
-          value={adminPassword}
-          onChange={(e) => setAdminPassword(e.target.value)}
-        />
-        {adminError && <Text c="red" size="sm" ta="center" mt="md">{adminError}</Text>}
-        <Button fullWidth mt="xl" color="green" onClick={handleAdminLogin}>
-          Admin Sign in
-        </Button>
-      </Modal>
-    </div>
+      <Container size="xl" py="xl">
+        <Stack gap="xl">
+          <Grid gutter="xl">
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <Card shadow="sm" padding="lg" radius="md" withBorder>
+                <Title order={2}>Features</Title>
+                <Text mt="md">
+                  Enjoy real-time tracking, detailed analytics, and project management tools designed to help reduce your carbon emissions.
+                </Text>
+              </Card>
+            </Grid.Col>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <Card shadow="sm" padding="lg" radius="md" withBorder>
+                <Title order={2}>About Us</Title>
+                <Text mt="md">
+                  EmissionSense is created by DigiBytes, a research group committed to sustainability in the tech industry.
+                </Text>
+              </Card>
+            </Grid.Col>
+          </Grid>
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={2}>Contact Us</Title>
+            <Text mt="md">
+              Have questions or feedback? Reach out to us at support@emissionsense.com.
+            </Text>
+          </Card>
+        </Stack>
+      </Container>
+      
+      <HowItWorks />
+      <Testimonials />
+      <ClientRequest />
+    </>
   );
 };
 
-export default LoginPage;
+export default LandingPage;
