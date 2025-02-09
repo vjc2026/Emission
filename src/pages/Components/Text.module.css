@@ -90,6 +90,7 @@
   color: var(--mantine-color-white);
   text-align: center;
   padding: calc(var(--mantine-spacing-xl) * 1.5);
+  animation: gradientShift 10s ease-in-out infinite alternate;
 }
 
 .heroTitle {
@@ -100,4 +101,14 @@
 .heroSubtitle {
   font-size: 24px;
   margin-top: var(--mantine-spacing-md);
+}
+
+/* Added keyframes for dynamic gradient animation */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
 }
