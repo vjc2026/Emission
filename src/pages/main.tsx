@@ -247,7 +247,7 @@ const MainContent: React.FC = () => {
             case 'All Projects':
               setCurrentComponent('component1');
               break;
-            case 'My Projects':
+            case 'My Profile':
               setCurrentComponent('component2');
               break;
             case 'Joined Projects':
@@ -274,22 +274,22 @@ const MainContent: React.FC = () => {
           setActive(item.link);
           switch (item.label) {
             case 'Dashboard':
-              setCurrentComponent('component4');
+              setCurrentComponent('component1');
               break;
             case 'Statistics':
-              setCurrentComponent('component5');
+              setCurrentComponent('component3');
               break;
             case 'Team Projects':
-              setCurrentComponent('component6');
-              break;
-            case 'Projects Session Tracker':
-              setCurrentComponent('component7');
-              break;
-            case 'Code Optimizer':
               setCurrentComponent('component8');
               break;
+            case 'Projects Session Tracker':
+              setCurrentComponent('component5');
+              break;
+            case 'Code Optimizer':
+              setCurrentComponent('component6');
+              break;
             case 'Compare Devices':
-              setCurrentComponent('component9');
+              setCurrentComponent('component7');
               break;
             default:
               setCurrentComponent('component4');
