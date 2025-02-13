@@ -18,7 +18,7 @@
 
 .taskSection {
   background: #f9f9f9;
-  padding: 20px;
+  padding: 10px;
   border-radius: 8px;
   margin-bottom: 20px;
 }
@@ -68,27 +68,164 @@
 
 .taskTable th,
 .taskTable td {
-  padding: 10px;
+  padding: 8px;
   text-align: left;
   border-bottom: 1px solid #ddd;
 }
 
 .taskAssignees {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 90vh;
-  color: var(--mantine-color-white);
-  text-align: center;
-  padding: calc(var(--mantine-spacing-xl) * 1.5);
+  gap: 5px;
 }
 
-.heroTitle {
-  font-size: 64px;
-  font-weight: 700;
+.assignee img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.moreAssignees {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #ddd;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .completed {
   background: #e0ffe0;
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background: white;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.panelContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panelContent h2 {
+  margin: 0;
+}
+
+.panelContent p {
+  margin: 0;
+}
+
+.panelContent .taskAssignees {
+  margin-top: 10px;
+}
+
+.panelButtons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.panelContent button {
+  padding: 5px 10px;
+  background: #006F3C;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.exitButton {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.startButton {
+  background: #4CAF50;
+}
+
+.stopButton {
+  background: #f44336;
+}
+
+.completeButton {
+  background: #008CBA;
+}
+
+.editButton {
+  background: #FFA500;
+}
+
+.saveButton {
+  background: #4CAF50;
+}
+
+.addForm input,
+.addForm textarea,
+.addForm select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.assigneesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.assignee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editAssigneeSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.minimizedAssignees {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.minimizedAssignees img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.minimizedAssignees .moreAssignees {
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
 }
