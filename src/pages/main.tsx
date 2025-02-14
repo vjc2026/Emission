@@ -14,13 +14,15 @@ import {
   IconAccessPoint,
   IconChevronLeft,
   IconChevronRight,
+  IconX,
+  IconCheck,
 } from '@tabler/icons-react';
 import {
   Flex, Button, Group, Avatar, Text, Box, Paper, Loader, Menu, ActionIcon, Indicator, Modal, UnstyledButton
 } from '@mantine/core';
-import ButtonComponent from './Components/Button';
+import ButtonComponent from './Components/Profile';
 import TextComponent from './Components/Text';
-import History from './Components/history';
+import History from './Components/CarbonCalculator';
 import Dashboard from './Components/Dashboard';
 import Compare from './Components/Compare';
 import TEST from './Components/TEST';
@@ -57,7 +59,17 @@ const MainContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [modalOpened, setModalOpened] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState<{ id: string; message: string; sender_name: string } | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<{
+    id: string;
+    message: string;
+    sender_name: string;
+    project_name: string;
+    organization: string;
+    project_description: string;
+    stage: string;
+    sender_email: string;
+    created_at: string;
+  } | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isSecondaryMinimized, setIsSecondaryMinimized] = useState(false);
   const [newNotificationCount, setNewNotificationCount] = useState(0);
@@ -140,6 +152,12 @@ const MainContent: React.FC = () => {
     id: string;
     message: string;
     sender_name: string;
+    project_name: string;
+    organization: string;
+    project_description: string;
+    stage: string;
+    sender_email: string;
+    created_at: string;
   }
 
   const handleOpenModal = (notification: Notification) => {
@@ -325,35 +343,102 @@ const MainContent: React.FC = () => {
           </Text>
         </div>
         <Group align="md">
-          <Menu shadow="md" width={300}>
+          <Menu shadow="md" width={350} position="bottom-end">
             <Menu.Target>
-              <Indicator label={unreadNotifications.length} size={16} color="red">
-                {unreadNotifications.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 3,
-                    right: 3,
-                    width: 8,
-                    height: 8,
-                    backgroundColor: 'orange',
-                    borderRadius: '50%'
-                  }} />
-                )}
-                <ActionIcon variant="transparent">
+              <Indicator 
+                label={unreadNotifications.length} 
+                size={16} 
+                color="red" 
+                processing
+                withBorder
+              >
+                <ActionIcon 
+                  variant="light" 
+                  radius="xl"
+                  size="lg"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    }
+                  }}
+                >
                   <IconBell size={24} color="white" />
                 </ActionIcon>
               </Indicator>
             </Menu.Target>
             <Menu.Dropdown>
-              {unreadNotifications.length > 0 ? (
-                unreadNotifications.map((notification, index) => (
-                  <Menu.Item key={index} onClick={() => handleOpenModal(notification)}>
-                    <Text fw={500}>{notification.message}</Text>
-                    <Text size="xs" color="dimmed">From: {notification.sender_name}</Text>
+              <Box p="xs">
+                <Group justify="space-between" mb="xs">
+                  <Text fw={600} size="sm">Notifications</Text>
+                  {unreadNotifications.length > 0 && (
+                    <Text size="xs" c="dimmed">{unreadNotifications.length} unread</Text>
+                  )}
+                </Group>
+              </Box>
+              <Menu.Divider />
+              <Box style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {unreadNotifications.length > 0 ? (
+                  unreadNotifications.map((notification, index) => (
+                    <Menu.Item 
+                      key={index} 
+                      onClick={() => handleOpenModal(notification)}
+                      py="md"
+                    >
+                      <Box>
+                        <Group justify="space-between" mb={4}>
+                          <Group gap={8}>
+                            <Box
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: '#FF6B6B',
+                                marginTop: 6
+                              }}
+                            />
+                            <Text fw={600} size="sm">
+                              {notification.sender_name}
+                            </Text>
+                          </Group>
+                          <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                            {new Date(notification.created_at).toLocaleDateString()}
+                          </Text>
+                        </Group>
+                        <Text size="sm" lineClamp={2} mb={4}>
+                          {notification.message}
+                        </Text>
+                        <Group gap={8}>
+                          <IconDashboard size={14} color="gray" />
+                          <Text size="xs" c="dimmed">{notification.project_name}</Text>
+                        </Group>
+                      </Box>
+                    </Menu.Item>
+                  ))
+                ) : (
+                  <Box py="lg" px="md">
+                    <Text ta="center" c="dimmed" size="sm">
+                      No new notifications
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              {unreadNotifications.length > 0 && (
+                <>
+                  <Menu.Divider />
+                  <Menu.Item 
+                    component="button" 
+                    onClick={handleRead}
+                    style={{
+                      width: '100%',
+                      textAlign: 'center',
+                      color: dlsuGreen
+                    }}
+                  >
+                    Mark all as read
                   </Menu.Item>
-                ))
-              ) : (
-                <Menu.Item>No notifications</Menu.Item>
+                </>
               )}
             </Menu.Dropdown>
           </Menu>
@@ -423,18 +508,78 @@ const MainContent: React.FC = () => {
       <Modal
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
-        title="Project Invitation"
+        title={
+          <Text size="lg" fw={600}>
+            Project Invitation
+          </Text>
+        }
+        size="lg"
+        styles={{
+          header: {
+            backgroundColor: dlsuGreen,
+            color: 'white',
+            padding: '16px'
+          },
+          title: {
+            color: 'white'
+          }
+        }}
       >
         {selectedNotification && (
-          <>
-            <Text fw={500}>{selectedNotification.message}</Text>
-            <Text size="xs" color="dimmed">From: {selectedNotification.sender_name}</Text>
-            <Group align="apart" mt="md">
-              <Button color="green" onClick={handleAccept}>Accept</Button>
-              <Button color="red" onClick={handleIgnore}>Ignore</Button>
-              <Button color="yellow" onClick={handleRead}>Marked as Read</Button>
+          <Box>
+            <Text fw={500} mb="md" size="lg">{selectedNotification.message}</Text>
+            
+            <Paper withBorder p="md" mb="md" radius="md" style={{ backgroundColor: '#f8f9fa' }}>
+              <Group mb="xs">
+                <IconDashboard size={20} color={dlsuGreen} />
+                <Text fw={600} size="lg">Project Details</Text>
+              </Group>
+              <Box pl={28}>
+                <Text mb={8}><b>Name:</b> {selectedNotification.project_name}</Text>
+                <Text mb={8}><b>Organization:</b> {selectedNotification.organization}</Text>
+                <Text mb={8}><b>Description:</b> {selectedNotification.project_description}</Text>
+                <Text><b>Current Stage:</b> {selectedNotification.stage}</Text>
+              </Box>
+            </Paper>
+
+            <Paper withBorder p="md" mb="md" radius="md" style={{ backgroundColor: '#f8f9fa' }}>
+              <Group mb="xs">
+                <IconUser size={20} color={dlsuGreen} />
+                <Text fw={600} size="lg">Invitation Details</Text>
+              </Group>
+              <Box pl={28}>
+                <Text mb={8}><b>From:</b> {selectedNotification.sender_name}</Text>
+                <Text mb={8}><b>Email:</b> {selectedNotification.sender_email}</Text>
+                <Text><b>Sent:</b> {new Date(selectedNotification.created_at).toLocaleString()}</Text>
+              </Box>
+            </Paper>
+
+            <Group justify="flex-end" mt="xl" gap="md">
+              <Button 
+                variant="outline" 
+                color="yellow" 
+                leftSection={<IconBell size={16} />}
+                onClick={handleRead}
+              >
+                Mark as Read
+              </Button>
+              <Button 
+                variant="outline"
+                color="red" 
+                leftSection={<IconX size={16} />}
+                onClick={handleIgnore}
+              >
+                Ignore
+              </Button>
+              <Button 
+                color="green" 
+                leftSection={<IconCheck size={16} />}
+                onClick={handleAccept}
+              >
+                Accept
+              </Button>
             </Group>
-          </>
+          </Box>
         )}
       </Modal>
     </>

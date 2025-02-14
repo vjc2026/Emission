@@ -75,25 +75,55 @@
 
 .taskAssignees {
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
 }
 
-.assignee img {
-  width: 30px;
-  height: 30px;
+.assignee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+}
+
+.assigneeAvatar {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #006F3C; /* DLSU green */
+}
+
+.assigneeInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.assigneeName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.assigneeRole {
+  font-size: 12px;
+  color: #666;
 }
 
 .moreAssignees {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background-color: #ddd;
-  font-size: 14px;
-  font-weight: bold;
+  background-color: #006F3C;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .completed {

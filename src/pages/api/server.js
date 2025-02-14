@@ -43,13 +43,38 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Set up global CORS headers
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Use cors middleware
-app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Update the uploads directory path to be relative to the project root
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
+// Serve static files from uploads directory with proper headers and error handling
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
+  next();
+}, express.static(uploadsDir, {
+  fallthrough: false // Return 404 if file doesn't exist
+}), (err, req, res, next) => {
+  if (err.status === 404) {
+    res.status(404).json({ error: 'Image not found' });
+  } else {
+    res.status(500).json({ error: 'Error serving image' });
+  }
+});
 
   app.post('/check-email', (req, res) => {
     const { email } = req.body;
@@ -68,12 +93,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
       }
     });
   });
-
-  // Ensure the uploads directory exists on startup
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true }); // Create the directory if it doesn't exist
-}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -1503,7 +1522,9 @@ app.get('/notifications', authenticateToken, (req, res) => {
       u.name as sender_name,
       u.email as sender_email,
       p.project_name,
-      p.project_description
+      p.project_description,
+      p.organization,
+      p.stage
     FROM notifications n
     JOIN users u ON n.sender_id = u.id
     JOIN user_history p ON n.project_id = p.id
@@ -1516,7 +1537,14 @@ app.get('/notifications', authenticateToken, (req, res) => {
       console.error('Error fetching notifications:', err);
       return res.status(500).json({ error: 'Failed to fetch notifications' });
     }
-    res.json({ notifications: results });
+
+    // Format the date for each notification
+    const formattedResults = results.map(notification => ({
+      ...notification,
+      created_at: new Date(notification.created_at).toLocaleString()
+    }));
+
+    res.json({ notifications: formattedResults });
   });
 });
 
@@ -1619,7 +1647,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
   const projectId = req.params.id;
 
   const query = `
-    SELECT u.id, u.name, u.email, pm.role, pm.joined_at
+    SELECT u.id, u.name, u.email, u.profile_image, pm.role, pm.joined_at
     FROM project_members pm
     JOIN users u ON pm.user_id = u.id
     WHERE pm.project_id = ?
@@ -1627,10 +1655,20 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
 
   connection.query(query, [projectId], (err, results) => {
     if (err) {
-      console.error('Error fetching project members:', err);
-      return res.status(500).json({ error: 'Failed to fetch project members' });
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
     }
-    res.json({ members: results });
+    
+    // Transform results to include full profile image URLs
+    const members = results.map(member => ({
+      ...member,
+      profile_image: member.profile_image 
+        ? `http://localhost:5000/uploads/${member.profile_image}`
+        : null
+    }));
+
+    console.log('Sending members data:', members); // Debug log
+    res.json({ members });
   });
 });
 
@@ -2085,3 +2123,10 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
     res.status(200).json({ emissions: combinedEmissions });
   });
 });
+
+// Serve static files from uploads directory with proper headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));

@@ -5,23 +5,28 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
-  background-color: #044202; /* DLSU-D green */
+  background: linear-gradient(135deg, #044202 0%, #006F3C 100%);
   color: #ffffff;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-  transition: width 0.3s ease-in-out; /* Smoother transition */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
 .minimized {
-  width: 100px; /* Width when minimized */
+  width: 80px; /* Width when minimized */
 }
 
 .navbarMain {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .footer {
   padding-top: 20px;
-  margin-top: 20px;
+  margin-top: auto;
   border-top: 1px solid #ffffff; /* Darker border */
 }
 
@@ -31,21 +36,48 @@
   align-items: center;
   text-decoration: none;
   font-size: 15px; /* Slightly larger font */
-  color: #ffffff;
-  padding: 12px 15px; /* Increased padding */
+  color: rgba(255, 255, 255, 0.85);
+  padding: 12px; /* Increased padding */
   border-radius: 8px; /* More rounded corners */
   font-weight: 500;
   margin-bottom: 8px; /* Reduced margin */
-  transition: background-color 0.3s ease; /* Smooth background transition */
+  transition: all 0.3s ease; /* Smooth background transition */
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .minimizedLink {
-  justify-content: right; /* Center icon when minimized */
+  justify-content: center; /* Center icon when minimized */
+  padding: 12px 8px;
+}
+
+.minimizedLink span {
+  display: none;
 }
 
 .link:hover {
-  background-color: #036b52;
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.link:active {
+  transform: translateX(2px);
+}
+
+.link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  background: rgba(255, 255, 255, 0.1);
+  transition: width 0.3s ease;
+}
+
+.link:hover::before {
+  width: 100%;
 }
 
 .linkActive {
@@ -54,11 +86,21 @@
 }
 
 .linkIcon {
+  min-width: 24px;
   margin-right: 12px; /* Increased icon margin */
   width: 22px; /* Slightly larger icon */
   height: 22px;
   color: #ffffff; /* Light gray icon color */
-  transition: color 0.3s ease; /* Smooth icon color transition */
+  transition: transform 0.3s ease; /* Smooth icon color transition */
+}
+
+.minimizedLink .linkIcon {
+  margin-right: 0;
+  transform: scale(1.2);
+}
+
+.link:hover .linkIcon {
+  transform: scale(1.1) rotate(5deg);
 }
 
 .linkActive .linkIcon {
@@ -67,18 +109,26 @@
 
 /* Toggle button styles */
 .toggleButton {
-  background: none;
+  position: absolute;
+  right: -12px;
+  top: 20px;
+  width: 24px;
+  height: 24px;
+  background: white;
   border: none;
-  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  margin-bottom: 20px;
-  font-size: 24px; /* Larger font size */
-  align-self: flex-end; /* Align to the right when not minimized */
-  transition: transform 0.3s ease; /* Smooth rotation */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 10;
 }
 
 .toggleButton:hover {
-  transform: rotate(90deg); /* Rotate on hover */
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .toggleButtonMinimized {
@@ -88,23 +138,24 @@
 /* Main content styles */
 .mainContent {
   flex: 1;
-  padding: 30px; /* Increased padding */
+  padding: 24px; /* Increased padding */
   overflow-y: auto;
-  background-color: #25262b; /* Darker background */
+  background: #f8f9fa; /* Darker background */
   color: #ffffff;
   border-radius: 12px; /* Rounded corners */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+  transition: all 0.3s ease;
 }
 
 /* Header styles */
 .header {
-  background: #1a1a1b; /* Dark background */
-  padding: 15px 20px; /* Increased padding */
+  background: linear-gradient(135deg, #006F3C 0%, #008C4C 100%);
+  padding: 16px 24px; /* Increased padding */
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 70px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Add shadow */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* Add shadow */
 }
 
 .headerLeft {
@@ -132,14 +183,67 @@
   font-size: 12px;
   padding: 3px 6px;
   border-radius: 10px;
+  animation: notification-pulse 2s infinite;
+}
+
+.notification {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 /* Avatar styles */
 .avatar {
   border: 2px solid #ffffff;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
 }
 
 .avatar:hover {
   transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Animation keyframes for notifications */
+@keyframes notification-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Card hover effects */
+.card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Button hover effects */
+.button {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.button:hover::after {
+  width: 300%;
+  height: 300%;
 }

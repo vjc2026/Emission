@@ -1,5 +1,36 @@
+.wrapper {
+  position: relative;
+  background: linear-gradient(180deg, rgba(0,70,67,0.97) 0%, rgba(0,31,63,0.95) 100%);
+  overflow: hidden;
+}
+
+.wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0, 255, 200, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(0, 200, 255, 0.08) 0%, transparent 50%);
+  animation: gradientFloat 8s ease-in-out infinite alternate;
+}
+
 .container {
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(0,31,63,0.97) 0%, rgba(0,70,67,0.95) 100%);
+  z-index: 1;
+}
+
+.container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0, 255, 200, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(0, 200, 255, 0.12) 0%, transparent 40%);
+  animation: gradientFloat 8s ease-in-out infinite alternate;
+  z-index: 0;
 }
 
 .title {
@@ -8,13 +39,113 @@
   color: #228be6;
 }
 
+.formWrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+  overflow: hidden;
+}
+
+.formWrapper:hover {
+  transform: translateY(-5px);
+  border-color: rgba(0, 255, 200, 0.2);
+}
+
+.formWrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(0, 255, 200, 0.05),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.formWrapper:hover::before {
+  opacity: 1;
+}
+
+.formOverlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(0, 255, 200, 0.1),
+    transparent 40%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.formWrapper:hover .formOverlay {
+  opacity: 1;
+}
+
 .form {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inputWrapper {
+  margin-bottom: 1.5rem;
 }
 
 .input {
   margin-bottom: 15px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  height: 3rem;
+  font-size: 1rem;
+  transition: all 0.3s ease !important;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.input:focus {
+  border-color: rgba(0, 255, 200, 0.5) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+textarea.input {
+  min-height: 120px;
+  padding-top: 0.8rem;
+}
+
+.label {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .buttonGroup {
@@ -24,9 +155,48 @@
 }
 
 .submitButton {
-  background-color: #228be6;
-  color: white;
-  &:hover {
-    background-color: #1c7ed6;
+  background: linear-gradient(135deg, #00ffc8 0%, #00b4ff 100%) !important;
+  border: none !important;
+  padding: 0 2rem;
+  height: 3.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.submitButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 255, 200, 0.3);
+}
+
+.submitButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s ease-out;
+}
+
+.submitButton:hover::before {
+  left: 100%;
+}
+
+@keyframes gradientFloat {
+  0% {
+    transform: translate(-10px, -10px) scale(1);
+  }
+  100% {
+    transform: translate(10px, 10px) scale(1.05);
   }
 }
