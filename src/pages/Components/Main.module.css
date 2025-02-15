@@ -1,8 +1,8 @@
 /* Navbar styles */
 .navbar {
   height: calc(100vh - 70px); /* adjusted height to account for header */
-  width: 280px; /* Increased width */
-  padding: 20px;
+  width: 240px; /* Reduced from 280px */
+  padding: 16px;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #044202 0%, #006F3C 100%);
@@ -14,7 +14,7 @@
 }
 
 .minimized {
-  width: 80px; /* Width when minimized */
+  width: 64px; /* Reduced from 80px */
 }
 
 .navbarMain {
@@ -22,6 +22,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 32px;
 }
 
 .footer {
@@ -35,7 +36,7 @@
   display: flex;
   align-items: center;
   text-decoration: none;
-  font-size: 15px; /* Slightly larger font */
+  font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.85);
   padding: 12px; /* Increased padding */
   border-radius: 8px; /* More rounded corners */
@@ -49,7 +50,7 @@
 
 .minimizedLink {
   justify-content: center; /* Center icon when minimized */
-  padding: 12px 8px;
+  padding: 12px 0;
 }
 
 .minimizedLink span {
@@ -88,8 +89,8 @@
 .linkIcon {
   min-width: 24px;
   margin-right: 12px; /* Increased icon margin */
-  width: 22px; /* Slightly larger icon */
-  height: 22px;
+  width: 20px; /* Slightly larger icon */
+  height: 20px;
   color: #ffffff; /* Light gray icon color */
   transition: transform 0.3s ease; /* Smooth icon color transition */
 }
@@ -110,11 +111,11 @@
 /* Toggle button styles */
 .toggleButton {
   position: absolute;
-  right: -12px;
-  top: 20px;
+  right: 16px;
+  top: 16px;
   width: 24px;
   height: 24px;
-  background: white;
+  background: transparent;
   border: none;
   border-radius: 50%;
   display: flex;
@@ -124,11 +125,15 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   z-index: 10;
+  color: white;
+  padding: 4px;
+  border-radius: 4px;
 }
 
 .toggleButton:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .toggleButtonMinimized {
@@ -246,4 +251,54 @@
 .button:hover::after {
   width: 300%;
   height: 300%;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .navbar {
+    position: fixed;
+    z-index: 1000;
+    transform: translateX(-100%);
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .navbar.active {
+    transform: translateX(0);
+  }
+
+  .minimized {
+    transform: translateX(-100%);
+  }
+
+  .minimized.active {
+    transform: translateX(0);
+    width: 64px;
+  }
+}
+
+/* Mobile overlay */
+.mobileOverlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobileOverlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .mobileOverlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
