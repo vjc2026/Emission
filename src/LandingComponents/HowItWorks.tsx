@@ -43,9 +43,14 @@ function Feature({ icon: Icon, title, description }: (typeof features)[0]) {
         style={{
           background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,255,200,0.03) 100%)',
           backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          transition: 'transform 0.3s ease, border-color 0.3s ease',
+          border: '1px solid rgba(255,255,255,0.05)',
           height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'transform 0.3s ease, border-color 0.3s ease',
           '&:hover': {
             transform: 'translateY(-5px)',
             borderColor: 'rgba(0,255,200,0.2)',
@@ -94,9 +99,15 @@ export function HowItWorks() {
       size="xl" 
       py={100}
       style={{
-        background: 'linear-gradient(180deg, rgba(0,31,63,0.97) 0%, rgba(0,70,67,0.95) 100%)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '0',
+        margin: '0 auto',
+        background: 'linear-gradient(180deg, rgba(0,31,63,0.97) 0%, rgba(0,70,67,0.95) 100%)'
       }}
     >
       <div 
@@ -114,7 +125,7 @@ export function HowItWorks() {
         initial={{ opacity: 0, y: 20 }}
         animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
         transition={{ duration: 0.6, ease: [0.215, 0.61, 0.355, 1] }}
-        style={{ position: 'relative', zIndex: 1 }}
+        style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 2rem' }}
       >
         <Title 
           ta="center" 
@@ -132,7 +143,7 @@ export function HowItWorks() {
         
         <Text 
           ta="center" 
-          mb={50}
+          mb={40}
           style={{ 
             color: '#b4ffe9',
             fontSize: 'clamp(1rem, 1.5vw, 1.2rem)',
@@ -145,7 +156,7 @@ export function HowItWorks() {
 
         <SimpleGrid 
           cols={{ base: 1, sm: 2, md: 3 }} 
-          spacing="xl"
+          spacing="md"
           style={{ position: 'relative', zIndex: 1 }}
         >
           {features.map((feature) => (

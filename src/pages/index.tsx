@@ -203,9 +203,11 @@ const LandingPage = () => {
         </Container>
       </section>
       
-      <HowItWorks />
-      <Testimonials />
-      <ClientRequest />
+      <Container size="xl" style={{ width: '100%', padding: 0 }}>
+        <HowItWorks />
+        <Testimonials />
+        <ClientRequest />
+      </Container>
     </div>
   );
 };

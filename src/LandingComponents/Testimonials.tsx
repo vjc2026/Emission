@@ -111,9 +111,15 @@ export function Testimonials() {
       size="xl" 
       py={100}
       style={{
-        background: 'linear-gradient(180deg, rgba(0,31,63,0.95) 0%, rgba(0,70,67,0.97) 100%)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '0',
+        margin: '0 auto',
+        background: 'linear-gradient(180deg, rgba(0,70,67,0.97) 0%, rgba(0,31,63,0.95) 100%)'
       }}
     >
       <div 
@@ -131,11 +137,11 @@ export function Testimonials() {
         initial={{ opacity: 0, y: 20 }}
         animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
         transition={{ duration: 0.6, ease: [0.215, 0.61, 0.355, 1] }}
-        style={{ position: 'relative', zIndex: 1 }}
+        style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 2rem' }}
       >
         <Title 
           ta="center" 
-          mb={50}
+          mb={40}
           style={{
             fontSize: 'clamp(2rem, 4vw, 3rem)',
             fontWeight: 800,
@@ -150,8 +156,8 @@ export function Testimonials() {
 
       <SimpleGrid 
         cols={{ base: 1, sm: 2, md: 3 }} 
-        spacing="xl"
-        style={{ position: 'relative', zIndex: 1 }}
+        spacing="md"
+        style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 2rem' }}
       >
         {testimonials.map((testimonial) => (
           <TestimonialCard 

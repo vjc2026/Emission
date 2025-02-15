@@ -1239,8 +1239,8 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
 
       // If not last stage, create next stage
       const insertNewStageQuery = `
-        INSERT INTO user_history (user_id, organization, project_name, project_description, session_duration, carbon_emit, stage, status, created_at)
-        SELECT user_id, organization, project_name, project_description, 0, 0, ?, 'In-Progress', NOW()
+        INSERT INTO user_history (user_id, organization, project_name, project_description, session_duration, carbon_emit, stage, status, project_id, created_at)
+        SELECT user_id, organization, project_name, project_description, 0, 0, ?, 'In-Progress', project_id, NOW()
         FROM user_history
         WHERE id = ? AND user_id = ?;
       `;
@@ -1250,15 +1250,32 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
           console.error('Error creating new project stage:', err);
           return res.status(500).json({ error: 'Database error while creating new project stage' });
         }
-        res.status(200).json({ 
-          message: 'Project stage completed and new stage created successfully',
-          isComplete: false
+
+        const newProjectId = results.insertId;
+
+        // Copy project members to the new stage
+        const copyMembersQuery = `
+          INSERT INTO project_members (project_id, user_id, role, joined_at)
+          SELECT ?, user_id, role, NOW()
+          FROM project_members
+          WHERE project_id = ?;
+        `;
+
+        connection.query(copyMembersQuery, [newProjectId, projectId], (err, results) => {
+          if (err) {
+            console.error('Error copying project members:', err);
+            return res.status(500).json({ error: 'Database error while copying project members' });
+          }
+
+          res.status(200).json({ 
+            message: 'Project stage completed and new stage created successfully',
+            isComplete: false
+          });
         });
       });
     });
   });
 });
-
 
 app.get('/organization_projects', authenticateToken, (req, res) => {
   const { organization } = req.query;
@@ -1404,27 +1421,30 @@ app.post('/send-reset-email', async (req, res) => {
           subject: 'Password Reset Request - EmissionSense',
           text: `Click the following link to reset your password: ${resetLink}`,
           html: `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
-          <div style="background-color: #4CAF50; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">EmissionSense</h1>
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="background-color: #006241; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">EmissionSense</h1>
           </div>
           
-          <div style="background-color: #f8f9fa; padding: 30px; border-radius: 5px; margin-top: 20px;">
-            <h2 style="color: #333; margin-top: 0;">Password Reset Request</h2>
-            <p style="color: #666; line-height: 1.6;">Hello,</p>
-            <p style="color: #666; line-height: 1.6;">We received a request to reset your password. To proceed with the password reset, please click the button below:</p>
+          <div style="background-color: #ffffff; padding: 32px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+            <h2 style="color: #1A1A1A; margin-top: 0; font-size: 24px; font-weight: 500;">Password Reset Request</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">Hello,</p>
+            <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">We received a request to reset your password. To proceed with the password reset, please click the button below:</p>
             
-            <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetLink}" style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetLink}" style="background-color: #006241; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 16px; display: inline-block; transition: background-color 0.2s ease;">Reset Password</a>
             </div>
             
-            <p style="color: #666; line-height: 1.6;">If you did not make this request, please ignore this email and your password will remain unchanged.</p>
-            <p style="color: #666; line-height: 1.6;">This link will expire in 5 minutes for security purposes.</p>
+            <div style="background-color: #f8f9fa; padding: 16px; border-radius: 6px; margin-top: 24px;">
+              <p style="color: #666; line-height: 1.6; font-size: 14px; margin: 0;">⚠️ If you did not make this request, please ignore this email and your password will remain unchanged.</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; font-size: 14px; margin-top: 24px;">This link will expire in 5 minutes for security purposes.</p>
           </div>
           
-          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-            <p>&copy; ${new Date().getFullYear()} EmissionSense. All rights reserved.</p>
-            <p>This is an automated message, please do not reply to this email.</p>
+          <div style="text-align: center; margin-top: 24px; color: #666;">
+            <p style="font-size: 14px; margin: 4px 0;">&copy; ${new Date().getFullYear()} EmissionSense. All rights reserved.</p>
+            <p style="font-size: 12px; color: #999; margin: 4px 0;">This is an automated message, please do not reply to this email.</p>
           </div>
         </div>
           `,

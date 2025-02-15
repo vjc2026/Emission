@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button, Group, Textarea, TextInput, Select } from '@mantine/core';
 import styles from './Text.module.css';
 
+type Task = {
+  id: number;
+  project_id: string; // Add project_id field
+  title: string;
+  description: string;
+  status: string;
+  type: string;
+  assignees: { email: string; name: string; role: string; profileImage: string }[];
+  spentTime: number;
+  isRunning: boolean;
+  startTime: number | null;
+  carbonEmit: number;
+  leader: { email: string; name: string; profileImage: string } | null;
+};
+
 const History = () => {
   // Existing task management state
   const [showActiveTasks, setShowActiveTasks] = useState(true);
@@ -9,6 +24,7 @@ const History = () => {
   const [tasks, setTasks] = useState([
     {
       id: 1,
+      project_id: 'PRJ-1', // Add project_id field
       title: 'Create draft design for Website using Figma',
       description: 'Design a draft for the new website using Figma.',
       status: 'In Progress',
@@ -132,6 +148,7 @@ const History = () => {
 
           return {
             id: project.id,
+            project_id: project.project_id, // Include project_id in task data
             title: project.project_name,
             description: project.project_description,
             status: project.status === 'Archived' ? 'Completed' : 'In Progress',
@@ -196,7 +213,8 @@ const History = () => {
           },
           body: JSON.stringify({ 
             sessionDuration: elapsed,
-            projectId: taskId 
+            projectId: taskId,
+            project_id: task.project_id // Include project_id in emissions calculation
           }),
         });
 
@@ -222,7 +240,29 @@ const History = () => {
           }));
         }
 
-        // Update task with new values
+        // Update task with new values and send to server
+        const updateResponse = await fetch('http://localhost:5000/user_Update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            projectName: task.title,
+            projectDescription: task.description,
+            sessionDuration: newSpentTime,
+            carbonEmissions: newCarbonEmit,
+            projectStage: task.type,
+            projectId: taskId,
+            project_id: task.project_id // Include project_id in update
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update task');
+        }
+
+        // Update local state
         setTasks(prevTasks => {
           const updatedTasks = prevTasks.map(t => {
             if (t.id === taskId) {
@@ -289,6 +329,11 @@ const History = () => {
     const nextStage = currentStageIndex < projectStages.length - 1 ? projectStages[currentStageIndex + 1] : null;
 
     try {
+      // First stop the timer if it's running
+      if (task.isRunning) {
+        await handleTimer(taskId);
+      }
+
       // Call the complete_project endpoint
       const completeResponse = await fetch(`http://localhost:5000/complete_project/${taskId}`, {
         method: 'POST',
@@ -296,127 +341,224 @@ const History = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ nextStage }),
+        body: JSON.stringify({ 
+          nextStage
+        }),
       });
 
       if (!completeResponse.ok) {
         throw new Error('Failed to complete project stage');
       }
 
+      const completionData = await completeResponse.json();
+
       setTasks(prevTasks => {
         const updatedTasks = prevTasks.map(t => {
           if (t.id === taskId) {
-            let updatedTask = { 
+            return { 
               ...t,
-              status: nextStage ? 'In Progress' : 'Completed',
-              type: nextStage || t.type
+              status: completionData.status,
+              type: completionData.stage
             };
-            if (t.isRunning) {
-              const elapsed = t.startTime ? Math.floor((Date.now() - t.startTime) / 1000) : 0;
-              updatedTask.spentTime += elapsed;
-              updatedTask.isRunning = false;
-              updatedTask.startTime = null;
-
-              // Calculate final emissions
-              const calculateFinalEmissions = async () => {
-                try {
-                  const emissionsEndpoint = currentDevice === 'Laptop' 
-                    ? 'http://localhost:5000/calculate_emissionsM'
-                    : 'http://localhost:5000/calculate_emissions';
-
-                  const response = await fetch(emissionsEndpoint, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ 
-                      sessionDuration: elapsed,
-                      projectId: taskId 
-                    }),
-                  });
-
-                  if (response.ok) {
-                    const { carbonEmissions } = await response.json();
-                    updatedTask.carbonEmit = (updatedTask.carbonEmit || 0) + carbonEmissions;
-                  }
-                } catch (err) {
-                  console.error('Error calculating final emissions:', err);
-                }
-              };
-
-              calculateFinalEmissions();
-            }
-            return updatedTask;
           }
           return t;
         });
         
         // Update selected task if it's currently selected
-        setSelectedTask(updatedTasks.find(task => task.id === taskId));
+        const updatedTask = updatedTasks.find(t => t.id === taskId);
+        if (selectedTask?.id === taskId && updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+
         return updatedTasks;
       });
 
-      // If this was the last stage, refresh the task list
-      if (!nextStage && user?.email) {
+      // Close the panel if the project is completed
+      if (completionData.status === 'Complete') {
+        setSelectedTask(null);
+      }
+
+      // Refresh the task list if needed
+      if (user?.email) {
         await fetchUserTasks(user.email);
       }
 
     } catch (err) {
       console.error('Error completing project stage:', err);
+      setError('Failed to complete project stage');
     }
   };
 
-  const handleAddTask = () => {
-    if (!newTask.title || !newTask.description) return;
-    
-    const task = {
-      id: Date.now(),
-      ...newTask,
-      status: 'In Progress',
-      spentTime: 0,
-      isRunning: false,
-      startTime: null,
-      carbonEmit: 0,
-      leader: null,
-    };
-    
-    setTasks([...tasks, task]);
-    setShowAddModal(false);
-    setNewTask({ title: '', description: '', type: 'Low', assignees: [] });
-  };
+  const handleAddTask = async () => {
+    if (!newTask.title || !newTask.description || !newTask.type) {
+      return;
+    }
 
-  const handleEditTask = () => {
-    setTasks(prevTasks => {
-      const updatedTasks = prevTasks.map(task => {
-        if (task.id === selectedTask.id) {
-          return { ...task, title: selectedTask.title, description: selectedTask.description, assignees: selectedTask.assignees };
-        }
-        return task;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      // Generate a unique project ID
+      const project_id = `PRJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create new project in the database
+      const response = await fetch('http://localhost:5000/user_history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          organization,
+          projectName: newTask.title,
+          projectDescription: newTask.description,
+          sessionDuration: 0,
+          carbonEmit: 0,
+          projectStage: newTask.type,
+          status: 'In-Progress',
+          project_id
+        }),
       });
-      setSelectedTask(updatedTasks.find(task => task.id === selectedTask.id));
-      return updatedTasks;
-    });
-    setIsEditing(false);
-  };
 
-  const handleAddAssignee = () => {
-    if (assigneeEmail && !newTask.assignees.includes(assigneeEmail)) {
-      setNewTask(prevTask => ({
-        ...prevTask,
-        assignees: [...prevTask.assignees, assigneeEmail],
-      }));
+      if (!response.ok) {
+        throw new Error('Failed to create project');
+      }
+
+      // Get the created project's ID from the response
+      const { projectId } = await response.json();
+
+      // Send invitations to all assignees
+      if (newTask.assignees.length > 0) {
+        const invitationPromises = newTask.assignees.map(async (assigneeEmail) => {
+          try {
+            const inviteResponse = await fetch('http://localhost:5000/send-invitation', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                recipientEmail: assigneeEmail,
+                projectId: projectId,
+                message: `You have been invited to join the project: ${newTask.title}`
+              }),
+            });
+
+            if (!inviteResponse.ok) {
+              console.warn(`Failed to send invitation to ${assigneeEmail}`);
+            }
+          } catch (error) {
+            console.warn(`Error sending invitation to ${assigneeEmail}:`, error);
+          }
+        });
+
+        // Wait for all invitations to be sent, but don't fail if some fail
+        await Promise.allSettled(invitationPromises);
+      }
+
+      // After successful project creation, fetch updated tasks list
+      if (user?.email) {
+        await fetchUserTasks(user.email);
+      }
+
+      // Reset form and close modal
+      setShowAddModal(false);
+      setNewTask({ title: '', description: '', type: 'Low', assignees: [] });
       setAssigneeEmail('');
+
+    } catch (err) {
+      console.error('Error creating project:', err);
+      setError('Failed to create project');
     }
   };
 
-  const handleEditAssignee = () => {
-    if (assigneeEmail && !selectedTask.assignees.includes(assigneeEmail)) {
-      setSelectedTask((prevTask: typeof selectedTask) => ({
-        ...prevTask,
-        assignees: [...prevTask.assignees, assigneeEmail],
-      }));
+  const handleAddAssignee = async () => {
+    if (!assigneeEmail) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      if (selectedTask) {
+        // Adding assignee to existing task
+        const response = await fetch('http://localhost:5000/send-invitation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            recipientEmail: assigneeEmail,
+            projectId: selectedTask.id,
+            message: `You have been invited to join the project: ${selectedTask.title}`
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send invitation');
+        }
+
+        // Update local state for existing task
+        setSelectedTask((prevTask: Task) => ({
+          ...prevTask,
+          assignees: [...prevTask.assignees, { email: assigneeEmail, name: 'Pending...', role: 'Member', profileImage: '' }]
+        }));
+
+        // Refresh the project members
+        if (user?.email) {
+          await fetchUserTasks(user.email);
+        }
+      } else {
+        // Adding assignee to new task
+        setNewTask(prevTask => ({
+          ...prevTask,
+          assignees: [...prevTask.assignees, assigneeEmail]
+        }));
+      }
+
       setAssigneeEmail('');
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      setError('Failed to send invitation');
+    }
+  };
+
+  // Update handleEditTask to handle project members
+  const handleEditTask = async () => {
+    if (!selectedTask) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      // Update project details
+      const updateResponse = await fetch(`http://localhost:5000/update_project/${selectedTask.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          projectName: selectedTask.title,
+          projectDescription: selectedTask.description,
+          projectStage: selectedTask.type,
+          project_id: selectedTask.project_id  // Include project_id in update
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update project');
+      }
+
+      // Refresh tasks list to get updated data
+      if (user?.email) {
+        await fetchUserTasks(user.email);
+      }
+
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error updating project:', err);
+      setError('Failed to update project');
     }
   };
 
@@ -502,9 +644,9 @@ const History = () => {
             value={newTask.type}
             onChange={(value) => setNewTask({ ...newTask, type: value || 'Low' })}
             data={[
-              { value: 'Low', label: 'Low' },
-              { value: 'Medium', label: 'Medium' },
-              { value: 'High', label: 'High' },
+              { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
+              { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
+              { value: 'Testing: Ensuring the software works as expected', label: 'High' },
             ]}
           />
           <TextInput
@@ -706,7 +848,7 @@ const History = () => {
                   value={assigneeEmail}
                   onChange={(e) => setAssigneeEmail(e.target.value)}
                 />
-                <Button onClick={handleEditAssignee}>Add Assignee</Button>
+                <Button onClick={handleAddAssignee}>Add Assignee</Button>
               </div>
             )}
             <div className={styles.panelButtons}>
