@@ -639,7 +639,7 @@ const History = () => {
             onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
           />
           <Select
-            label="Task Type"
+            label="Project Stage"
             placeholder="Select type"
             value={newTask.type}
             onChange={(value) => setNewTask({ ...newTask, type: value || 'Low' })}
