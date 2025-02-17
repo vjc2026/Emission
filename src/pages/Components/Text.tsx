@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Group, Textarea, TextInput, Select } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { Modal, Button, Group, Textarea, TextInput, Select, Badge, Text, NumberInput } from '@mantine/core';
+import { DatePicker, DateValue } from '@mantine/dates';
 import styles from './Text.module.css';
 
 type Task = {
   id: number;
-  project_id: string; // Add project_id field
+  project_id: string;
   title: string;
   description: string;
   status: string;
@@ -15,6 +17,11 @@ type Task = {
   startTime: number | null;
   carbonEmit: number;
   leader: { email: string; name: string; profileImage: string } | null;
+  stage_duration: number;
+  stage_start_date: string;
+  stage_due_date: string;
+  project_start_date: string;
+  project_due_date: string;
 };
 
 const History = () => {
@@ -24,17 +31,27 @@ const History = () => {
   const [tasks, setTasks] = useState([
     {
       id: 1,
-      project_id: 'PRJ-1', // Add project_id field
+      project_id: 'PRJ-1',
       title: 'Create draft design for Website using Figma',
       description: 'Design a draft for the new website using Figma.',
       status: 'In Progress',
       type: 'Low',
-      assignees: ['user1@example.com', 'user2@example.com', 'user3@example.com', 'user4@example.com'],
+      assignees: [
+        { email: 'user1@example.com', name: 'User 1', role: 'Member', profileImage: '' },
+        { email: 'user2@example.com', name: 'User 2', role: 'Member', profileImage: '' },
+        { email: 'user3@example.com', name: 'User 3', role: 'Member', profileImage: '' },
+        { email: 'user4@example.com', name: 'User 4', role: 'Member', profileImage: '' }
+      ],
       spentTime: 6840, // 1:54h in seconds
       isRunning: false,
       startTime: null as number | null,
       carbonEmit: 0,
       leader: null as { email: string; name: string; profileImage: string } | null,
+      stage_duration: 0,
+      stage_start_date: new Date().toISOString().split('T')[0],
+      stage_due_date: '',
+      project_start_date: new Date().toISOString().split('T')[0],
+      project_due_date: ''
     }
   ]);
   const [now, setNow] = useState(Date.now());
@@ -42,8 +59,13 @@ const History = () => {
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    type: 'Low',
+    type: 'Design: Creating the software architecture',
     assignees: [] as string[],
+    stage_duration: 14,
+    stage_start_date: new Date().toISOString().split('T')[0],
+    stage_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    project_start_date: new Date().toISOString().split('T')[0],
+    project_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
   const [selectedTask, setSelectedTask] = useState(null as any);
   const [isEditing, setIsEditing] = useState(false);
@@ -159,6 +181,11 @@ const History = () => {
             carbonEmit: project.carbon_emit,
             isRunning: false,
             startTime: null,
+            stage_duration: project.stage_duration,
+            stage_start_date: project.stage_start_date,
+            stage_due_date: project.stage_due_date,
+            project_start_date: project.project_start_date,
+            project_due_date: project.project_due_date
           };
         }));
 
@@ -186,6 +213,20 @@ const History = () => {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${days > 0 ? `${days}d ` : ''}${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m ` : ''}${secs}s`;
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Not set';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      console.error('Date formatting error:', e);
+      return 'Invalid date';
+    }
   };
 
   const handleTimer = async (taskId: number) => {
@@ -398,74 +439,59 @@ const History = () => {
     if (!token) return;
 
     try {
-      // Generate a unique project ID
-      const project_id = `PRJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const stage_duration = parseInt(newTask.stage_duration.toString()) || 14;
+      const now = new Date();
+      const stage_start_date = now.toISOString().split('T')[0];
+      const due_date = new Date(now);
+      due_date.setDate(now.getDate() + stage_duration);
+      const stage_due_date = due_date.toISOString().split('T')[0];
 
-      // Create new project in the database
+      const projectData = {
+        projectName: newTask.title,
+        projectDescription: newTask.description,
+        organization,
+        projectStage: newTask.type,
+        sessionDuration: 0,
+        carbonEmit: 0,
+        status: "In-Progress",
+        stage_duration,
+        stage_start_date,
+        stage_due_date,
+        project_start_date: stage_start_date,
+        project_due_date: stage_due_date
+      };
+
       const response = await fetch('http://localhost:5000/user_history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          organization,
-          projectName: newTask.title,
-          projectDescription: newTask.description,
-          sessionDuration: 0,
-          carbonEmit: 0,
-          projectStage: newTask.type,
-          status: 'In-Progress',
-          project_id
-        }),
+        body: JSON.stringify(projectData),
       });
 
       if (!response.ok) {
         throw new Error('Failed to create project');
       }
 
-      // Get the created project's ID from the response
-      const { projectId } = await response.json();
-
-      // Send invitations to all assignees
-      if (newTask.assignees.length > 0) {
-        const invitationPromises = newTask.assignees.map(async (assigneeEmail) => {
-          try {
-            const inviteResponse = await fetch('http://localhost:5000/send-invitation', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                recipientEmail: assigneeEmail,
-                projectId: projectId,
-                message: `You have been invited to join the project: ${newTask.title}`
-              }),
-            });
-
-            if (!inviteResponse.ok) {
-              console.warn(`Failed to send invitation to ${assigneeEmail}`);
-            }
-          } catch (error) {
-            console.warn(`Error sending invitation to ${assigneeEmail}:`, error);
-          }
-        });
-
-        // Wait for all invitations to be sent, but don't fail if some fail
-        await Promise.allSettled(invitationPromises);
-      }
-
-      // After successful project creation, fetch updated tasks list
+      const data = await response.json();
+      
       if (user?.email) {
         await fetchUserTasks(user.email);
       }
 
-      // Reset form and close modal
       setShowAddModal(false);
-      setNewTask({ title: '', description: '', type: 'Low', assignees: [] });
-      setAssigneeEmail('');
-
+      setNewTask({
+        title: '',
+        description: '',
+        type: 'Design: Creating the software architecture',
+        assignees: [],
+        stage_duration: 14,
+        stage_start_date: new Date().toISOString().split('T')[0],
+        stage_due_date: '',
+        project_start_date: new Date().toISOString().split('T')[0],
+        project_due_date: ''
+      });
     } catch (err) {
       console.error('Error creating project:', err);
       setError('Failed to create project');
@@ -542,12 +568,17 @@ const History = () => {
           projectName: selectedTask.title,
           projectDescription: selectedTask.description,
           projectStage: selectedTask.type,
-          project_id: selectedTask.project_id  // Include project_id in update
+          stage_duration: selectedTask.stage_duration,
+          stage_start_date: selectedTask.stage_start_date,
+          stage_due_date: selectedTask.stage_due_date,
+          project_due_date: selectedTask.project_due_date
         }),
       });
 
+      const responseData = await updateResponse.json();
+
       if (!updateResponse.ok) {
-        throw new Error('Failed to update project');
+        throw new Error(responseData.error || 'Failed to update project');
       }
 
       // Refresh tasks list to get updated data
@@ -558,7 +589,8 @@ const History = () => {
       setIsEditing(false);
     } catch (err) {
       console.error('Error updating project:', err);
-      setError('Failed to update project');
+      // Show error to user (you might want to add a state for error messages)
+      alert('Failed to update project: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
@@ -607,6 +639,61 @@ const History = () => {
     );
   };
 
+  // Add a function to calculate progress and status
+  const calculateProgress = (task: Task) => {
+    if (!task.stage_start_date || !task.stage_due_date) {
+      return { progress: 0, status: task.status };
+    }
+
+    try {
+      const now = new Date();
+      const startDate = new Date(task.stage_start_date);
+      const dueDate = new Date(task.stage_due_date);
+
+      if (isNaN(startDate.getTime()) || isNaN(dueDate.getTime())) {
+        return { progress: 0, status: task.status };
+      }
+
+      const totalDuration = dueDate.getTime() - startDate.getTime();
+      const elapsed = now.getTime() - startDate.getTime();
+      const progress = totalDuration > 0 ? Math.min(100, Math.max(0, (elapsed / totalDuration) * 100)) : 0;
+
+      let status = task.status;
+      if (now > dueDate && status === 'In-Progress') {
+        status = 'Delayed';
+      } else if (progress > 90 && status === 'In-Progress') {
+        status = 'At Risk';
+      }
+
+      return { progress, status };
+    } catch (e) {
+      console.error('Error calculating progress:', e);
+      return { progress: 0, status: task.status };
+    }
+  };
+
+  // Add useEffect to update stage_due_date when stage_duration changes
+  useEffect(() => {
+    if (newTask.stage_start_date && newTask.stage_duration) {
+      const startDate = new Date(newTask.stage_start_date);
+      const dueDate = new Date(startDate);
+      dueDate.setDate(startDate.getDate() + newTask.stage_duration);
+      setNewTask(prev => ({
+        ...prev,
+        stage_due_date: dueDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [newTask.stage_start_date, newTask.stage_duration]);
+
+  const handleDateChange = (date: DateValue, field: keyof Task) => {
+    if (!selectedTask || !date) return;
+    
+    setSelectedTask({
+      ...selectedTask,
+      [field]: date.toISOString().split('T')[0]
+    });
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -631,24 +718,54 @@ const History = () => {
             placeholder="Task title"
             value={newTask.title}
             onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            required
           />
           <Textarea
             label="Task Description"
             placeholder="Task description"
             value={newTask.description}
             onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+            required
           />
           <Select
             label="Project Stage"
             placeholder="Select type"
             value={newTask.type}
-            onChange={(value) => setNewTask({ ...newTask, type: value || 'Low' })}
+            onChange={(value) => setNewTask({ ...newTask, type: value || 'Design: Creating the software architecture' })}
             data={[
               { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
               { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
-              { value: 'Testing: Ensuring the software works as expected', label: 'High' },
+              { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
             ]}
+            required
           />
+          <NumberInput
+            label="Stage Duration (days)"
+            value={newTask.stage_duration}
+            onChange={(value) => {
+              const duration = Number(value) || 14;
+              const startDate = new Date();
+              const dueDate = new Date(startDate);
+              dueDate.setDate(startDate.getDate() + duration);
+              
+              setNewTask({
+                ...newTask,
+                stage_duration: duration,
+                stage_start_date: startDate.toISOString().split('T')[0],
+                stage_due_date: dueDate.toISOString().split('T')[0],
+                project_start_date: startDate.toISOString().split('T')[0],
+                project_due_date: dueDate.toISOString().split('T')[0]
+              });
+            }}
+            min={1}
+            max={365}
+            required
+          />
+          <div className={styles.dateGrid}>
+            <Text size="sm" fw={500} style={{ marginTop: '1rem' }}>Timeline Dates</Text>
+            <Text size="xs" color="dimmed">Start Date: {formatDate(newTask.stage_start_date)}</Text>
+            <Text size="xs" color="dimmed">Due Date: {formatDate(newTask.stage_due_date)}</Text>
+          </div>
           <TextInput
             label="Assignee Email"
             placeholder="Enter assignee email"
@@ -665,8 +782,7 @@ const History = () => {
             ))}
           </div>
           <Group align="right" mt="md">
-            <Button onClick={handleAddTask}>Add Task</Button>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
+            <Button onClick={handleAddTask} style={{ backgroundColor: '#006400', color: '#fff' }}>Create</Button>
           </Group>
         </div>
       </Modal>
@@ -685,6 +801,8 @@ const History = () => {
                   <th>Type</th>
                   <th>Leader</th>
                   <th>Assignees</th>
+                  <th>Timeline</th>
+                  <th>Progress</th>
                   <th>Spent Time</th>
                   <th>Carbon Emissions</th>
                 </tr>
@@ -695,31 +813,47 @@ const History = () => {
                     ? task.spentTime + (task.startTime ? Math.floor((Date.now() - task.startTime) / 1000) : 0)
                     : task.spentTime;
 
+                  const { progress, status } = calculateProgress(task);
+                  const progressColor = status === 'Delayed' ? 'red' 
+                    : status === 'At Risk' ? 'yellow' 
+                    : 'green';
+
+                  const daysRemaining = Math.ceil((new Date(task.stage_due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
                   return (
                     <tr key={task.id} onClick={() => handleTaskClick(task)}>
                       <td>{task.title}</td>
-                      <td>{task.status}</td>
+                      <td>
+                        <Badge 
+                          color={status === 'Delayed' ? 'red' : status === 'At Risk' ? 'yellow' : 'green'}
+                        >
+                          {status}
+                        </Badge>
+                      </td>
                       <td>{task.type}</td>
                       <td>
-                        {task.leader && (
-                          <div className={styles.assignee}>
-                            <img 
-                              src={task.leader.profileImage || '/default-avatar.png'} 
-                              alt={task.leader.name}
-                              className={styles.assigneeAvatar}
-                              onError={(e: any) => {
-                                e.target.onerror = null;
-                                e.target.src = '/default-avatar.png';
-                              }}
-                            />
-                            <div className={styles.assigneeInfo}>
-                              <span className={styles.assigneeName}>{task.leader.name}</span>
-                              <span className={styles.assigneeRole}>Leader</span>
-                            </div>
-                          </div>
-                        )}
+                        {task.leader && renderAssignees([task.leader])}
                       </td>
                       <td>{renderAssignees(task.assignees)}</td>
+                      <td>
+                        <div className={styles.timelineInfo}>
+                          <div>Start: {new Date(task.stage_start_date).toLocaleDateString()}</div>
+                          <div>Due: {new Date(task.stage_due_date).toLocaleDateString()}</div>
+                          <div>{daysRemaining} days remaining</div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.progressBar}>
+                          <div 
+                            className={styles.progressFill} 
+                            style={{ 
+                              width: `${progress}%`,
+                              backgroundColor: progressColor 
+                            }} 
+                          />
+                          <span>{Math.round(progress)}%</span>
+                        </div>
+                      </td>
                       <td>{formatTime(currentSeconds)}</td>
                       <td>{task.carbonEmit ? `${task.carbonEmit.toFixed(2)} kg CO2` : '0 kg CO2'}</td>
                     </tr>
@@ -800,17 +934,101 @@ const History = () => {
           </div>
           <div className={styles.panelContent}>
             {isEditing ? (
-              <Textarea
-                label="Task Description"
-                value={selectedTask.description}
-                onChange={(e) => setSelectedTask({ ...selectedTask, description: e.target.value })}
-                placeholder="Enter task description"
-              />
+              <>
+                <Textarea
+                  label="Task Description"
+                  value={selectedTask.description}
+                  onChange={(e) => setSelectedTask({ ...selectedTask, description: e.target.value })}
+                  placeholder="Enter task description"
+                />
+                <NumberInput
+                  label="Stage Duration (days)"
+                  value={selectedTask.stage_duration || 14}
+                  onChange={(value) => {
+                    const duration = Number(value);
+                    if (!isNaN(duration) && duration > 0) {
+                      const startDate = new Date(selectedTask.stage_start_date || new Date());
+                      const dueDate = new Date(startDate);
+                      dueDate.setDate(startDate.getDate() + duration);
+                      setSelectedTask({
+                        ...selectedTask,
+                        stage_duration: duration,
+                        stage_due_date: dueDate.toISOString().split('T')[0]
+                      });
+                    }
+                  }}
+                  min={1}
+                  max={365}
+                />
+                
+                
+              </>
             ) : (
-              <p>{selectedTask.description}</p>
+              <>
+                <p>{selectedTask.description}</p>
+                <div className={styles.timelineDetails}>
+                  <h3>Timeline Details</h3>
+                  <div className={styles.timelineGrid}>
+                    <div>
+                      <strong>Stage Duration:</strong> {selectedTask.stage_duration} days
+                    </div>
+                    <div>
+                      <strong>Stage Start:</strong> {formatDate(selectedTask.stage_start_date)}
+                    </div>
+                    <div>
+                      <strong>Stage Due:</strong> {formatDate(selectedTask.stage_due_date)}
+                    </div>
+                    <div>
+                      <strong>Project Due:</strong> {formatDate(selectedTask.project_due_date)}
+                    </div>
+                  </div>
+                  <div className={styles.progressSection}>
+                    <strong>Progress:</strong>
+                    {(() => {
+                      const { progress, status } = calculateProgress(selectedTask);
+                      const daysLeft = selectedTask.stage_due_date ? 
+                        Math.ceil((new Date(selectedTask.stage_due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 
+                        0;
+
+                      return (
+                        <>
+                          <div className={styles.progressBar}>
+                            <div 
+                              className={styles.progressFill} 
+                              style={{ 
+                                width: `${progress}%`,
+                                backgroundColor: status === 'Delayed' ? '#ff4d4f' : 
+                                               status === 'At Risk' ? '#faad14' : 
+                                               '#52c41a'
+                              }} 
+                            />
+                            <span>{Math.round(progress)}%</span>
+                          </div>
+                          <div className={styles.progressInfo}>
+                            <Badge 
+                              color={status === 'Delayed' ? 'red' : 
+                                    status === 'At Risk' ? 'yellow' : 
+                                    'green'}
+                            >
+                              {status}
+                            </Badge>
+                            {daysLeft > 0 && (
+                              <Text size="sm" color="dimmed">
+                                {daysLeft} days remaining
+                              </Text>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </>
             )}
-            <p><strong>Status:</strong> {selectedTask.status}</p>
-            <p><strong>Type:</strong> {selectedTask.type}</p>
+            <div className={styles.taskMeta}>
+              <p><strong>Status:</strong> {selectedTask.status}</p>
+              <p><strong>Type:</strong> {selectedTask.type}</p>
+            </div>
             {selectedTask.leader && (
               <div className={styles.leaderSection}>
                 <strong>Project Leader:</strong>

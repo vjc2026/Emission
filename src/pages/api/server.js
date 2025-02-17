@@ -334,32 +334,62 @@ app.get('/user', authenticateToken, (req, res) => {
 
 app.post('/user_history', authenticateToken, (req, res) => {
   const { organization, projectName, projectDescription, sessionDuration, carbonEmit, projectStage, status } = req.body;
-  const userId = req.user.id; // Get the user ID from the authenticated token
+  const userId = req.user.id;
 
-  // Log the data being inserted
-  console.log('Inserting session data:', {
-    userId,
-    organization,
-    projectName,
-    projectDescription,
-    sessionDuration,
-    carbonEmit,
-    projectStage, // Log the new field
-    status
-  });
+  // Set default values for timeline fields with more robust date handling
+  const now = new Date();
+  const stage_start_date = req.body.stage_start_date || now.toISOString().split('T')[0];
+  const stage_duration = req.body.stage_duration || 14;
+  
+  // Calculate stage_due_date based on stage_duration
+  const due_date = new Date(stage_start_date);
+  due_date.setDate(due_date.getDate() + stage_duration);
+  const stage_due_date = req.body.stage_due_date || due_date.toISOString().split('T')[0];
+  
+  // Set project dates
+  const project_start_date = req.body.project_start_date || stage_start_date;
+  const project_due_date = req.body.project_due_date || stage_due_date;
+
+  // Validate dates
+  const dates = [stage_start_date, stage_due_date, project_start_date, project_due_date];
+  for (const date of dates) {
+    if (isNaN(new Date(date).getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+  }
 
   const query = `
-    INSERT INTO user_history (user_id, organization, project_name, project_description, session_duration, carbon_emit, stage, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO user_history (
+      user_id, organization, project_name, project_description, 
+      session_duration, carbon_emit, stage, status,
+      stage_duration, stage_start_date, stage_due_date,
+      project_start_date, project_due_date
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  connection.query(query, [userId, organization, projectName, projectDescription, sessionDuration, carbonEmit, projectStage, status], (err, results) => {
+  connection.query(query, [
+    userId, organization, projectName, projectDescription, 
+    sessionDuration, carbonEmit, projectStage, status,
+    stage_duration, stage_start_date, stage_due_date,
+    project_start_date, project_due_date
+  ], (err, results) => {
     if (err) {
       console.error('Error inserting session data into the database:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    res.status(200).json({ message: 'Session recorded successfully' });
+    res.status(200).json({ 
+      message: 'Session recorded successfully',
+      projectId: results.insertId,
+      timeline: {
+        stage_duration,
+        stage_start_date,
+        stage_due_date,
+        project_start_date,
+        project_due_date
+      }
+    });
   });
 });
 
@@ -460,27 +490,67 @@ app.get('/user_project_display', authenticateToken, (req, res) => {
 
 // Endpoint to update a project
 app.put('/update_project/:id', authenticateToken, (req, res) => {
-  const projectId = req.params.id; // Get project ID from request parameters
-  const userId = req.user.id; // Get user ID from the authenticated token
-  const { projectName, projectDescription, projectStage } = req.body; // Get project data from the request body
+  const projectId = req.params.id;
+  const userId = req.user.id;
+  const { 
+    projectName, 
+    projectDescription, 
+    projectStage,
+    stage_duration,
+    stage_start_date,
+    stage_due_date,
+    project_due_date 
+  } = req.body;
+
+  console.log('Update request received:', {
+    projectId,
+    userId,
+    projectName,
+    projectDescription,
+    projectStage,
+    stage_duration
+  });
+
+  // Basic validation
+  if (!projectName || !projectDescription) {
+    console.log('Missing required fields');
+    return res.status(400).json({ error: 'Project name and description are required' });
+  }
 
   const query = `
     UPDATE user_history 
-    SET project_name = ?, project_description = ?, stage = ? 
-    WHERE id = ? AND user_id = ?
+    SET project_name = ?,
+        project_description = ?,
+        stage = ?,
+        stage_duration = ?
+    WHERE id = ? AND (user_id = ? OR id IN (SELECT project_id FROM project_members WHERE user_id = ?))
   `;
 
-  connection.query(query, [projectName, projectDescription, projectStage, projectId, userId], (err, results) => {
+  connection.query(query, [
+    projectName,
+    projectDescription,
+    projectStage || 'Design: Creating the software architecture',
+    stage_duration || 14,
+    projectId,
+    userId,
+    userId
+  ], (err, results) => {
     if (err) {
-      console.error('Error updating project in the database:', err);
-      return res.status(500).json({ error: 'Database error' });
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error', details: err.message });
     }
 
-    if (results.affectedRows > 0) {
-      res.status(200).json({ message: 'Project updated successfully' });
-    } else {
-      res.status(404).json({ error: 'Project not found or you do not have permission to update this project' });
+    if (results.affectedRows === 0) {
+      console.log('No rows affected');
+      return res.status(404).json({ error: 'Project not found or no permission to update' });
     }
+
+    console.log('Update successful:', results);
+    res.status(200).json({ 
+      message: 'Project updated successfully',
+      projectId: projectId,
+      affectedRows: results.affectedRows
+    });
   });
 });
 
@@ -1696,13 +1766,19 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
   const userId = req.user.id;
 
   const userProjectsQuery = `
-    SELECT id, organization, project_name, project_description, session_duration, carbon_emit, stage, status 
+    SELECT id, organization, project_name, project_description, 
+           session_duration, carbon_emit, stage, status,
+           stage_duration, stage_start_date, stage_due_date,
+           project_start_date, project_due_date
     FROM user_history 
     WHERE user_id = ? AND status NOT IN ('Complete', 'Archived')
   `;
 
   const invitedProjectsQuery = `
-    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, uh.session_duration, uh.carbon_emit, uh.stage, uh.status 
+    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, 
+           uh.session_duration, uh.carbon_emit, uh.stage, uh.status,
+           uh.stage_duration, uh.stage_start_date, uh.stage_due_date,
+           uh.project_start_date, uh.project_due_date
     FROM user_history uh
     JOIN project_members pm ON uh.id = pm.project_id
     WHERE pm.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
@@ -2150,3 +2226,25 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   next();
 }, express.static(path.join(__dirname, 'uploads')));
+
+// Endpoint to initialize timeline dates for existing records
+app.post('/initialize_timeline_dates', authenticateAdmin, (req, res) => {
+  const updateQuery = `
+    UPDATE user_history 
+    SET stage_start_date = created_at,
+        project_start_date = created_at 
+    WHERE stage_start_date IS NULL OR project_start_date IS NULL
+  `;
+
+  connection.query(updateQuery, (err, results) => {
+    if (err) {
+      console.error('Error updating timeline dates:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ 
+      message: 'Timeline dates initialized successfully',
+      recordsUpdated: results.affectedRows 
+    });
+  });
+});

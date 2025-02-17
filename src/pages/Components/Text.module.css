@@ -89,10 +89,26 @@
   border: 1px solid #ddd;
   border-radius: 5px;
   margin-bottom: 10px;
+  transition: all 0.3s ease;
 }
 
 .taskItem.completed {
   background-color: #f0f0f0;
+}
+
+.taskItem.delayed {
+  border-color: #ff4d4f;
+  background-color: rgba(255, 77, 79, 0.05);
+}
+
+.taskItem.atRisk {
+  border-color: #faad14;
+  background-color: rgba(250, 173, 20, 0.05);
+}
+
+.taskItem.onTrack {
+  border-color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.05);
 }
 
 .taskDetails {
@@ -363,8 +379,7 @@
 .addForm {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 16px;
+  gap: 1rem;
 }
 
 .addForm input,
@@ -376,6 +391,7 @@
   border-radius: 8px;
   transition: all 0.2s ease;
   font-size: 14px;
+  margin-bottom: 0.5rem;
 }
 
 .addForm input:focus,
@@ -384,6 +400,14 @@
   border-color: #006F3C;
   box-shadow: 0 0 0 3px rgba(0,111,60,0.1);
   outline: none;
+}
+
+.addForm .mantine-NumberInput-wrapper {
+  margin-bottom: 0;
+}
+
+.addForm .mantine-NumberInput-input {
+  width: 100%;
 }
 
 .assigneesList {
@@ -472,4 +496,239 @@
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-5px); }
   40%, 80% { transform: translateX(5px); }
+}
+
+.timelineInfo {
+  font-size: 0.9rem;
+  color: #666;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 20px;
+  background-color: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progressBar span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #333;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.timelineDetails {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.timelineGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.progressSection {
+  margin-top: 1rem;
+}
+
+.progressSection strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.timelineDetails h3 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+/* Make the progress bar larger in the details panel */
+.timelineDetails .progressBar {
+  height: 24px;
+  margin: 0.5rem 0;
+}
+
+.timelineDetails .progressBar span {
+  font-size: 1rem;
+}
+
+.dateGrid {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.timelinePreview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1rem;
+}
+
+.editSection {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.sectionTitle {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: #2C3E50;
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.dateInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.teamSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.currentTeam {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.memberBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.smallAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.titleInput {
+  margin: -0.5rem 0;
+}
+
+.panelButtons {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.editHeader {
+  padding: 1rem 0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.formColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timelineGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.timelineSummary {
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.timelineInfo {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.assigneeSection {
+  border-top: 1px solid #e9ecef;
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.assigneeInput {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.assigneesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.removeBadge {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.removeBadge:hover {
+  opacity: 1;
+}
+
+.editForm {
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
