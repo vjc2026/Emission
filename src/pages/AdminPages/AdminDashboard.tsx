@@ -28,6 +28,7 @@ interface Project {
   owner: string; // Owner email
   organization: string; // Add organization field
   members: string[]; // Add members field
+  created_at: string; // Add created_at field
 }
 
 interface ThProps {
@@ -42,7 +43,7 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
   return (
     <Table.Th className={classes.th}>
       <UnstyledButton onClick={onSort} className={classes.control}>
-        <Group position="column" align="center" spacing={0}> {/* Change direction to column and add spacing */}
+        <Group align="center" gap={0}>
           <Text fw={500} fz="sm">
             {children}
           </Text>
@@ -134,6 +135,11 @@ const fetchProjectMembers = async (projectId: number) => {
     console.error('Error fetching project members:', error);
     return 'Error fetching members';
   }
+};
+
+// Add a function to format the date nicely
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString();
 };
 
 const AdminDashboard: React.FC = () => {
@@ -272,9 +278,10 @@ const AdminDashboard: React.FC = () => {
         <Table.Td onClick={() => toggleMembers(project.id)} style={{ cursor: 'pointer' }}>
           {expandedProjectId === project.id ? 'Hide Members' : 'Show Members'}
         </Table.Td> {/* Toggle members dropdown */}
+        <Table.Td>{formatDate(project.created_at)}</Table.Td> {/* Add created_at column */}
       </Table.Tr>
       <Table.Tr>
-        <Table.Td colSpan={9} style={{ padding: 0 }}>
+        <Table.Td colSpan={10} style={{ padding: 0 }}>
           <Collapse in={expandedProjectId === project.id}>
             <div style={{ padding: '10px 20px' }}>
               <Text fw={500} mb="xs">Members</Text> {/* Add Members header */}
@@ -368,6 +375,13 @@ const AdminDashboard: React.FC = () => {
                   >
                     Members
                   </Th> {/* Add members column */}
+                  <Th 
+                    sorted={sortBy === 'created_at'}
+                    reversed={reverseSortDirection}
+                    onSort={() => setSorting('created_at')}
+                  >
+                    Created At
+                  </Th>
                 </Table.Tr>
               </Table.Tbody>
               <Table.Tbody>
@@ -375,7 +389,7 @@ const AdminDashboard: React.FC = () => {
                   rows
                 ) : (
                   <Table.Tr>
-                    <Table.Td colSpan={9}>
+                    <Table.Td colSpan={10}>
                       <Text fw={500} ta="center">
                         Nothing found
                       </Text>

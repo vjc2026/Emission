@@ -461,6 +461,7 @@ const History = () => {
         project_due_date: stage_due_date
       };
 
+      // Create the project first
       const response = await fetch('http://localhost:5000/user_history', {
         method: 'POST',
         headers: {
@@ -475,10 +476,45 @@ const History = () => {
       }
 
       const data = await response.json();
+      const projectId = data.projectId;
+
+      // Send invitations to all assignees
+      const invitationPromises = newTask.assignees.map(async (assigneeEmail) => {
+        try {
+          const inviteResponse = await fetch('http://localhost:5000/send-invitation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              recipientEmail: assigneeEmail,
+              projectId: projectId,
+              message: `You have been invited to join the project: ${newTask.title}`
+            }),
+          });
+
+          if (!inviteResponse.ok) {
+            console.error(`Failed to send invitation to ${assigneeEmail}`);
+          }
+        } catch (err) {
+          console.error(`Error sending invitation to ${assigneeEmail}:`, err);
+        }
+      });
+
+      // Wait for all invitations to be sent
+      await Promise.all(invitationPromises);
       
       if (user?.email) {
         await fetchUserTasks(user.email);
       }
+
+      // Show success notification
+      notifications.show({
+        title: 'Project Created',
+        message: 'Project created successfully and invitations sent to team members',
+        color: 'green',
+      });
 
       setShowAddModal(false);
       setNewTask({
@@ -494,7 +530,12 @@ const History = () => {
       });
     } catch (err) {
       console.error('Error creating project:', err);
-      setError('Failed to create project');
+      // Show error notification
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to create project or send invitations',
+        color: 'red',
+      });
     }
   };
 
