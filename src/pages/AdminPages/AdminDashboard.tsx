@@ -88,12 +88,12 @@ function sortData(
 // Function to get CSS class based on status
 const getStatusClass = (status: string) => {
   switch (status) {
-    case 'In-Progress':
+    case 'In Progress':
       return classes.statusInProgress;
     case 'Complete':
       return classes.statusComplete;
-    case 'Archived': // Add case for Archived status
-      return classes.statusArchived; // Apply red color class
+    case 'Archived':
+      return classes.statusArchived;
     default:
       return '';
   }
