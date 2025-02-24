@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from './AdminLayout';
-import { IconChevronDown, IconChevronUp, IconSearch, IconSelector } from '@tabler/icons-react';
+import { IconSearch, IconChevronUp, IconChevronDown, IconSelector, IconPlus, IconTrash, IconEdit } from '@tabler/icons-react';
 import {
-  Center,
+  Badge,
+  Modal,
+  Button,
   Group,
-  keys,
-  ScrollArea,
-  Table,
   Text,
   TextInput,
+  ScrollArea,
+  Collapse,
+  Table,
   UnstyledButton,
-  Button, // Import Button component
-  Modal, // Import Modal component
-  Collapse, // Import Collapse component
+  Center,
+  Select,
+  Textarea,
+  Paper
 } from '@mantine/core';
 import classes from './AdminDashboard.module.css';
 
@@ -29,6 +32,12 @@ interface Project {
   organization: string; // Add organization field
   members: string[]; // Add members field
   created_at: string; // Add created_at field
+  stage_duration?: number;  // Add optional fields for timeline
+  stage_start_date?: string;
+  stage_due_date?: string;
+  project_start_date?: string;
+  project_due_date?: string;
+  carbonEmit?: number;
 }
 
 interface ThProps {
@@ -59,7 +68,7 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
 function filterData(data: Project[], search: string) {
   const query = search.toLowerCase().trim();
   return data.filter((item) =>
-    keys(data[0]).some((key) => item[key].toString().toLowerCase().includes(query))
+    data.length > 0 && Object.keys(data[0]).some((key) => item[key as keyof Project]?.toString().toLowerCase().includes(query))
   );
 }
 
@@ -76,10 +85,10 @@ function sortData(
   return filterData(
     [...data].sort((a, b) => {
       if (payload.reversed) {
-        return b[sortBy].toString().localeCompare(a[sortBy].toString());
+        return (b[sortBy]?.toString() ?? '').localeCompare(a[sortBy]?.toString() ?? '');
       }
 
-      return a[sortBy].toString().localeCompare(b[sortBy].toString());
+      return (a[sortBy]?.toString() ?? '').localeCompare(b[sortBy]?.toString() ?? '');
     }),
     payload.search
   );
@@ -142,6 +151,36 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString();
 };
 
+const renderAssignees = (members: string[]) => {
+  const membersList = Array.isArray(members) ? members : [];
+  const displayedMembers = membersList.slice(0, 3);
+  const remainingCount = membersList.length - displayedMembers.length;
+
+  return (
+    <div className={classes.assignees}>
+      {displayedMembers.map((member, index) => (
+        <div key={index} className={classes.assignee}>
+          <img 
+            src={`https://www.gravatar.com/avatar/${member}?d=identicon`}
+            alt={member}
+            className={classes.assigneeAvatar}
+            onError={(e: any) => {
+              e.target.onerror = null;
+              e.target.src = '/default-avatar.png';
+            }}
+          />
+          <span>{member}</span>
+        </div>
+      ))}
+      {remainingCount > 0 && (
+        <div className={classes.moreAssignees}>
+          +{remainingCount}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminDashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +191,24 @@ const AdminDashboard: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null); // Add state for selected project
   const [isModalOpen, setIsModalOpen] = useState(false); // Add state for modal visibility
   const [expandedProjectId, setExpandedProjectId] = useState<number | null>(null); // Add state for expanded project
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // Add state for edit modal visibility
+  const [editTitle, setEditTitle] = useState(''); // Add state for edit title
+  const [editDescription, setEditDescription] = useState(''); // Add state for edit description
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // Add state for create modal visibility
+  const [newProject, setNewProject] = useState({
+    project_name: '',
+    project_description: '',
+    status: 'In Progress',
+    stage: 'Design: Creating the software architecture',
+    carbon_emit: 0,
+    session_duration: 0,
+    owner: '',
+    organization: '', // This will be set automatically based on owner
+    members: [] as string[],
+    created_at: new Date().toISOString(),
+  });
+  const [newProjectAssignee, setNewProjectAssignee] = useState('');
+  const [assigneeEmail, setAssigneeEmail] = useState(''); // Add state for assignee email
   const router = useRouter();
 
   useEffect(() => {
@@ -257,167 +314,587 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const toggleMembers = (projectId: number) => {
-    setExpandedProjectId(expandedProjectId === projectId ? null : projectId);
+  const calculateProgress = (project: Project) => {
+    // Assuming each stage has equal weight
+    const stages = [
+      'Design: Creating the software architecture',
+      'Development: Writing the actual code',
+      'Testing: Ensuring the software works as expected'
+    ];
+    
+    const currentStageIndex = stages.indexOf(project.stage);
+    if (currentStageIndex === -1) return 0;
+    
+    return ((currentStageIndex + 1) / stages.length) * 100;
+  };
+
+  const closePanel = () => {
+    setSelectedProject(null);
+  };
+
+  // Function to handle opening the edit modal
+  const handleEditProject = () => {
+    if (selectedProject) {
+      setEditTitle(selectedProject.project_name);
+      setEditDescription(selectedProject.project_description);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  // Function to handle saving the edited project
+  const handleSaveEdit = () => {
+    if (selectedProject) {
+      const updatedProject = {
+        ...selectedProject,
+        project_name: editTitle,
+        project_description: editDescription,
+      };
+
+      setProjects(projects.map(project => project.id === selectedProject.id ? updatedProject : project));
+      setSortedData(sortedData.map(project => project.id === selectedProject.id ? updatedProject : project));
+      setSelectedProject(updatedProject);
+      setIsEditModalOpen(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      // First, fetch the owner's organization
+      const ownerResponse = await fetch(`http://localhost:5000/user_organization/${newProject.owner}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!ownerResponse.ok) {
+        throw new Error(`Error fetching owner organization: ${ownerResponse.status}`);
+      }
+
+      const ownerData = await ownerResponse.json();
+      const ownerOrganization = ownerData.organization;
+
+      // Create project with the owner's organization
+      const projectToCreate = {
+        ...newProject,
+        organization: ownerOrganization,
+        members: [...newProject.members],
+      };
+
+      const response = await fetch('http://localhost:5000/admin/create_project', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectToCreate),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+
+      const createdProject = await response.json();
+      setProjects([...projects, createdProject]);
+      setSortedData([...projects, createdProject]);
+      setIsCreateModalOpen(false);
+      
+      // Reset form
+      setNewProject({
+        project_name: '',
+        project_description: '',
+        status: 'In Progress',
+        stage: 'Design: Creating the software architecture',
+        carbon_emit: 0,
+        session_duration: 0,
+        owner: '',
+        organization: '',
+        members: [],
+        created_at: new Date().toISOString(),
+      });
+      setNewProjectAssignee('');
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+      console.error('Error creating project:', error);
+    }
+  };
+
+  const handleAddAssignee = async () => {
+    if (selectedProject && assigneeEmail) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No token found');
+        }
+  
+        const response = await fetch('http://localhost:5000/add_project_member', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectId: selectedProject.id,
+            userId: assigneeEmail, // Assuming assigneeEmail is the user ID
+            role: 'member',
+          }),
+        });
+  
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status} ${response.statusText}`);
+        }
+  
+        const updatedProject = {
+          ...selectedProject,
+          members: [...selectedProject.members, assigneeEmail],
+        };
+  
+        setProjects(projects.map(project => project.id === selectedProject.id ? updatedProject : project));
+        setSortedData(sortedData.map(project => project.id === selectedProject.id ? updatedProject : project));
+        setSelectedProject(updatedProject);
+        setAssigneeEmail('');
+      } catch (error) {
+        console.error('Error adding assignee:', error);
+        alert("An error occurred while adding the assignee. Please try again later.");
+      }
+    }
+  };
+
+  const handleAddNewProjectAssignee = () => {
+    if (newProjectAssignee && !newProject.members.includes(newProjectAssignee)) {
+      setNewProject({
+        ...newProject,
+        members: [...newProject.members, newProjectAssignee]
+      });
+      setNewProjectAssignee('');
+    }
   };
 
   const rows = sortedData.map((project) => (
     <React.Fragment key={project.id}>
-      <Table.Tr
+      <tr 
         onClick={() => setSelectedProject(project)}
-        className={`${classes.projectRow} ${selectedProject?.id === project.id ? classes.selectedRow : ''}`} // Highlight selected project and apply cursor style
+        className={`${classes.projectRow} ${selectedProject?.id === project.id ? classes.selectedRow : ''}`}
       >
-        <Table.Td>{project.project_name}</Table.Td>
-        <Table.Td>{project.project_description}</Table.Td>
-        <Table.Td className={getStatusClass(project.status)}>{project.status}</Table.Td> {/* Apply color to status */}
-        <Table.Td>{project.stage}</Table.Td>
-        <Table.Td>{project.carbon_emit.toFixed(3)}</Table.Td>
-        <Table.Td>{formatDuration(project.session_duration)}</Table.Td> {/* Format session duration */}
-        <Table.Td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.owner}</Table.Td> {/* Handle text overflow for owner */}
-        <Table.Td>{project.organization}</Table.Td> {/* Display organization */}
-        <Table.Td onClick={() => toggleMembers(project.id)} style={{ cursor: 'pointer' }}>
-          {expandedProjectId === project.id ? 'Hide Members' : 'Show Members'}
-        </Table.Td> {/* Toggle members dropdown */}
-        <Table.Td>{formatDate(project.created_at)}</Table.Td> {/* Add created_at column */}
-      </Table.Tr>
-      <Table.Tr>
-        <Table.Td colSpan={10} style={{ padding: 0 }}>
-          <Collapse in={expandedProjectId === project.id}>
-            <div style={{ padding: '10px 20px' }}>
-              <Text fw={500} mb="xs">Members</Text> {/* Add Members header */}
-              {project.members}
+        <td>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '6px',
+              background: `hsl(${project.id * 40}, 70%, 90%)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '16px',
+              fontWeight: '500',
+              color: `hsl(${project.id * 40}, 70%, 30%)`
+            }}>
+              {project.project_name.charAt(0).toUpperCase()}
             </div>
-          </Collapse>
-        </Table.Td>
-      </Table.Tr>
+            {project.project_name}
+          </div>
+        </td>
+        <td>
+          <div style={{ 
+            maxWidth: '200px', 
+            whiteSpace: 'nowrap', 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis' 
+          }}>
+            {project.project_description}
+          </div>
+        </td>
+        <td>
+          <Badge 
+            variant="light"
+            radius="sm"
+            size="lg"
+            color={
+              project.status === 'Complete' ? 'blue' :
+              project.status === 'Archived' ? 'gray' :
+              'green'
+            }
+          >
+            {project.status}
+          </Badge>
+        </td>
+        <td>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: project.stage.includes('Design') ? '#22c55e' :
+                        project.stage.includes('Development') ? '#3b82f6' :
+                        '#a855f7'
+            }} />
+            {project.stage}
+          </div>
+        </td>
+        <td>
+          <div className={classes.progressBar}>
+            <div 
+              className={classes.progressFill} 
+              style={{ 
+                width: `${calculateProgress(project)}%`,
+                backgroundColor: project.status === 'Complete' ? '#3b82f6' : '#22c55e'
+              }} 
+            />
+            <span>{Math.round(calculateProgress(project))}%</span>
+          </div>
+        </td>
+        <td>{formatDuration(project.session_duration)}</td>
+        <td>
+          <Text size="sm" fw={500} color={project.carbon_emit > 10 ? 'red' : 'green'}>
+            {project.carbon_emit.toFixed(2)} kg CO2
+          </Text>
+        </td>
+        <td>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img 
+              src={`https://www.gravatar.com/avatar/${project.owner}?d=identicon&s=24`}
+              alt={project.owner}
+              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+            />
+            {project.owner}
+          </div>
+        </td>
+        <td>
+          <Badge variant="dot" color="gray">
+            {project.organization}
+          </Badge>
+        </td>
+        <td>{formatDate(project.created_at)}</td>
+      </tr>
     </React.Fragment>
   ));
 
   return (
     <AdminLayout>
-      <div>
-        <h1>Admin Dashboard</h1>
-        <h2>All Projects</h2>
-        {error ? (
-          <div style={{ color: 'red' }}>{error}</div>
-        ) : (
-          <ScrollArea>
+      <div className={classes.container}>
+        <div className={classes.header}>
+          <Group>
+            <h1>Admin Dashboard</h1>
+            <Badge size="lg" variant="dot" color="blue">
+              {projects.length} Projects
+            </Badge>
+          </Group>
+          <Group>
             <TextInput
               placeholder="Search by any field"
-              mb="md"
               leftSection={<IconSearch size={16} stroke={1.5} />}
               value={search}
               onChange={handleSearchChange}
+              style={{ width: '300px' }}
             />
-            <Table className={classes.table} horizontalSpacing="md" verticalSpacing="xs" miw={700} layout="fixed">
-              <Table.Tbody>
-                <Table.Tr>
-                  <Th
-                    sorted={sortBy === 'project_name'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('project_name')}
-                  >
-                    Project Name
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'project_description'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('project_description')}
-                  >
-                    Description
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'status'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('status')}
-                  >
-                    Status
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'stage'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('stage')}
-                  >
-                    Stage
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'carbon_emit'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('carbon_emit')}
-                  >
-                    Carbon Emit
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'session_duration'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('session_duration')}
-                  >
-                    Session Duration
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'owner'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('owner')}
-                  >
-                    Owner
-                  </Th> {/* Add owner email column */}
-                  <Th
-                    sorted={sortBy === 'organization'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('organization')}
-                  >
-                    Organization
-                  </Th> {/* Add organization column */}
-                  <Th
-                    sorted={sortBy === 'members'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('members')}
-                  >
-                    Members
-                  </Th> {/* Add members column */}
-                  <Th 
-                    sorted={sortBy === 'created_at'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('created_at')}
-                  >
-                    Created At
-                  </Th>
-                </Table.Tr>
-              </Table.Tbody>
-              <Table.Tbody>
-                {rows.length > 0 ? (
-                  rows
-                ) : (
-                  <Table.Tr>
-                    <Table.Td colSpan={10}>
-                      <Text fw={500} ta="center">
-                        Nothing found
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        )}
-        {selectedProject && (
-          <>
-            <Button color="red" onClick={() => setIsModalOpen(true)} style={{ marginTop: '20px' }}>
-              Delete Selected Project
-            </Button>
-            <Modal
-              opened={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              title="Confirm Deletion"
+            <Button 
+              onClick={() => setIsCreateModalOpen(true)} 
+              variant="gradient" 
+              gradient={{ from: 'indigo', to: 'cyan' }}
+              leftSection={<IconPlus size={16} />}
             >
-              <Text>Are you sure you want to delete this project?</Text>
-              <Group align="apart" mt="md">
-                <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button color="red" onClick={handleDeleteProject}>Delete</Button>
-              </Group>
-            </Modal>
-          </>
+              Create Project
+            </Button>
+          </Group>
+        </div>
+
+        <ScrollArea>
+          <Table className={classes.taskTable}>
+            <thead>
+              <tr>
+                <Th sorted={sortBy === 'project_name'} reversed={reverseSortDirection} onSort={() => setSorting('project_name')}>Project Name</Th>
+                <Th sorted={sortBy === 'project_description'} reversed={reverseSortDirection} onSort={() => setSorting('project_description')}>Description</Th>
+                <Th sorted={sortBy === 'status'} reversed={reverseSortDirection} onSort={() => setSorting('status')}>Status</Th>
+                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage</Th>
+                <Th sorted={false} reversed={false} onSort={() => {}}>Progress</Th>
+                <Th sorted={sortBy === 'session_duration'} reversed={reverseSortDirection} onSort={() => setSorting('session_duration')}>Duration</Th>
+                <Th sorted={sortBy === 'carbon_emit'} reversed={reverseSortDirection} onSort={() => setSorting('carbon_emit')}>Carbon Emissions</Th>
+                <Th sorted={sortBy === 'owner'} reversed={reverseSortDirection} onSort={() => setSorting('owner')}>Owner</Th>
+                <Th sorted={sortBy === 'organization'} reversed={reverseSortDirection} onSort={() => setSorting('organization')}>Organization</Th>
+                <Th sorted={sortBy === 'created_at'} reversed={reverseSortDirection} onSort={() => setSorting('created_at')}>Created At</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length > 0 ? (
+                rows
+              ) : (
+                <tr>
+                  <td colSpan={11}>
+                    <Text fw={500} ta="center">
+                      Nothing found
+                    </Text>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </ScrollArea>
+
+        {selectedProject && (
+          <div className={classes.panel}>
+            <div className={classes.panelHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  borderRadius: '8px',
+                  background: `hsl(${selectedProject.id * 40}, 70%, 90%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  fontWeight: '500',
+                  color: `hsl(${selectedProject.id * 40}, 70%, 30%)`
+                }}>
+                  {selectedProject.project_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2>{selectedProject.project_name}</h2>
+                  <Text size="sm" color="dimmed">Created {formatDate(selectedProject.created_at)}</Text>
+                </div>
+              </div>
+              <button className={classes.exitButton} onClick={closePanel}>✖</button>
+            </div>
+            
+            <div className={classes.panelContent}>
+              <Paper p="md" radius="md" withBorder mb="md">
+                <Text>{selectedProject.project_description}</Text>
+              </Paper>
+              
+              <div className={classes.timelineDetails}>
+                <h3>Project Details</h3>
+                <div className={classes.timelineGrid}>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Status</Text>
+                    <Badge 
+                      size="lg"
+                      variant="light"
+                      color={
+                        selectedProject.status === 'Complete' ? 'blue' :
+                        selectedProject.status === 'Archived' ? 'gray' :
+                        'green'
+                      }
+                    >
+                      {selectedProject.status}
+                    </Badge>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Stage</Text>
+                    <Group>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: selectedProject.stage.includes('Design') ? '#22c55e' :
+                                  selectedProject.stage.includes('Development') ? '#3b82f6' :
+                                  '#a855f7'
+                      }} />
+                      {selectedProject.stage}
+                    </Group>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Organization</Text>
+                    <Badge variant="dot" size="lg" color="gray">
+                      {selectedProject.organization}
+                    </Badge>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Carbon Emissions</Text>
+                    <Text size="lg" fw={500} c={selectedProject.carbon_emit > 10 ? 'red' : 'green'}>
+                      {selectedProject.carbon_emit.toFixed(2)} kg CO2
+                    </Text>
+                  </Paper>
+                </div>
+
+                <Paper p="md" radius="md" withBorder mt="md">
+                  <Text size="sm" fw={500} c="dimmed" mb="xs">Progress</Text>
+                  <div className={classes.progressBar}>
+                    <div 
+                      className={classes.progressFill} 
+                      style={{ 
+                        width: `${calculateProgress(selectedProject)}%`,
+                        backgroundColor: selectedProject.status === 'Complete' ? '#3b82f6' : '#22c55e'
+                      }} 
+                    />
+                    <span>{Math.round(calculateProgress(selectedProject))}%</span>
+                  </div>
+                </Paper>
+              </div>
+
+              <Paper p="md" radius="md" withBorder mt="md">
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm" fw={500} c="dimmed">Team Members</Text>
+                  <Button 
+                    variant="subtle" 
+                    size="xs"
+                    onClick={() => setIsEditModalOpen(true)}
+                  >
+                    Manage Team
+                  </Button>
+                </Group>
+                {renderAssignees(selectedProject.members)}
+              </Paper>
+
+              <div className={classes.panelButtons}>
+                <Button 
+                  color="red" 
+                  variant="light"
+                  onClick={() => setIsModalOpen(true)}
+                  leftSection={<IconTrash size={16} />}
+                >
+                  Delete Project
+                </Button>
+                <Button 
+                  color="blue"
+                  onClick={handleEditProject}
+                  leftSection={<IconEdit size={16} />}
+                >
+                  Edit Project
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
+
+        <Modal
+          opened={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Confirm Deletion"
+        >
+          <Text>Are you sure you want to delete this project?</Text>
+          <Text size="sm" c="dimmed" mt="sm">
+            This action cannot be undone. The project and all its data will be permanently deleted.
+          </Text>
+          <Group align="apart" mt="xl">
+            <Button variant="light" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button color="red" onClick={handleDeleteProject}>Delete Project</Button>
+          </Group>
+        </Modal>
+
+        <Modal
+          opened={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Project"
+        >
+          <TextInput
+            label="Project Title"
+            value={editTitle}
+            onChange={(event) => setEditTitle(event.currentTarget.value)}
+            required
+          />
+          <Textarea
+            label="Project Description"
+            value={editDescription}
+            onChange={(event) => setEditDescription(event.currentTarget.value)}
+            required
+          />
+          <TextInput
+            label="Assignee Email"
+            placeholder="Enter assignee email"
+            value={assigneeEmail}
+            onChange={(e) => setAssigneeEmail(e.target.value)}
+          />
+          <Button onClick={handleAddAssignee}>Add Assignee</Button>
+          <div className={classes.assigneesList}>
+            {Array.isArray(selectedProject?.members) && selectedProject?.members.map((assignee, index) => (
+              <div key={index} className={classes.assignee}>
+                <img src={`https://www.gravatar.com/avatar/${assignee}?d=identicon`} alt="Assignee" />
+                <span>{assignee}</span>
+              </div>
+            ))}
+          </div>
+          <Group align="apart" mt="xl">
+            <Button variant="light" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <Button color="blue" onClick={handleSaveEdit}>Save</Button>
+          </Group>
+        </Modal>
+
+        <Modal
+          opened={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          title="Create New Project"
+        >
+          <TextInput
+            label="Project Title"
+            value={newProject.project_name}
+            onChange={(event) => setNewProject({ ...newProject, project_name: event.currentTarget.value })}
+            required
+          />
+          <Textarea
+            label="Project Description"
+            value={newProject.project_description}
+            onChange={(event) => setNewProject({ ...newProject, project_description: event.currentTarget.value })}
+            required
+          />
+          <TextInput
+            label="Owner Email"
+            value={newProject.owner}
+            onChange={(event) => setNewProject({ ...newProject, owner: event.currentTarget.value })}
+            required
+          />
+          <div className={classes.assigneeSection}>
+            <TextInput
+              label="Add Assignee (Email)"
+              value={newProjectAssignee}
+              onChange={(e) => setNewProjectAssignee(e.target.value)}
+              placeholder="Enter assignee email"
+            />
+            <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
+              Add Assignee
+            </Button>
+          </div>
+          {newProject.members.length > 0 && (
+            <div className={classes.assigneesList}>
+              <Text fw={500} mt="md">Added Assignees:</Text>
+              {newProject.members.map((member, index) => (
+                <Badge 
+                  key={index}
+                  mr={5}
+                  mb={5}
+                  rightSection={
+                    <Center onClick={() => {
+                      setNewProject({
+                        ...newProject,
+                        members: newProject.members.filter((_, i) => i !== index)
+                      });
+                    }} style={{ cursor: 'pointer' }}>
+                      ×
+                    </Center>
+                  }
+                >
+                  {member}
+                </Badge>
+              ))}
+            </div>
+          )}
+          <Select
+            label="Status"
+            value={newProject.status}
+            onChange={(value) => setNewProject({ ...newProject, status: value ?? '' })}
+            data={['In Progress', 'Complete', 'Archived']}
+            required
+          />
+          <Select
+            label="Stage"
+            value={newProject.stage}
+            onChange={(value) => setNewProject({ ...newProject, stage: value ?? '' })}
+            data={['Design: Creating the software architecture', 'Development: Writing the actual code', 'Testing: Ensuring the software works as expected']}
+            required
+          />
+          <Group align="apart" mt="xl">
+            <Button variant="light" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
+            <Button color="blue" onClick={handleCreateProject}>Create</Button>
+          </Group>
+        </Modal>
       </div>
     </AdminLayout>
   );

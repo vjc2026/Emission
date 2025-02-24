@@ -2336,3 +2336,69 @@ app.post('/initialize_timeline_dates', authenticateAdmin, (req, res) => {
     });
   });
 });
+
+// Endpoint to add a project member
+app.post('/add_project_member', authenticateAdmin, (req, res) => {
+  const { projectId, userId, role } = req.body;
+
+  const query = `
+    INSERT INTO project_members (project_id, user_id, role)
+    VALUES (?, ?, ?)
+  `;
+
+  connection.query(query, [projectId, userId, role], (err, results) => {
+    if (err) {
+      console.error('Error adding project member:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Project member added successfully' });
+  });
+});
+
+// Endpoint to remove a project member
+app.delete('/remove_project_member', authenticateAdmin, (req, res) => {
+  const { projectId, userId } = req.body;
+
+  const query = `
+    DELETE FROM project_members
+    WHERE project_id = ? AND user_id = ?
+  `;
+
+  connection.query(query, [projectId, userId], (err, results) => {
+    if (err) {
+      console.error('Error removing project member:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Project member removed successfully' });
+  });
+});
+
+// Endpoint to fetch project members
+app.get('/project_members/:projectId', authenticateToken, (req, res) => {
+  const projectId = req.params.projectId;
+
+  const query = `
+    SELECT u.id, u.name, u.email, u.profile_image, pm.role, pm.joined_at
+    FROM project_members pm
+    JOIN users u ON pm.user_id = u.id
+    WHERE pm.project_id = ?
+  `;
+
+  connection.query(query, [projectId], (err, results) => {
+    if (err) {
+      console.error('Error fetching project members:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const members = results.map(member => ({
+      ...member,
+      profile_image: member.profile_image 
+        ? `http://localhost:5000/uploads/${member.profile_image}`
+        : null
+    }));
+
+    res.status(200).json({ members });
+  });
+});
