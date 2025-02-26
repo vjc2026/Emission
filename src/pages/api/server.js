@@ -2338,22 +2338,81 @@ app.post('/initialize_timeline_dates', authenticateAdmin, (req, res) => {
 });
 
 // Endpoint to add a project member
-app.post('/add_project_member', authenticateAdmin, (req, res) => {
-  const { projectId, userId, role } = req.body;
+app.post('/add_project_member', authenticateAdmin, async (req, res) => {
+  const { projectId, userEmail, role } = req.body;
 
-  const query = `
-    INSERT INTO project_members (project_id, user_id, role)
-    VALUES (?, ?, ?)
-  `;
+  // Validate required fields
+  if (!projectId || !userEmail || !role) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
 
-  connection.query(query, [projectId, userId, role], (err, results) => {
-    if (err) {
-      console.error('Error adding project member:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    // First find the user ID from email
+    const findUserQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(findUserQuery, [userEmail], (err, userResults) => {
+      if (err) {
+        console.error('Error finding user:', err);
+        return res.status(500).json({ error: 'Database error while finding user' });
+      }
 
-    res.status(200).json({ message: 'Project member added successfully' });
-  });
+      if (userResults.length === 0) {
+        return res.status(404).json({ error: 'User not found with the provided email' });
+      }
+
+      const userId = userResults[0].id;
+
+      // Check if user is already a member of the project
+      const checkMemberQuery = 'SELECT * FROM project_members WHERE project_id = ? AND user_id = ?';
+      
+      connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
+        if (err) {
+          console.error('Error checking existing member:', err);
+          return res.status(500).json({ error: 'Database error while checking existing member' });
+        }
+
+        if (memberResults.length > 0) {
+          return res.status(400).json({ error: 'User is already a member of this project' });
+        }
+
+        // Add the new project member
+        const addMemberQuery = `
+          INSERT INTO project_members (project_id, user_id, role, joined_at)
+          VALUES (?, ?, ?, NOW())
+        `;
+
+        connection.query(addMemberQuery, [projectId, userId, role], (err, results) => {
+          if (err) {
+            console.error('Error adding project member:', err);
+            return res.status(500).json({ error: 'Database error while adding member' });
+          }
+
+          // Fetch updated members list
+          const getMembersQuery = `
+            SELECT u.name, u.email
+            FROM project_members pm
+            JOIN users u ON pm.user_id = u.id
+            WHERE pm.project_id = ?
+          `;
+
+          connection.query(getMembersQuery, [projectId], (err, membersList) => {
+            if (err) {
+              console.error('Error fetching updated members list:', err);
+              return res.status(500).json({ error: 'Database error while fetching members' });
+            }
+
+            res.status(200).json({ 
+              message: 'Member added successfully',
+              members: membersList.map(member => ({ name: member.name, email: member.email }))
+            });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Error in add_project_member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Endpoint to remove a project member
@@ -2400,5 +2459,61 @@ app.get('/project_members/:projectId', authenticateToken, (req, res) => {
     }));
 
     res.status(200).json({ members });
+  });
+});
+
+// Endpoint to add project member by email (admin only)
+app.post('/add_project_member', authenticateAdmin, (req, res) => {
+  const { projectId, userEmail, role } = req.body;
+
+  // First find the user ID from email
+  const findUserQuery = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(findUserQuery, [userEmail], (err, userResults) => {
+    if (err) {
+      console.error('Error finding user:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (userResults.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResults[0].id;
+    
+    // Check if member already exists
+    const checkMemberQuery = `
+      SELECT * FROM project_members 
+      WHERE project_id = ? AND user_id = ?
+    `;
+
+    connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
+      if (err) {
+        console.error('Error checking membership:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (memberResults.length > 0) {
+        return res.status(409).json({ error: 'User is already a project member' });
+      }
+
+      // Insert new member
+      const insertQuery = `
+        INSERT INTO project_members (project_id, user_id, role)
+        VALUES (?, ?, ?)
+      `;
+
+      connection.query(insertQuery, [projectId, userId, role], (err, results) => {
+        if (err) {
+          console.error('Error adding project member:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        res.status(200).json({ 
+          message: 'Project member added successfully',
+          memberId: results.insertId
+        });
+      });
+    });
   });
 });

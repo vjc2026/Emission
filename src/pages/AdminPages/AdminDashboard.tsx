@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from './AdminLayout';
-import { IconSearch, IconChevronUp, IconChevronDown, IconSelector, IconPlus, IconTrash, IconEdit } from '@tabler/icons-react';
+import { IconSearch, IconChevronUp, IconChevronDown, IconSelector, IconPlus, IconTrash, IconEdit, IconX } from '@tabler/icons-react';
 import {
   Badge,
   Modal,
@@ -139,10 +139,11 @@ const fetchProjectMembers = async (projectId: number) => {
     }
 
     const data = await response.json();
-    return data.members.map((member: { name: string }) => member.name).join(', ');
+    // Ensure we're returning an array of strings
+    return Array.isArray(data.members) ? data.members.map((member: { name: string, email: string }) => member.email) : [];
   } catch (error) {
     console.error('Error fetching project members:', error);
-    return 'Error fetching members';
+    return [];
   }
 };
 
@@ -151,10 +152,9 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString();
 };
 
-const renderAssignees = (members: string[]) => {
-  const membersList = Array.isArray(members) ? members : [];
-  const displayedMembers = membersList.slice(0, 3);
-  const remainingCount = membersList.length - displayedMembers.length;
+const renderAssignees = (members: string[] | undefined) => {
+  if (!members || !Array.isArray(members)) return null;
+  const displayedMembers = members.slice(0, 3);
 
   return (
     <div className={classes.assignees}>
@@ -164,19 +164,10 @@ const renderAssignees = (members: string[]) => {
             src={`https://www.gravatar.com/avatar/${member}?d=identicon`}
             alt={member}
             className={classes.assigneeAvatar}
-            onError={(e: any) => {
-              e.target.onerror = null;
-              e.target.src = '/default-avatar.png';
-            }}
           />
-          <span>{member}</span>
+          <span>{member.includes('@') ? member.split('@')[0] : member}</span>
         </div>
       ))}
-      {remainingCount > 0 && (
-        <div className={classes.moreAssignees}>
-          +{remainingCount}
-        </div>
-      )}
     </div>
   );
 };
@@ -434,7 +425,7 @@ const AdminDashboard: React.FC = () => {
         if (!token) {
           throw new Error('No token found');
         }
-  
+
         const response = await fetch('http://localhost:5000/add_project_member', {
           method: 'POST',
           headers: {
@@ -443,27 +434,34 @@ const AdminDashboard: React.FC = () => {
           },
           body: JSON.stringify({
             projectId: selectedProject.id,
-            userId: assigneeEmail, // Assuming assigneeEmail is the user ID
+            userEmail: assigneeEmail,
             role: 'member',
           }),
         });
-  
+
         if (!response.ok) {
-          throw new Error(`Error: ${response.status} ${response.statusText}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to add member');
         }
-  
+
+        const data = await response.json();
+        
         const updatedProject = {
           ...selectedProject,
-          members: [...selectedProject.members, assigneeEmail],
+          members: data.members.map((member: { email: string }) => member.email)
         };
-  
-        setProjects(projects.map(project => project.id === selectedProject.id ? updatedProject : project));
-        setSortedData(sortedData.map(project => project.id === selectedProject.id ? updatedProject : project));
+
+        setProjects(projects.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSortedData(sortedData.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
         setSelectedProject(updatedProject);
         setAssigneeEmail('');
       } catch (error) {
         console.error('Error adding assignee:', error);
-        alert("An error occurred while adding the assignee. Please try again later.");
+        alert(error instanceof Error ? error.message : "An error occurred");
       }
     }
   };
@@ -783,38 +781,57 @@ const AdminDashboard: React.FC = () => {
         <Modal
           opened={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          title="Edit Project"
+          title="Manage Team Members"
         >
           <TextInput
-            label="Project Title"
-            value={editTitle}
-            onChange={(event) => setEditTitle(event.currentTarget.value)}
-            required
-          />
-          <Textarea
-            label="Project Description"
-            value={editDescription}
-            onChange={(event) => setEditDescription(event.currentTarget.value)}
-            required
-          />
-          <TextInput
-            label="Assignee Email"
-            placeholder="Enter assignee email"
+            label="Add Member by Email"
+            placeholder="Enter member email"
             value={assigneeEmail}
             onChange={(e) => setAssigneeEmail(e.target.value)}
+            type="email"
+            required
           />
-          <Button onClick={handleAddAssignee}>Add Assignee</Button>
-          <div className={classes.assigneesList}>
-            {Array.isArray(selectedProject?.members) && selectedProject?.members.map((assignee, index) => (
-              <div key={index} className={classes.assignee}>
-                <img src={`https://www.gravatar.com/avatar/${assignee}?d=identicon`} alt="Assignee" />
-                <span>{assignee}</span>
-              </div>
-            ))}
-          </div>
-          <Group align="apart" mt="xl">
-            <Button variant="light" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button color="blue" onClick={handleSaveEdit}>Save</Button>
+          <Button 
+            onClick={handleAddAssignee} 
+            mt="sm"
+            disabled={!assigneeEmail.includes('@')}
+          >
+            Add Member
+          </Button>
+
+          <Paper p="md" mt="md" withBorder>
+            <Text size="sm" fw={500} mb="xs">Current Members</Text>
+            <div className={classes.assignees}>
+              {(selectedProject?.members || []).map((member, index) => (
+                <Badge
+                  key={index}
+                  variant="light"
+                  color="blue"
+                  mr={4}
+                  mb={4}
+                  rightSection={
+                    <IconX 
+                      size={12} 
+                      onClick={() => {
+                        // Add remove member functionality here if needed
+                      }} 
+                      style={{ cursor: 'pointer' }}
+                    />
+                  }
+                >
+                  {member}
+                </Badge>
+              ))}
+            </div>
+          </Paper>
+
+          <Group justify="flex-end" mt="xl">
+            <Button 
+              variant="light" 
+              onClick={() => setIsEditModalOpen(false)}
+            >
+              Close
+            </Button>
           </Group>
         </Modal>
 
