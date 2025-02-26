@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from './AdminLayout';
 import { Table, TextInput, ScrollArea, Text, Button, Modal, Group, PasswordInput, FileInput, Avatar, Tooltip, Center, Select, Paper, Container, Title, Badge, Divider } from '@mantine/core';
-import { IconSearch, IconUserPlus, IconTrash, IconEdit, IconUpload } from '@tabler/icons-react';
+import { IconSearch, IconUserPlus, IconTrash, IconUpload } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import axios from 'axios';
 import styles from './AdminUsers.module.css';
@@ -270,14 +270,6 @@ const AdminUsers: React.FC = () => {
                       <Table.Td>{user.organization}</Table.Td>
                       <Table.Td>
                         <Group justify="center" gap="xs">
-                          <Button
-                            variant="subtle"
-                            color="blue"
-                            size="sm"
-                            leftSection={<IconEdit size={16} />}
-                          >
-                            Edit
-                          </Button>
                           <Button
                             className={styles.deleteButton}
                             size="sm"
