@@ -170,13 +170,17 @@ const History = () => {
 
           return {
             id: project.id,
-            project_id: project.project_id, // Include project_id in task data
+            project_id: project.project_id,
             title: project.project_name,
             description: project.project_description,
             status: project.status === 'Archived' ? 'Completed' : 'In Progress',
             type: project.stage || 'Low',
             assignees: members,
-            leader: leader,
+            leader: {
+              email: project.owner_email,
+              name: project.owner_name,
+              profileImage: null // Since this is the owner, we'll use Gravatar
+            },
             spentTime: project.session_duration,
             carbonEmit: project.carbon_emit,
             isRunning: false,
@@ -840,7 +844,7 @@ const History = () => {
                   <th>Name</th>
                   <th>Status</th>
                   <th>Type</th>
-                  <th>Leader</th>
+                  <th>Owner</th>
                   <th>Assignees</th>
                   <th>Timeline</th>
                   <th>Progress</th>
@@ -873,7 +877,16 @@ const History = () => {
                       </td>
                       <td>{task.type}</td>
                       <td>
-                        {task.leader && renderAssignees([task.leader])}
+                        {task.leader && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <img 
+                              src={task.leader.profileImage || `https://www.gravatar.com/avatar/${task.leader.email}?d=identicon&s=24`}
+                              alt={task.leader.name}
+                              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                            />
+                            <span>{task.leader.name || task.leader.email}</span>
+                          </div>
+                        )}
                       </td>
                       <td>{renderAssignees(task.assignees)}</td>
                       <td>
@@ -916,7 +929,7 @@ const History = () => {
                   <th>Name</th>
                   <th>Status</th>
                   <th>Type</th>
-                  <th>Leader</th>
+                  <th>Owner</th>
                   <th>Assignees</th>
                   <th>Spent Time</th>
                   <th>Carbon Emissions</th>
@@ -930,20 +943,13 @@ const History = () => {
                     <td>{task.type}</td>
                     <td>
                       {task.leader && (
-                        <div className={styles.assignee}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <img 
-                            src={task.leader.profileImage || '/default-avatar.png'} 
+                            src={task.leader.profileImage || `https://www.gravatar.com/avatar/${task.leader.email}?d=identicon&s=24`}
                             alt={task.leader.name}
-                            className={styles.assigneeAvatar}
-                            onError={(e: any) => {
-                              e.target.onerror = null;
-                              e.target.src = '/default-avatar.png';
-                            }}
+                            style={{ borderRadius: '50%', width: '24px', height: '24px' }}
                           />
-                          <div className={styles.assigneeInfo}>
-                            <span className={styles.assigneeName}>{task.leader.name}</span>
-                            <span className={styles.assigneeRole}>Leader</span>
-                          </div>
+                          <span>{task.leader.name || task.leader.email}</span>
                         </div>
                       )}
                     </td>

@@ -1854,20 +1854,24 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
   const userId = req.user.id;
 
   const userProjectsQuery = `
-    SELECT id, organization, project_name, project_description, 
-           session_duration, carbon_emit, stage, status,
-           stage_duration, stage_start_date, stage_due_date,
-           project_start_date, project_due_date
-    FROM user_history 
-    WHERE user_id = ? AND status NOT IN ('Complete', 'Archived')
+    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, 
+           uh.session_duration, uh.carbon_emit, uh.stage, uh.status,
+           uh.stage_duration, uh.stage_start_date, uh.stage_due_date,
+           uh.project_start_date, uh.project_due_date,
+           u.email as owner_email, u.name as owner_name
+    FROM user_history uh
+    JOIN users u ON uh.user_id = u.id 
+    WHERE uh.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
   `;
 
   const invitedProjectsQuery = `
     SELECT uh.id, uh.organization, uh.project_name, uh.project_description, 
            uh.session_duration, uh.carbon_emit, uh.stage, uh.status,
            uh.stage_duration, uh.stage_start_date, uh.stage_due_date,
-           uh.project_start_date, uh.project_due_date
+           uh.project_start_date, uh.project_due_date,
+           u.email as owner_email, u.name as owner_name
     FROM user_history uh
+    JOIN users u ON uh.user_id = u.id
     JOIN project_members pm ON uh.id = pm.project_id
     WHERE pm.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
   `;
