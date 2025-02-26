@@ -2012,7 +2012,22 @@ app.get('/user_devices', authenticateToken, (req, res) => {
 // View all the users projects
 app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
   const query = `
-    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, uh.session_duration, uh.carbon_emit, uh.stage, uh.status, uh.created_at, u.email AS owner
+    SELECT 
+      uh.id, 
+      uh.organization, 
+      uh.project_name, 
+      uh.project_description, 
+      uh.session_duration, 
+      uh.carbon_emit, 
+      uh.stage, 
+      uh.status, 
+      uh.created_at,
+      uh.stage_duration,
+      uh.stage_start_date,
+      uh.stage_due_date,
+      uh.project_start_date,
+      uh.project_due_date,
+      u.email AS owner
     FROM user_history uh
     JOIN users u ON uh.user_id = u.id
     ORDER BY uh.created_at DESC
@@ -2020,11 +2035,21 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
 
   connection.query(query, (err, results) => {
     if (err) {
-      console.error('Error querying the database:', err);
+      console.error('Error fetching projects:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    res.status(200).json({ projects: results }); // Send back all projects with owner email
+    // Format dates to ISO string format for consistent handling
+    const formattedResults = results.map(project => ({
+      ...project,
+      stage_start_date: project.stage_start_date ? project.stage_start_date.toISOString().split('T')[0] : null,
+      stage_due_date: project.stage_due_date ? project.stage_due_date.toISOString().split('T')[0] : null,
+      project_start_date: project.project_start_date ? project.project_start_date.toISOString().split('T')[0] : null,
+      project_due_date: project.project_due_date ? project.project_due_date.toISOString().split('T')[0] : null,
+      created_at: project.created_at ? project.created_at.toISOString() : null
+    }));
+
+    res.status(200).json({ projects: formattedResults });
   });
 });
 

@@ -159,12 +159,16 @@ const formatDate = (dateString: string | undefined) => {
 };
 
 // Add a function to calculate days remaining
-const calculateDaysRemaining = (dueDate: string | undefined) => {
+const calculateDaysRemaining = (dueDate: string | undefined, status?: string) => {
   if (!dueDate) return 'No due date';
   const due = new Date(dueDate);
   const now = new Date();
   const diffTime = due.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays <= 0 && status !== 'Complete') {
+    return <span className={classes.pastDue}>Past due</span>;
+  }
   return diffDays > 0 ? `${diffDays} days remaining` : 'Past due';
 };
 
@@ -228,6 +232,10 @@ const AdminDashboard: React.FC = () => {
     project_description: '',
     owner: ''
   });
+  const [editStatus, setEditStatus] = useState('');
+  const [editStageStartDate, setEditStageStartDate] = useState('');
+  const [editStageDueDate, setEditStageDueDate] = useState('');
+  const [editProjectDueDate, setEditProjectDueDate] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -356,23 +364,65 @@ const AdminDashboard: React.FC = () => {
     if (selectedProject) {
       setEditTitle(selectedProject.project_name);
       setEditDescription(selectedProject.project_description);
+      setEditStatus(selectedProject.status);
+      setEditStageStartDate(selectedProject.stage_start_date || '');
+      setEditStageDueDate(selectedProject.stage_due_date || '');
+      setEditProjectDueDate(selectedProject.project_due_date || '');
       setIsEditModalOpen(true);
     }
   };
 
   // Function to handle saving the edited project
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (selectedProject) {
-      const updatedProject = {
-        ...selectedProject,
-        project_name: editTitle,
-        project_description: editDescription,
-      };
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No token found');
+        }
 
-      setProjects(projects.map(project => project.id === selectedProject.id ? updatedProject : project));
-      setSortedData(sortedData.map(project => project.id === selectedProject.id ? updatedProject : project));
-      setSelectedProject(updatedProject);
-      setIsEditModalOpen(false);
+        const response = await fetch(`http://localhost:5000/update_project/${selectedProject.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectName: editTitle,
+            projectDescription: editDescription,
+            status: editStatus,
+            stage_start_date: editStageStartDate,
+            stage_due_date: editStageDueDate,
+            project_due_date: editProjectDueDate,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update project');
+        }
+
+        const updatedProject = {
+          ...selectedProject,
+          project_name: editTitle,
+          project_description: editDescription,
+          status: editStatus,
+          stage_start_date: editStageStartDate,
+          stage_due_date: editStageDueDate,
+          project_due_date: editProjectDueDate,
+        };
+
+        setProjects(projects.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSortedData(sortedData.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSelectedProject(updatedProject);
+        setIsEditModalOpen(false);
+      } catch (error) {
+        console.error('Error updating project:', error);
+        // You might want to show an error message to the user here
+      }
     }
   };
 
@@ -723,7 +773,7 @@ const AdminDashboard: React.FC = () => {
         <td>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <Text size="xs">Stage: {formatDate(project.stage_due_date)}</Text>
-            <Text size="xs" c="dimmed">{calculateDaysRemaining(project.stage_due_date)}</Text>
+            <Text size="xs" c="dimmed">{calculateDaysRemaining(project.stage_due_date, project.status)}</Text>
           </div>
         </td>
       </tr>
@@ -887,7 +937,7 @@ const AdminDashboard: React.FC = () => {
                       <Text size="sm" fw={500} c="dimmed">Stage Due</Text>
                       <Text>{formatDate(selectedProject.stage_due_date)}</Text>
                       <Text size="xs" c="dimmed">
-                        {calculateDaysRemaining(selectedProject.stage_due_date)}
+                        {calculateDaysRemaining(selectedProject.stage_due_date, selectedProject.status)}
                       </Text>
                     </div>
                     <div>
@@ -898,7 +948,7 @@ const AdminDashboard: React.FC = () => {
                       <Text size="sm" fw={500} c="dimmed">Project Due</Text>
                       <Text>{formatDate(selectedProject.project_due_date)}</Text>
                       <Text size="xs" c="dimmed">
-                        {calculateDaysRemaining(selectedProject.project_due_date)}
+                        {calculateDaysRemaining(selectedProject.project_due_date, selectedProject.status)}
                       </Text>
                     </div>
                   </div>
@@ -1284,6 +1334,134 @@ const AdminDashboard: React.FC = () => {
                 });
               }}>Cancel</Button>
               <Button color="blue" onClick={handleCreateProject}>Create</Button>
+            </Group>
+          </div>
+        </Modal>
+
+        <Modal
+          opened={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Project"
+          size="lg"
+        >
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <TextInput
+              label="Project Title"
+              value={editTitle}
+              onChange={(event) => setEditTitle(event.currentTarget.value)}
+              required
+            />
+
+            <Textarea
+              label="Project Description"
+              value={editDescription}
+              onChange={(event) => setEditDescription(event.currentTarget.value)}
+              required
+              minRows={3}
+            />
+
+            <Select
+              label="Status"
+              value={editStatus}
+              onChange={(value) => setEditStatus(value || '')}
+              data={['In Progress', 'Complete', 'Archived']}
+              required
+            />
+
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Timeline Settings</Text>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <Group grow>
+                  <TextInput
+                    type="date"
+                    label="Stage Start Date"
+                    value={editStageStartDate}
+                    onChange={(event) => setEditStageStartDate(event.currentTarget.value)}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Due Date"
+                    value={editStageDueDate}
+                    onChange={(event) => setEditStageDueDate(event.currentTarget.value)}
+                    min={editStageStartDate}
+                    error={editStageDueDate && editStageStartDate && new Date(editStageDueDate) <= new Date(editStageStartDate) ? 
+                      "Due date must be after start date" : null}
+                  />
+                </Group>
+
+                <TextInput
+                  type="date"
+                  label="Project Due Date"
+                  value={editProjectDueDate}
+                  onChange={(event) => setEditProjectDueDate(event.currentTarget.value)}
+                  min={editStageStartDate}
+                  error={editProjectDueDate && editStageStartDate && new Date(editProjectDueDate) <= new Date(editStageStartDate) ? 
+                    "Project due date must be after stage start date" : null}
+                />
+              </div>
+            </Paper>
+
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Team Members</Text>
+              <TextInput
+                label="Add Member by Email"
+                placeholder="Enter member email"
+                value={assigneeEmail}
+                onChange={(e) => {
+                  setAssigneeEmail(e.target.value);
+                  if (assigneeError) setAssigneeError('');
+                }}
+                type="email"
+                required
+              />
+              <Button 
+                onClick={handleAddAssignee} 
+                mt="sm"
+                disabled={!assigneeEmail.includes('@')}
+              >
+                Add Member
+              </Button>
+              {assigneeError && (
+                <p className={classes.errorText}>{assigneeError}</p>
+              )}
+
+              <Paper p="md" mt="md" withBorder>
+                <Text size="sm" fw={500} mb="xs">Current Members</Text>
+                <div className={classes.assignees}>
+                  {(selectedProject?.members || []).map((member, index) => (
+                    <Badge
+                      key={index}
+                      variant="light"
+                      color="blue"
+                      mr={4}
+                      mb={4}
+                      rightSection={
+                        <IconX 
+                          size={12} 
+                          onClick={() => {
+                            // Add remove member functionality here if needed
+                          }} 
+                          style={{ cursor: 'pointer' }}
+                        />
+                      }
+                    >
+                      {member}
+                    </Badge>
+                  ))}
+                </div>
+              </Paper>
+            </Paper>
+
+            <Group justify="flex-end" mt="xl">
+              <Button 
+                variant="light" 
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button color="blue" onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
             </Group>
           </div>
         </Modal>
