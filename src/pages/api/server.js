@@ -2517,3 +2517,161 @@ app.post('/add_project_member', authenticateAdmin, (req, res) => {
     });
   });
 });
+
+// Endpoint to get user's organization by email
+app.get('/user_organization/:email', authenticateAdmin, (req, res) => {
+  const { email } = req.params;
+  
+  const query = 'SELECT organization FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.status(200).json({ organization: results[0].organization });
+  });
+});
+
+// Endpoint to create a new project with members
+app.post('/admin/create_project', authenticateAdmin, (req, res) => {
+  const { project_name, project_description, status, stage, owner, members, organization } = req.body;
+
+  // Start a transaction since we need to make multiple related database changes
+  connection.beginTransaction(err => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction start failed' });
+    }
+
+    // First find the owner's user ID from email
+    const findOwnerQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(findOwnerQuery, [owner], (err, ownerResults) => {
+      if (err) {
+        return connection.rollback(() => {
+          res.status(500).json({ error: 'Error finding owner' });
+        });
+      }
+
+      if (ownerResults.length === 0) {
+        return connection.rollback(() => {
+          res.status(404).json({ error: 'Owner not found' });
+        });
+      }
+
+      const ownerId = ownerResults[0].id;
+
+      // Create the project
+      const createProjectQuery = `
+        INSERT INTO user_history (
+          user_id, organization, project_name, project_description, 
+          status, stage, carbon_emit, session_duration,
+          stage_start_date, stage_due_date, project_start_date,
+          project_due_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, NOW(), 
+          DATE_ADD(NOW(), INTERVAL 14 DAY), NOW(),
+          DATE_ADD(NOW(), INTERVAL 42 DAY), NOW())
+      `;
+
+      connection.query(createProjectQuery, 
+        [ownerId, organization, project_name, project_description, status, stage],
+        (err, projectResult) => {
+          if (err) {
+            return connection.rollback(() => {
+              console.error('Error creating project:', err);
+              res.status(500).json({ error: 'Failed to create project' });
+            });
+          }
+
+          const projectId = projectResult.insertId;
+
+          // If there are members to add
+          if (members && members.length > 0) {
+            // Find all member IDs from their emails
+            const findMembersQuery = 'SELECT id FROM users WHERE email IN (?)';
+            connection.query(findMembersQuery, [members], (err, memberResults) => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error finding members:', err);
+                  res.status(500).json({ error: 'Failed to find members' });
+                });
+              }
+
+              // Create values for batch insert
+              const memberValues = memberResults.map(member => [projectId, member.id, 'member', new Date()]);
+
+              // Insert all members
+              const addMembersQuery = `
+                INSERT INTO project_members (project_id, user_id, role, joined_at)
+                VALUES ?
+              `;
+
+              connection.query(addMembersQuery, [memberValues], (err) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    console.error('Error adding members:', err);
+                    res.status(500).json({ error: 'Failed to add project members' });
+                  });
+                }
+
+                // If everything succeeded, commit the transaction
+                connection.commit(err => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      console.error('Error committing transaction:', err);
+                      res.status(500).json({ error: 'Failed to commit transaction' });
+                    });
+                  }
+
+                  res.status(200).json({
+                    id: projectId,
+                    project_name,
+                    project_description,
+                    status,
+                    stage,
+                    carbon_emit: 0,
+                    session_duration: 0,
+                    owner,
+                    organization,
+                    members,
+                    created_at: new Date().toISOString()
+                  });
+                });
+              });
+            });
+          } else {
+            // If no members to add, just commit the transaction
+            connection.commit(err => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error committing transaction:', err);
+                  res.status(500).json({ error: 'Failed to commit transaction' });
+                });
+              }
+
+              res.status(200).json({
+                id: projectId,
+                project_name,
+                project_description,
+                status,
+                stage,
+                carbon_emit: 0,
+                session_duration: 0,
+                owner,
+                organization,
+                members: [],
+                created_at: new Date().toISOString()
+              });
+            });
+          }
+        }
+      );
+    });
+  });
+});
