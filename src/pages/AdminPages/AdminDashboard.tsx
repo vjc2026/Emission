@@ -502,19 +502,13 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const columns: { key: keyof Project; label: string }[] = [
-    { key: 'project_name', label: 'Project Name' },
-    { key: 'project_description', label: 'Description' },
-    { key: 'owner', label: 'Owner' },
-    { key: 'organization', label: 'Organization' },
+  const columns = [
+    { key: 'project_name', label: 'Project' },
     { key: 'status', label: 'Status' },
     { key: 'stage', label: 'Stage' },
-    { key: 'carbon_emit', label: 'Carbon Emissions' },
-    { key: 'session_duration', label: 'Session Duration' },
-    { key: 'stage_start_date', label: 'Stage Start' },
-    { key: 'stage_due_date', label: 'Stage Due' },
-    { key: 'project_start_date', label: 'Project Start' },
-    { key: 'project_due_date', label: 'Project Due' }
+    { key: 'carbon_emit', label: 'Carbon' },
+    { key: 'owner', label: 'Owner' },
+    { key: 'timeline', label: 'Timeline' }
   ];
 
   const rows = sortedData.map((project) => (
@@ -524,39 +518,36 @@ const AdminDashboard: React.FC = () => {
         className={`${classes.projectRow} ${selectedProject?.id === project.id ? classes.selectedRow : ''}`}
       >
         <td>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              borderRadius: '6px',
-              background: `hsl(${project.id * 40}, 70%, 90%)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '16px',
-              fontWeight: '500',
-              color: `hsl(${project.id * 40}, 70%, 30%)`
-            }}>
-              {project.project_name.charAt(0).toUpperCase()}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ 
+                width: '32px', 
+                height: '32px', 
+                borderRadius: '6px',
+                background: `hsl(${project.id * 40}, 70%, 90%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: '500',
+                color: `hsl(${project.id * 40}, 70%, 30%)`
+              }}>
+                {project.project_name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div>{project.project_name}</div>
+                <Text size="xs" color="dimmed" style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {project.project_description}
+                </Text>
+              </div>
             </div>
-            {project.project_name}
-          </div>
-        </td>
-        <td>
-          <div style={{ 
-            maxWidth: '200px', 
-            whiteSpace: 'nowrap', 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis' 
-          }}>
-            {project.project_description}
           </div>
         </td>
         <td>
           <Badge 
             variant="light"
             radius="sm"
-            size="lg"
+            size="sm"
             color={
               project.status === 'Complete' ? 'blue' :
               project.status === 'Archived' ? 'gray' :
@@ -566,68 +557,58 @@ const AdminDashboard: React.FC = () => {
             {project.status}
           </Badge>
         </td>
-        <td>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: project.stage.includes('Design') ? '#22c55e' :
-                        project.stage.includes('Development') ? '#3b82f6' :
-                        '#a855f7'
-            }} />
-            {project.stage}
+        <td style={{ maxWidth: '200px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: project.stage.includes('Design') ? '#22c55e' :
+                          project.stage.includes('Development') ? '#3b82f6' :
+                          '#a855f7'
+              }} />
+              {project.stage.split(':')[0]}
+            </div>
+            <div className={classes.progressBar}>
+              <div 
+                className={classes.progressFill} 
+                style={{ 
+                  width: `${calculateProgress(project)}%`,
+                  backgroundColor: project.status === 'Complete' ? '#3b82f6' : '#22c55e'
+                }} 
+              />
+              <span>{Math.round(calculateProgress(project))}%</span>
+            </div>
           </div>
         </td>
-        <td>
-          <div className={classes.progressBar}>
-            <div 
-              className={classes.progressFill} 
-              style={{ 
-                width: `${calculateProgress(project)}%`,
-                backgroundColor: project.status === 'Complete' ? '#3b82f6' : '#22c55e'
-              }} 
-            />
-            <span>{Math.round(calculateProgress(project))}%</span>
-          </div>
-        </td>
-        <td>{formatDuration(project.session_duration)}</td>
         <td>
           <Text size="sm" fw={500} color={project.carbon_emit > 10 ? 'red' : 'green'}>
             {project.carbon_emit.toFixed(2)} kg CO2
           </Text>
         </td>
         <td>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img 
-              src={`https://www.gravatar.com/avatar/${project.owner}?d=identicon&s=24`}
-              alt={project.owner}
-              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
-            />
-            {project.owner}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img 
+                src={`https://www.gravatar.com/avatar/${project.owner}?d=identicon&s=24`}
+                alt={project.owner}
+                style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+              />
+              <div>
+                <div>{project.owner.split('@')[0]}</div>
+                <Badge variant="dot" size="xs" color="gray">
+                  {project.organization}
+                </Badge>
+              </div>
+            </div>
           </div>
         </td>
         <td>
-          <Badge variant="dot" color="gray">
-            {project.organization}
-          </Badge>
-        </td>
-        <td>{formatDate(project.created_at)}</td>
-        <td>{formatDate(project.stage_start_date)}</td>
-        <td>
-          {formatDate(project.stage_due_date)}
-          <br />
-          <small className={classes.daysRemaining}>
-            {calculateDaysRemaining(project.stage_due_date)}
-          </small>
-        </td>
-        <td>{formatDate(project.project_start_date)}</td>
-        <td>
-          {formatDate(project.project_due_date)}
-          <br />
-          <small className={classes.daysRemaining}>
-            {calculateDaysRemaining(project.project_due_date)}
-          </small>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <Text size="xs">Stage: {formatDate(project.stage_due_date)}</Text>
+            <Text size="xs" c="dimmed">{calculateDaysRemaining(project.stage_due_date)}</Text>
+          </div>
         </td>
       </tr>
     </React.Fragment>
@@ -666,20 +647,12 @@ const AdminDashboard: React.FC = () => {
           <Table className={classes.taskTable}>
             <thead>
               <tr>
-                <Th sorted={sortBy === 'project_name'} reversed={reverseSortDirection} onSort={() => setSorting('project_name')}>Project Name</Th>
-                <Th sorted={sortBy === 'project_description'} reversed={reverseSortDirection} onSort={() => setSorting('project_description')}>Description</Th>
+                <Th sorted={sortBy === 'project_name'} reversed={reverseSortDirection} onSort={() => setSorting('project_name')}>Project</Th>
                 <Th sorted={sortBy === 'status'} reversed={reverseSortDirection} onSort={() => setSorting('status')}>Status</Th>
-                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage</Th>
-                <Th sorted={false} reversed={false} onSort={() => {}}>Progress</Th>
-                <Th sorted={sortBy === 'session_duration'} reversed={reverseSortDirection} onSort={() => setSorting('session_duration')}>Duration</Th>
-                <Th sorted={sortBy === 'carbon_emit'} reversed={reverseSortDirection} onSort={() => setSorting('carbon_emit')}>Carbon Emissions</Th>
+                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage & Progress</Th>
+                <Th sorted={sortBy === 'carbon_emit'} reversed={reverseSortDirection} onSort={() => setSorting('carbon_emit')}>Carbon</Th>
                 <Th sorted={sortBy === 'owner'} reversed={reverseSortDirection} onSort={() => setSorting('owner')}>Owner</Th>
-                <Th sorted={sortBy === 'organization'} reversed={reverseSortDirection} onSort={() => setSorting('organization')}>Organization</Th>
-                <Th sorted={sortBy === 'created_at'} reversed={reverseSortDirection} onSort={() => setSorting('created_at')}>Created At</Th>
-                <Th sorted={sortBy === 'stage_start_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_start_date')}>Stage Start</Th>
-                <Th sorted={sortBy === 'stage_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_due_date')}>Stage Due</Th>
-                <Th sorted={sortBy === 'project_start_date'} reversed={reverseSortDirection} onSort={() => setSorting('project_start_date')}>Project Start</Th>
-                <Th sorted={sortBy === 'project_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('project_due_date')}>Project Due</Th>
+                <Th sorted={sortBy === 'stage_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_due_date')}>Timeline</Th>
               </tr>
             </thead>
             <tbody>
@@ -687,7 +660,7 @@ const AdminDashboard: React.FC = () => {
                 rows
               ) : (
                 <tr>
-                  <td colSpan={11}>
+                  <td colSpan={6}>
                     <Text fw={500} ta="center">
                       Nothing found
                     </Text>
