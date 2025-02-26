@@ -221,6 +221,13 @@ const AdminDashboard: React.FC = () => {
   });
   const [newProjectAssignee, setNewProjectAssignee] = useState('');
   const [assigneeEmail, setAssigneeEmail] = useState(''); // Add state for assignee email
+  const [assigneeError, setAssigneeError] = useState<string>('');
+  const [newProjectAssigneeError, setNewProjectAssigneeError] = useState<string>('');
+  const [createErrors, setCreateErrors] = useState({
+    project_name: '',
+    project_description: '',
+    owner: ''
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -370,6 +377,41 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleCreateProject = async () => {
+    // Reset all errors first
+    setCreateErrors({
+      project_name: '',
+      project_description: '',
+      owner: ''
+    });
+
+    // Validate required fields
+    let hasError = false;
+    const newErrors = {
+      project_name: '',
+      project_description: '',
+      owner: ''
+    };
+
+    if (!newProject.project_name.trim()) {
+      newErrors.project_name = 'Project title is required';
+      hasError = true;
+    }
+
+    if (!newProject.project_description.trim()) {
+      newErrors.project_description = 'Project description is required';
+      hasError = true;
+    }
+
+    if (!newProject.owner.trim()) {
+      newErrors.owner = 'Owner email is required';
+      hasError = true;
+    }
+
+    if (hasError) {
+      setCreateErrors(newErrors);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -444,13 +486,59 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const validateEmail = async (email: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      const response = await fetch(`http://localhost:5000/validate_user_email/${email}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      return data.exists;
+    } catch (error) {
+      console.error('Error validating email:', error);
+      return false;
+    }
+  };
+
   const handleAddAssignee = async () => {
     if (selectedProject && assigneeEmail) {
       try {
+        // Reset error message at the start
+        setAssigneeError('');
+
         const token = localStorage.getItem('token');
         if (!token) {
-          throw new Error('No token found');
+          setAssigneeError('Authentication error');
+          return;
         }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(assigneeEmail)) {
+          setAssigneeError('Invalid email format');
+          return;
+        }
+
+        // Check if user exists in database
+        const userExists = await validateEmail(assigneeEmail);
+        if (!userExists) {
+          setAssigneeError('User not found in the system');
+          return;
+        }
+
+        // If we get here, the email is valid, so clear any error
+        setAssigneeError('');
 
         const response = await fetch('http://localhost:5000/add_project_member', {
           method: 'POST',
@@ -467,7 +555,8 @@ const AdminDashboard: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to add member');
+          setAssigneeError(errorData.error || 'Failed to add member');
+          return;
         }
 
         const data = await response.json();
@@ -485,20 +574,47 @@ const AdminDashboard: React.FC = () => {
         ));
         setSelectedProject(updatedProject);
         setAssigneeEmail('');
+        setAssigneeError('');
       } catch (error) {
         console.error('Error adding assignee:', error);
-        alert(error instanceof Error ? error.message : "An error occurred");
+        setAssigneeError(error instanceof Error ? error.message : "An error occurred");
       }
     }
   };
 
-  const handleAddNewProjectAssignee = () => {
-    if (newProjectAssignee && !newProject.members.includes(newProjectAssignee)) {
-      setNewProject({
-        ...newProject,
-        members: [...newProject.members, newProjectAssignee]
-      });
-      setNewProjectAssignee('');
+  const handleAddNewProjectAssignee = async () => {
+    if (newProjectAssignee) {
+      try {
+        // Reset error message at the start
+        setNewProjectAssigneeError('');
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newProjectAssignee)) {
+          setNewProjectAssigneeError('Invalid email format');
+          return;
+        }
+
+        // Check if user exists in database
+        const userExists = await validateEmail(newProjectAssignee);
+        if (!userExists) {
+          setNewProjectAssigneeError('User not found in the system');
+          return;
+        }
+
+        // If we get here, the email is valid, so clear any error
+        setNewProjectAssigneeError('');
+
+        if (!newProject.members.includes(newProjectAssignee)) {
+          setNewProject({
+            ...newProject,
+            members: [...newProject.members, newProjectAssignee]
+          });
+          setNewProjectAssignee('');
+        }
+      } catch (error) {
+        setNewProjectAssigneeError(error instanceof Error ? error.message : "An error occurred");
+      }
     }
   };
 
@@ -862,7 +978,11 @@ const AdminDashboard: React.FC = () => {
             label="Add Member by Email"
             placeholder="Enter member email"
             value={assigneeEmail}
-            onChange={(e) => setAssigneeEmail(e.target.value)}
+            onChange={(e) => {
+              setAssigneeEmail(e.target.value);
+              // Clear error when user starts typing
+              if (assigneeError) setAssigneeError('');
+            }}
             type="email"
             required
           />
@@ -873,6 +993,9 @@ const AdminDashboard: React.FC = () => {
           >
             Add Member
           </Button>
+          {assigneeError && (
+            <p className={classes.errorText}>{assigneeError}</p>
+          )}
 
           <Paper p="md" mt="md" withBorder>
             <Text size="sm" fw={500} mb="xs">Current Members</Text>
@@ -912,29 +1035,62 @@ const AdminDashboard: React.FC = () => {
 
         <Modal
           opened={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setCreateErrors({
+              project_name: '',
+              project_description: '',
+              owner: ''
+            });
+          }}
           title="Create New Project"
           size="lg"
         >
           <div style={{ display: 'grid', gap: '1rem' }}>
-            <TextInput
-              label="Project Title"
-              value={newProject.project_name}
-              onChange={(event) => setNewProject({ ...newProject, project_name: event.currentTarget.value })}
-              required
-            />
-            <Textarea
-              label="Project Description"
-              value={newProject.project_description}
-              onChange={(event) => setNewProject({ ...newProject, project_description: event.currentTarget.value })}
-              required
-            />
-            <TextInput
-              label="Owner Email"
-              value={newProject.owner}
-              onChange={(event) => setNewProject({ ...newProject, owner: event.currentTarget.value })}
-              required
-            />
+            <div>
+              <TextInput
+                label="Project Title"
+                value={newProject.project_name}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, project_name: event.currentTarget.value });
+                  if (createErrors.project_name) {
+                    setCreateErrors({ ...createErrors, project_name: '' });
+                  }
+                }}
+                required
+                error={createErrors.project_name}
+              />
+            </div>
+
+            <div>
+              <Textarea
+                label="Project Description"
+                value={newProject.project_description}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, project_description: event.currentTarget.value });
+                  if (createErrors.project_description) {
+                    setCreateErrors({ ...createErrors, project_description: '' });
+                  }
+                }}
+                required
+                error={createErrors.project_description}
+              />
+            </div>
+
+            <div>
+              <TextInput
+                label="Owner Email"
+                value={newProject.owner}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, owner: event.currentTarget.value });
+                  if (createErrors.owner) {
+                    setCreateErrors({ ...createErrors, owner: '' });
+                  }
+                }}
+                required
+                error={createErrors.owner}
+              />
+            </div>
 
             {/* Timeline Section */}
             <Paper p="md" withBorder>
@@ -946,7 +1102,11 @@ const AdminDashboard: React.FC = () => {
                     label="Stage Duration (days)"
                     value={newProject.stage_duration}
                     onChange={(event) => {
-                      const duration = parseInt(event.currentTarget.value);
+                      // Handle empty or invalid input
+                      const inputValue = event.currentTarget.value;
+                      const duration = inputValue === '' ? 0 : Math.max(0, parseInt(inputValue));
+                      
+                      // Calculate new due date based on start date and duration
                       const stageStart = new Date(newProject.stage_start_date);
                       const stageDue = new Date(stageStart);
                       stageDue.setDate(stageStart.getDate() + duration);
@@ -957,7 +1117,8 @@ const AdminDashboard: React.FC = () => {
                         stage_due_date: stageDue.toISOString().split('T')[0]
                       });
                     }}
-                    min={1}
+                    min={0}
+                    error={newProject.stage_duration === 0 ? "Duration cannot be 0 days" : null}
                   />
                   <TextInput
                     type="date"
@@ -969,19 +1130,46 @@ const AdminDashboard: React.FC = () => {
                       const due = new Date(start);
                       due.setDate(start.getDate() + newProject.stage_duration);
                       
+                      // Ensure project start date is not after stage start date
+                      const projectStart = new Date(newProject.project_start_date);
+                      if (start < projectStart) {
+                        start.setHours(0, 0, 0, 0);
+                      }
+                      
                       setNewProject({
                         ...newProject,
                         stage_start_date: startDate,
                         stage_due_date: due.toISOString().split('T')[0],
-                        project_start_date: startDate
+                        project_start_date: start < projectStart ? startDate : newProject.project_start_date
                       });
                     }}
+                    min={new Date().toISOString().split('T')[0]} // Cannot select past dates
                   />
                   <TextInput
                     type="date"
                     label="Stage Due Date"
                     value={newProject.stage_due_date}
-                    onChange={(event) => setNewProject({ ...newProject, stage_due_date: event.currentTarget.value })}
+                    onChange={(event) => {
+                      const dueDate = event.currentTarget.value;
+                      const start = new Date(newProject.stage_start_date);
+                      const due = new Date(dueDate);
+                      
+                      // Calculate duration based on selected dates
+                      const diffTime = due.getTime() - start.getTime();
+                      const duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      
+                      // Only update if due date is after start date
+                      if (duration >= 0) {
+                        setNewProject({
+                          ...newProject,
+                          stage_due_date: dueDate,
+                          stage_duration: duration
+                        });
+                      }
+                    }}
+                    min={newProject.stage_start_date} // Cannot select date before start date
+                    error={new Date(newProject.stage_due_date) <= new Date(newProject.stage_start_date) ? 
+                      "Due date must be after start date" : null}
                   />
                 </Group>
 
@@ -990,13 +1178,35 @@ const AdminDashboard: React.FC = () => {
                     type="date"
                     label="Project Start Date"
                     value={newProject.project_start_date}
-                    onChange={(event) => setNewProject({ ...newProject, project_start_date: event.currentTarget.value })}
+                    onChange={(event) => {
+                      const startDate = event.currentTarget.value;
+                      const start = new Date(startDate);
+                      const due = new Date(newProject.project_due_date);
+                      
+                      // Only update if project start is before project due
+                      if (start <= due) {
+                        setNewProject({ ...newProject, project_start_date: startDate });
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]} // Cannot select past dates
                   />
                   <TextInput
                     type="date"
                     label="Project Due Date"
                     value={newProject.project_due_date}
-                    onChange={(event) => setNewProject({ ...newProject, project_due_date: event.currentTarget.value })}
+                    onChange={(event) => {
+                      const dueDate = event.currentTarget.value;
+                      const start = new Date(newProject.project_start_date);
+                      const due = new Date(dueDate);
+                      
+                      // Only update if project due is after project start
+                      if (due >= start) {
+                        setNewProject({ ...newProject, project_due_date: dueDate });
+                      }
+                    }}
+                    min={newProject.project_start_date} // Cannot select date before project start
+                    error={new Date(newProject.project_due_date) <= new Date(newProject.project_start_date) ? 
+                      "Project due date must be after start date" : null}
                   />
                 </Group>
               </div>
@@ -1006,12 +1216,22 @@ const AdminDashboard: React.FC = () => {
               <TextInput
                 label="Add Assignee (Email)"
                 value={newProjectAssignee}
-                onChange={(e) => setNewProjectAssignee(e.target.value)}
-                placeholder="Enter assignee email"
+                onChange={(e) => {
+                  setNewProjectAssignee(e.target.value);
+                  // Clear error when user starts typing
+                  if (newProjectAssigneeError) setNewProjectAssigneeError('');
+                }}
+                placeholder="Enter email"
+                className={`p-2 border rounded flex-1 ${
+                  newProjectAssigneeError ? 'border-red-500' : 'border-gray-300'
+                }`}
               />
               <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
                 Add Assignee
               </Button>
+              {newProjectAssigneeError && (
+                <p className={classes.errorText}>{newProjectAssigneeError}</p>
+              )}
             </div>
 
             {newProject.members.length > 0 && (
@@ -1055,7 +1275,14 @@ const AdminDashboard: React.FC = () => {
             />
 
             <Group align="apart" mt="xl">
-              <Button variant="light" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
+              <Button variant="light" onClick={() => {
+                setIsCreateModalOpen(false);
+                setCreateErrors({
+                  project_name: '',
+                  project_description: '',
+                  owner: ''
+                });
+              }}>Cancel</Button>
               <Button color="blue" onClick={handleCreateProject}>Create</Button>
             </Group>
           </div>

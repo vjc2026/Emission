@@ -2722,3 +2722,21 @@ app.post('/admin/create_project', authenticateAdmin, (req, res) => {
     });
   });
 });
+
+// Endpoint to validate if a user email exists
+app.get('/validate_user_email/:email', authenticateToken, (req, res) => {
+  const { email } = req.params;
+
+  // Check if email exists in the database
+  const query = 'SELECT * FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error validating user email:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    // Return whether the email exists
+    res.json({ exists: results.length > 0 });
+  });
+});

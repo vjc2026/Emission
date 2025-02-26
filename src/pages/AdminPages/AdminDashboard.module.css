@@ -510,3 +510,9 @@
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+.errorText {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
