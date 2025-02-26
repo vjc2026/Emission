@@ -2540,7 +2540,29 @@ app.get('/user_organization/:email', authenticateAdmin, (req, res) => {
 
 // Endpoint to create a new project with members
 app.post('/admin/create_project', authenticateAdmin, (req, res) => {
-  const { project_name, project_description, status, stage, owner, members, organization } = req.body;
+  const { 
+    project_name, 
+    project_description, 
+    status, 
+    stage, 
+    owner, 
+    members, 
+    organization,
+    stage_duration = 14, // Default 14 days if not provided
+    stage_start_date = new Date().toISOString().split('T')[0], // Default to today if not provided
+    stage_due_date,
+    project_start_date = stage_start_date, // Default to stage start date if not provided
+    project_due_date 
+  } = req.body;
+
+  // Calculate default due dates if not provided
+  const defaultStageDueDate = new Date(stage_start_date);
+  defaultStageDueDate.setDate(defaultStageDueDate.getDate() + stage_duration);
+  const finalStageDueDate = stage_due_date || defaultStageDueDate.toISOString().split('T')[0];
+
+  const defaultProjectDueDate = new Date(project_start_date);
+  defaultProjectDueDate.setDate(defaultProjectDueDate.getDate() + 42); // Default 42 days for project
+  const finalProjectDueDate = project_due_date || defaultProjectDueDate.toISOString().split('T')[0];
 
   // Start a transaction since we need to make multiple related database changes
   connection.beginTransaction(err => {
@@ -2555,6 +2577,7 @@ app.post('/admin/create_project', authenticateAdmin, (req, res) => {
     connection.query(findOwnerQuery, [owner], (err, ownerResults) => {
       if (err) {
         return connection.rollback(() => {
+          console.error('Error finding owner:', err);
           res.status(500).json({ error: 'Error finding owner' });
         });
       }
@@ -2567,20 +2590,30 @@ app.post('/admin/create_project', authenticateAdmin, (req, res) => {
 
       const ownerId = ownerResults[0].id;
 
-      // Create the project
+      // Create the project with timeline fields
       const createProjectQuery = `
         INSERT INTO user_history (
           user_id, organization, project_name, project_description, 
           status, stage, carbon_emit, session_duration,
-          stage_start_date, stage_due_date, project_start_date,
-          project_due_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, NOW(), 
-          DATE_ADD(NOW(), INTERVAL 14 DAY), NOW(),
-          DATE_ADD(NOW(), INTERVAL 42 DAY), NOW())
+          stage_duration, stage_start_date, stage_due_date,
+          project_start_date, project_due_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, NOW())
       `;
 
       connection.query(createProjectQuery, 
-        [ownerId, organization, project_name, project_description, status, stage],
+        [
+          ownerId, 
+          organization, 
+          project_name, 
+          project_description, 
+          status, 
+          stage,
+          stage_duration,
+          stage_start_date,
+          finalStageDueDate,
+          project_start_date,
+          finalProjectDueDate
+        ],
         (err, projectResult) => {
           if (err) {
             return connection.rollback(() => {
@@ -2640,6 +2673,11 @@ app.post('/admin/create_project', authenticateAdmin, (req, res) => {
                     owner,
                     organization,
                     members,
+                    stage_duration,
+                    stage_start_date,
+                    stage_due_date: finalStageDueDate,
+                    project_start_date,
+                    project_due_date: finalProjectDueDate,
                     created_at: new Date().toISOString()
                   });
                 });
@@ -2666,6 +2704,11 @@ app.post('/admin/create_project', authenticateAdmin, (req, res) => {
                 owner,
                 organization,
                 members: [],
+                stage_duration,
+                stage_start_date,
+                stage_due_date: finalStageDueDate,
+                project_start_date,
+                project_due_date: finalProjectDueDate,
                 created_at: new Date().toISOString()
               });
             });

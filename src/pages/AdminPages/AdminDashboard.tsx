@@ -148,8 +148,24 @@ const fetchProjectMembers = async (projectId: number) => {
 };
 
 // Add a function to format the date nicely
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString();
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return 'Not set';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Add a function to calculate days remaining
+const calculateDaysRemaining = (dueDate: string | undefined) => {
+  if (!dueDate) return 'No due date';
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffTime = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? `${diffDays} days remaining` : 'Past due';
 };
 
 const renderAssignees = (members: string[] | undefined) => {
@@ -197,6 +213,11 @@ const AdminDashboard: React.FC = () => {
     organization: '', // This will be set automatically based on owner
     members: [] as string[],
     created_at: new Date().toISOString(),
+    stage_duration: 14, // Default 14 days
+    stage_start_date: new Date().toISOString().split('T')[0], // Today's date
+    stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0], // Today + 14 days
+    project_start_date: new Date().toISOString().split('T')[0], // Today's date
+    project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0], // Today + 42 days
   });
   const [newProjectAssignee, setNewProjectAssignee] = useState('');
   const [assigneeEmail, setAssigneeEmail] = useState(''); // Add state for assignee email
@@ -406,6 +427,11 @@ const AdminDashboard: React.FC = () => {
         organization: '',
         members: [],
         created_at: new Date().toISOString(),
+        stage_duration: 14, // Default 14 days
+        stage_start_date: new Date().toISOString().split('T')[0], // Today's date
+        stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0], // Today + 14 days
+        project_start_date: new Date().toISOString().split('T')[0], // Today's date
+        project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0], // Today + 42 days
       });
       setNewProjectAssignee('');
     } catch (error) {
@@ -475,6 +501,21 @@ const AdminDashboard: React.FC = () => {
       setNewProjectAssignee('');
     }
   };
+
+  const columns: { key: keyof Project; label: string }[] = [
+    { key: 'project_name', label: 'Project Name' },
+    { key: 'project_description', label: 'Description' },
+    { key: 'owner', label: 'Owner' },
+    { key: 'organization', label: 'Organization' },
+    { key: 'status', label: 'Status' },
+    { key: 'stage', label: 'Stage' },
+    { key: 'carbon_emit', label: 'Carbon Emissions' },
+    { key: 'session_duration', label: 'Session Duration' },
+    { key: 'stage_start_date', label: 'Stage Start' },
+    { key: 'stage_due_date', label: 'Stage Due' },
+    { key: 'project_start_date', label: 'Project Start' },
+    { key: 'project_due_date', label: 'Project Due' }
+  ];
 
   const rows = sortedData.map((project) => (
     <React.Fragment key={project.id}>
@@ -572,6 +613,22 @@ const AdminDashboard: React.FC = () => {
           </Badge>
         </td>
         <td>{formatDate(project.created_at)}</td>
+        <td>{formatDate(project.stage_start_date)}</td>
+        <td>
+          {formatDate(project.stage_due_date)}
+          <br />
+          <small className={classes.daysRemaining}>
+            {calculateDaysRemaining(project.stage_due_date)}
+          </small>
+        </td>
+        <td>{formatDate(project.project_start_date)}</td>
+        <td>
+          {formatDate(project.project_due_date)}
+          <br />
+          <small className={classes.daysRemaining}>
+            {calculateDaysRemaining(project.project_due_date)}
+          </small>
+        </td>
       </tr>
     </React.Fragment>
   ));
@@ -619,6 +676,10 @@ const AdminDashboard: React.FC = () => {
                 <Th sorted={sortBy === 'owner'} reversed={reverseSortDirection} onSort={() => setSorting('owner')}>Owner</Th>
                 <Th sorted={sortBy === 'organization'} reversed={reverseSortDirection} onSort={() => setSorting('organization')}>Organization</Th>
                 <Th sorted={sortBy === 'created_at'} reversed={reverseSortDirection} onSort={() => setSorting('created_at')}>Created At</Th>
+                <Th sorted={sortBy === 'stage_start_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_start_date')}>Stage Start</Th>
+                <Th sorted={sortBy === 'stage_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_due_date')}>Stage Due</Th>
+                <Th sorted={sortBy === 'project_start_date'} reversed={reverseSortDirection} onSort={() => setSorting('project_start_date')}>Project Start</Th>
+                <Th sorted={sortBy === 'project_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('project_due_date')}>Project Due</Th>
               </tr>
             </thead>
             <tbody>
@@ -839,78 +900,151 @@ const AdminDashboard: React.FC = () => {
           opened={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
           title="Create New Project"
+          size="lg"
         >
-          <TextInput
-            label="Project Title"
-            value={newProject.project_name}
-            onChange={(event) => setNewProject({ ...newProject, project_name: event.currentTarget.value })}
-            required
-          />
-          <Textarea
-            label="Project Description"
-            value={newProject.project_description}
-            onChange={(event) => setNewProject({ ...newProject, project_description: event.currentTarget.value })}
-            required
-          />
-          <TextInput
-            label="Owner Email"
-            value={newProject.owner}
-            onChange={(event) => setNewProject({ ...newProject, owner: event.currentTarget.value })}
-            required
-          />
-          <div className={classes.assigneeSection}>
+          <div style={{ display: 'grid', gap: '1rem' }}>
             <TextInput
-              label="Add Assignee (Email)"
-              value={newProjectAssignee}
-              onChange={(e) => setNewProjectAssignee(e.target.value)}
-              placeholder="Enter assignee email"
+              label="Project Title"
+              value={newProject.project_name}
+              onChange={(event) => setNewProject({ ...newProject, project_name: event.currentTarget.value })}
+              required
             />
-            <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
-              Add Assignee
-            </Button>
-          </div>
-          {newProject.members.length > 0 && (
-            <div className={classes.assigneesList}>
-              <Text fw={500} mt="md">Added Assignees:</Text>
-              {newProject.members.map((member, index) => (
-                <Badge 
-                  key={index}
-                  mr={5}
-                  mb={5}
-                  rightSection={
-                    <Center onClick={() => {
+            <Textarea
+              label="Project Description"
+              value={newProject.project_description}
+              onChange={(event) => setNewProject({ ...newProject, project_description: event.currentTarget.value })}
+              required
+            />
+            <TextInput
+              label="Owner Email"
+              value={newProject.owner}
+              onChange={(event) => setNewProject({ ...newProject, owner: event.currentTarget.value })}
+              required
+            />
+
+            {/* Timeline Section */}
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Timeline Settings</Text>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <Group grow>
+                  <TextInput
+                    type="number"
+                    label="Stage Duration (days)"
+                    value={newProject.stage_duration}
+                    onChange={(event) => {
+                      const duration = parseInt(event.currentTarget.value);
+                      const stageStart = new Date(newProject.stage_start_date);
+                      const stageDue = new Date(stageStart);
+                      stageDue.setDate(stageStart.getDate() + duration);
+                      
                       setNewProject({
                         ...newProject,
-                        members: newProject.members.filter((_, i) => i !== index)
+                        stage_duration: duration,
+                        stage_due_date: stageDue.toISOString().split('T')[0]
                       });
-                    }} style={{ cursor: 'pointer' }}>
-                      ×
-                    </Center>
-                  }
-                >
-                  {member}
-                </Badge>
-              ))}
+                    }}
+                    min={1}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Start Date"
+                    value={newProject.stage_start_date}
+                    onChange={(event) => {
+                      const startDate = event.currentTarget.value;
+                      const start = new Date(startDate);
+                      const due = new Date(start);
+                      due.setDate(start.getDate() + newProject.stage_duration);
+                      
+                      setNewProject({
+                        ...newProject,
+                        stage_start_date: startDate,
+                        stage_due_date: due.toISOString().split('T')[0],
+                        project_start_date: startDate
+                      });
+                    }}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Due Date"
+                    value={newProject.stage_due_date}
+                    onChange={(event) => setNewProject({ ...newProject, stage_due_date: event.currentTarget.value })}
+                  />
+                </Group>
+
+                <Group grow>
+                  <TextInput
+                    type="date"
+                    label="Project Start Date"
+                    value={newProject.project_start_date}
+                    onChange={(event) => setNewProject({ ...newProject, project_start_date: event.currentTarget.value })}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Project Due Date"
+                    value={newProject.project_due_date}
+                    onChange={(event) => setNewProject({ ...newProject, project_due_date: event.currentTarget.value })}
+                  />
+                </Group>
+              </div>
+            </Paper>
+
+            <div className={classes.assigneeSection}>
+              <TextInput
+                label="Add Assignee (Email)"
+                value={newProjectAssignee}
+                onChange={(e) => setNewProjectAssignee(e.target.value)}
+                placeholder="Enter assignee email"
+              />
+              <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
+                Add Assignee
+              </Button>
             </div>
-          )}
-          <Select
-            label="Status"
-            value={newProject.status}
-            onChange={(value) => setNewProject({ ...newProject, status: value ?? '' })}
-            data={['In Progress', 'Complete', 'Archived']}
-            required
-          />
-          <Select
-            label="Stage"
-            value={newProject.stage}
-            onChange={(value) => setNewProject({ ...newProject, stage: value ?? '' })}
-            data={['Design: Creating the software architecture', 'Development: Writing the actual code', 'Testing: Ensuring the software works as expected']}
-            required
-          />
-          <Group align="apart" mt="xl">
-            <Button variant="light" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-            <Button color="blue" onClick={handleCreateProject}>Create</Button>
-          </Group>
+
+            {newProject.members.length > 0 && (
+              <div className={classes.assigneesList}>
+                <Text fw={500} mt="md">Added Assignees:</Text>
+                {newProject.members.map((member, index) => (
+                  <Badge 
+                    key={index}
+                    mr={5}
+                    mb={5}
+                    rightSection={
+                      <Center onClick={() => {
+                        setNewProject({
+                          ...newProject,
+                          members: newProject.members.filter((_, i) => i !== index)
+                        });
+                      }} style={{ cursor: 'pointer' }}>
+                        ×
+                      </Center>
+                    }
+                  >
+                    {member}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <Select
+              label="Status"
+              value={newProject.status}
+              onChange={(value) => setNewProject({ ...newProject, status: value ?? '' })}
+              data={['In Progress', 'Complete', 'Archived']}
+              required
+            />
+            <Select
+              label="Stage"
+              value={newProject.stage}
+              onChange={(value) => setNewProject({ ...newProject, stage: value ?? '' })}
+              data={['Design: Creating the software architecture', 'Development: Writing the actual code', 'Testing: Ensuring the software works as expected']}
+              required
+            />
+
+            <Group align="apart" mt="xl">
+              <Button variant="light" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
+              <Button color="blue" onClick={handleCreateProject}>Create</Button>
+            </Group>
+          </div>
         </Modal>
       </div>
     </AdminLayout>
