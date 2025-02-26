@@ -726,6 +726,19 @@ const AdminDashboard: React.FC = () => {
             
             <div className={classes.panelContent}>
               <Paper p="md" radius="md" withBorder mb="md">
+                <Group mb="md">
+                  <div>
+                    <Text size="sm" fw={500} c="dimmed">Owner</Text>
+                    <Group>
+                      <img 
+                        src={`https://www.gravatar.com/avatar/${selectedProject.owner}?d=identicon&s=24`}
+                        alt={selectedProject.owner}
+                        style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                      />
+                      <Text>{selectedProject.owner}</Text>
+                    </Group>
+                  </div>
+                </Group>
                 <Text>{selectedProject.project_description}</Text>
               </Paper>
               
@@ -773,6 +786,34 @@ const AdminDashboard: React.FC = () => {
                     </Text>
                   </Paper>
                 </div>
+
+                <Paper p="md" radius="md" withBorder mt="md">
+                  <Text size="sm" fw={500} c="dimmed" mb="xs">Timeline</Text>
+                  <div className={classes.timelineDates}>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Stage Start</Text>
+                      <Text>{formatDate(selectedProject.stage_start_date)}</Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Stage Due</Text>
+                      <Text>{formatDate(selectedProject.stage_due_date)}</Text>
+                      <Text size="xs" c="dimmed">
+                        {calculateDaysRemaining(selectedProject.stage_due_date)}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Project Start</Text>
+                      <Text>{formatDate(selectedProject.project_start_date)}</Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Project Due</Text>
+                      <Text>{formatDate(selectedProject.project_due_date)}</Text>
+                      <Text size="xs" c="dimmed">
+                        {calculateDaysRemaining(selectedProject.project_due_date)}
+                      </Text>
+                    </div>
+                  </div>
+                </Paper>
 
                 <Paper p="md" radius="md" withBorder mt="md">
                   <Text size="sm" fw={500} c="dimmed" mb="xs">Progress</Text>

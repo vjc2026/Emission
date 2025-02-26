@@ -343,10 +343,28 @@
   margin: 1rem 0;
 }
 
-.timelineGrid div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.timelineGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.timelineDates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.timelineDates > div {
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: var(--mantine-color-gray-0);
+}
+
+.daysRemaining {
+  color: var(--mantine-color-dimmed);
+  font-size: 0.8rem;
 }
 
 .progressSection {
