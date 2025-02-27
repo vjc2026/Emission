@@ -60,21 +60,21 @@ const LandingPage = () => {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.15, // Slightly faster stagger
-        delayChildren: 0.2,    // Quicker initial delay
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
         ease: "easeOut"
       }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 15 }, // Reduced distance for smoother animation
+    hidden: { opacity: 0, y: 15 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.6, // Slightly faster duration
-        ease: [0.215, 0.61, 0.355, 1] // Smooth easeOutCubic
+        duration: 0.6,
+        ease: [0.215, 0.61, 0.355, 1]
       }
     }
   };
@@ -123,26 +123,24 @@ const LandingPage = () => {
             >
               Start Your Green Journey
             </motion.button>
-            
-            
           </motion.div>
 
           <motion.div 
             className={styles.heroVisual}
-            initial={{ opacity: 0, scale: 0.9 }} // Less extreme initial scale
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ 
               opacity: 1, 
               scale: 1,
               transition: {
                 duration: 1,
-                ease: [0.215, 0.61, 0.355, 1] // Smooth easeOutCubic
+                ease: [0.215, 0.61, 0.355, 1]
               }
             }}
           >
             <motion.div 
               className={styles.glowingOrb}
               animate={{
-                scale: [1, 1.03, 1], // Subtler scale animation
+                scale: [1, 1.03, 1],
                 opacity: [0.85, 1, 0.85],
               }}
               transition={{
@@ -163,22 +161,44 @@ const LandingPage = () => {
             </motion.div>
           </motion.div>
         </div>
+        
+        <motion.div 
+          className={styles.scrollIndicator}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ 
+            opacity: [0.4, 0.8, 0.4], 
+            y: [0, 10, 0] 
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            repeatType: "loop",
+            ease: "easeInOut",
+            delay: 1
+          }}
+        >
+          <IconLeaf 
+            size={24} 
+            color="#00ffc8" 
+            style={{ transform: 'rotate(45deg)' }} 
+          />
+        </motion.div>
       </section>
 
       <section className={styles.featureSection}>
         <Container size="xl">
           <motion.div 
             className={styles.featureGrid}
-            initial={{ opacity: 0, y: 15 }} // Reduced distance
+            initial={{ opacity: 0, y: 15 }}
             whileInView={{ 
               opacity: 1, 
               y: 0,
               transition: {
                 duration: 0.6,
-                ease: [0.215, 0.61, 0.355, 1] // Smooth easeOutCubic
+                ease: [0.215, 0.61, 0.355, 1]
               }
             }}
-            viewport={{ once: true, margin: "-100px" }} // Improved viewport trigger
+            viewport={{ once: true, margin: "-100px" }}
           >
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>
@@ -203,11 +223,27 @@ const LandingPage = () => {
         </Container>
       </section>
       
-      <Container size="xl" style={{ width: '100%', padding: 0 }}>
-        <HowItWorks />
-        <Testimonials />
-        <ClientRequest />
-      </Container>
+      <div className={styles.sectionConnector}></div>
+      
+      <HowItWorks />
+      
+      <div className={styles.sectionConnector}></div>
+      
+      <Testimonials />
+      
+      <div className={styles.sectionConnector}></div>
+      
+      <ClientRequest />
+      
+      <footer className={styles.footer}>
+        <Container size="xl" style={{ padding: '2rem 1rem' }}>
+          <div className={styles.footerContent}>
+            <Text ta="center" size="sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              © {new Date().getFullYear()} EmissionSense. All rights reserved. Building a sustainable future, one line of code at a time.
+            </Text>
+          </div>
+        </Container>
+      </footer>
     </div>
   );
 };

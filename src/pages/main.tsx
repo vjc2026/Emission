@@ -52,7 +52,6 @@ const secondaryData = [
 ];
 
 const MainContent: React.FC = () => {
-  // ...existing state declarations...
   const [opened, setOpened] = useState(false);
   const [currentComponent, setCurrentComponent] = useState<string>('component1');
   const [userData, setUserData] = useState<{ name: string; organization: string; profile_image: string | null }>({ name: '', organization: '', profile_image: null });
