@@ -13,6 +13,10 @@ import {
   UnstyledButton,
   Select,
   Collapse,
+  Paper,
+  Container,
+  Transition,
+  Badge,
 } from '@mantine/core';
 import classes from './AdminDashboard.module.css';
 
@@ -35,7 +39,7 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
     <Table.Th className={classes.th}>
       <UnstyledButton onClick={onSort} className={classes.control}>
         <Group justify="space-between">
-          <Text fw={500} fz="sm">
+          <Text fw={600} fz="sm" c="dimmed">
             {children}
           </Text>
           <Center className={classes.icon}>
@@ -154,27 +158,37 @@ const AdminEmissionView: React.FC = () => {
     uniqueOrganizations.map((organization) => {
       const organizationData = sortedData.filter(data => data.organization === organization);
       const totalCarbonEmit = organizationData.reduce((sum, data) => sum + data.total_carbon_emit, 0);
+      const isExpanded = expandedOrganizations.includes(organization);
 
       return (
         <React.Fragment key={organization}>
-          <Table.Tr onClick={() => toggleOrganization(organization)}>
-            <Table.Td>{organization}</Table.Td>
-            <Table.Td>{totalCarbonEmit.toFixed(3)}</Table.Td>
+          <Table.Tr 
+            onClick={() => toggleOrganization(organization)}
+            className={`${classes.organizationRow} ${isExpanded ? classes.expandedRow : ''}`}
+          >
+            <Table.Td>
+              <Group>
+                <IconChevronDown 
+                  size={16} 
+                  style={{ 
+                    transform: isExpanded ? 'rotate(-180deg)' : 'none',
+                    transition: 'transform 0.2s ease'
+                  }}
+                />
+                <Text fw={500}>{organization}</Text>
+              </Group>
+            </Table.Td>
+            <Table.Td className={classes.carbonValue}>{totalCarbonEmit.toFixed(3)}</Table.Td>
           </Table.Tr>
           <Table.Tr>
             <Table.Td colSpan={2} style={{ padding: 0 }}>
-              <Collapse in={expandedOrganizations.includes(organization)}>
+              <Collapse in={isExpanded}>
                 <Table>
                   <Table.Tbody>
-                    <Table.Tr>
-                      <Table.Td colSpan={2} style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold', textAlign: 'left' }}>
-                        Users:
-                      </Table.Td>
-                    </Table.Tr>
                     {organizationData.map((user) => (
-                      <Table.Tr key={user.user}>
-                        <Table.Td style={{ backgroundColor: '#f0f0f0'}}>{user.user}</Table.Td>
-                        <Table.Td style={{ backgroundColor: '#f0f0f0'}}>{user.total_carbon_emit}</Table.Td>
+                      <Table.Tr key={user.user} className={classes.userRow}>
+                        <Table.Td pl={40}>{user.user}</Table.Td>
+                        <Table.Td className={classes.carbonValue}>{user.total_carbon_emit.toFixed(3)}</Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
@@ -190,80 +204,90 @@ const AdminEmissionView: React.FC = () => {
       <Table.Tr key={data.user}>
         <Table.Td>{data.organization}</Table.Td>
         <Table.Td>{data.user}</Table.Td>
-        <Table.Td>{data.total_carbon_emit.toFixed(3)}</Table.Td>
+        <Table.Td className={classes.carbonValue}>{data.total_carbon_emit.toFixed(3)}</Table.Td>
       </Table.Tr>
     ))
   );
 
   return (
     <AdminLayout>
-      <div>
-        <h1>Admin Emission View</h1>
-        <Select
-          value={viewBy}
-          onChange={(value) => setViewBy(value as 'organization' | 'individual')}
-          data={[
-            { value: 'organization', label: 'By Organization' },
-            { value: 'individual', label: 'By Individual' },
-          ]}
-          mb="md"
-        />
-        {error ? (
-          <div style={{ color: 'red' }}>{error}</div>
-        ) : (
-          <ScrollArea>
+      <Container size="xl" className={classes.emissionView}>
+        <div className={classes.emissionHeader}>
+          <h1>Emission Analytics</h1>
+          <Group gap="md">
+            <Select
+              className={classes.viewSelect}
+              value={viewBy}
+              onChange={(value) => setViewBy(value as 'organization' | 'individual')}
+              data={[
+                { value: 'organization', label: 'Organization View' },
+                { value: 'individual', label: 'Individual View' },
+              ]}
+              placeholder="Select view type"
+            />
             <TextInput
-              placeholder="Search by any field"
-              mb="md"
+              className={classes.searchWrapper}
+              placeholder="Search entries..."
               leftSection={<IconSearch size={16} stroke={1.5} />}
               value={search}
               onChange={handleSearchChange}
             />
-            <Table horizontalSpacing="md" verticalSpacing="xs" miw={700} layout="fixed">
-              <Table.Tbody>
-                <Table.Tr>
-                  <Th
-                    sorted={sortBy === 'organization'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('organization')}
-                  >
-                    Organization
-                  </Th>
-                  {viewBy === 'individual' && (
-                    <Th
-                      sorted={sortBy === 'user'}
-                      reversed={reverseSortDirection}
-                      onSort={() => setSorting('user')}
-                    >
-                      User
-                    </Th>
-                  )}
-                  <Th
-                    sorted={sortBy === 'total_carbon_emit'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('total_carbon_emit')}
-                  >
-                    Total Carbon Emit
-                  </Th>
-                </Table.Tr>
-              </Table.Tbody>
-              <Table.Tbody>
-                {rows.length > 0 ? (
-                  rows
-                ) : (
+          </Group>
+        </div>
+
+        {error ? (
+          <Paper p="md" withBorder color="red">
+            <Text c="red">{error}</Text>
+          </Paper>
+        ) : (
+          <Paper className={classes.tableCard}>
+            <ScrollArea>
+              <Table horizontalSpacing="md" verticalSpacing="xs" miw={700}>
+                <Table.Thead className={classes.tableHeader}>
                   <Table.Tr>
-                    <Table.Td colSpan={viewBy === 'individual' ? 3 : 2}>
-                      <Text fw={500} ta="center">
-                        Nothing found
-                      </Text>
-                    </Table.Td>
+                    <Th
+                      sorted={sortBy === 'organization'}
+                      reversed={reverseSortDirection}
+                      onSort={() => setSorting('organization')}
+                    >
+                      Organization
+                    </Th>
+                    {viewBy === 'individual' && (
+                      <Th
+                        sorted={sortBy === 'user'}
+                        reversed={reverseSortDirection}
+                        onSort={() => setSorting('user')}
+                      >
+                        User
+                      </Th>
+                    )}
+                    <Th
+                      sorted={sortBy === 'total_carbon_emit'}
+                      reversed={reverseSortDirection}
+                      onSort={() => setSorting('total_carbon_emit')}
+                    >
+                      Carbon Emission (kg CO₂)
+                    </Th>
                   </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
+                </Table.Thead>
+                <Table.Tbody>
+                  {rows.length > 0 ? (
+                    rows
+                  ) : (
+                    <Table.Tr>
+                      <Table.Td colSpan={viewBy === 'individual' ? 3 : 2}>
+                        <Text fw={500} ta="center" c="dimmed">
+                          No results found
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          </Paper>
         )}
-      </div>
+      </Container>
     </AdminLayout>
   );
 };

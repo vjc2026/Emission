@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from './AdminLayout';
-import { Table, TextInput, ScrollArea, Text, Button, Modal, Group, PasswordInput, FileInput, Avatar, Tooltip, Center, Select } from '@mantine/core';
-import { IconSearch } from '@tabler/icons-react';
+import { Table, TextInput, ScrollArea, Text, Button, Modal, Group, PasswordInput, FileInput, Avatar, Tooltip, Center, Select, Paper, Container, Title, Badge, Divider } from '@mantine/core';
+import { IconSearch, IconUserPlus, IconTrash, IconUpload } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import axios from 'axios';
+import styles from './AdminUsers.module.css';
 
 const AdminUsers: React.FC = () => {
   interface User {
@@ -23,6 +24,8 @@ const AdminUsers: React.FC = () => {
   const [cpuOptions, setCpuOptions] = useState<{ label: string; value: string }[]>([]);
   const [gpuOptions, setGpuOptions] = useState<{ label: string; value: string }[]>([]);
   const [ramOptions, setRamOptions] = useState<{ label: string; value: string }[]>([]);
+  const [deleteModalOpened, setDeleteModalOpened] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const form = useForm({
     initialValues: {
@@ -200,187 +203,276 @@ const AdminUsers: React.FC = () => {
     }
   };
 
+  const openDeleteModal = (user: User) => {
+    setUserToDelete(user);
+    setDeleteModalOpened(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await handleDeleteUser(userToDelete.id);
+      setDeleteModalOpened(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
+  };
+
   return (
     <AdminLayout>
-      <div>
-        <h1>Admin Users</h1>
-        <Group align="apart" mb="md">
-          <TextInput
-            placeholder="Search by any field"
-            leftSection={<IconSearch size={16} stroke={1.5} />}
-            value={search}
-            onChange={(event) => setSearch(event.currentTarget.value)}
-          />
-          <Button onClick={() => setModalOpened(true)}>Create User</Button>
-        </Group>
-        <ScrollArea>
-          <Table horizontalSpacing="md" verticalSpacing="xs" miw={700} layout="fixed">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>ID</Table.Th>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Email</Table.Th>
-                <Table.Th>Organization</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <Table.Tr key={user.id}>
-                    <Table.Td>{user.id}</Table.Td>
-                    <Table.Td>{user.name}</Table.Td>
-                    <Table.Td>{user.email}</Table.Td>
-                    <Table.Td>{user.organization}</Table.Td>
-                    <Table.Td>
-                      <Button color="red" onClick={() => handleDeleteUser(user.id)}>Delete</Button>
+      <Container size="xl" className={styles.container}>
+        <div className={styles.header}>
+          <Title className={styles.title}>User Management</Title>
+        </div>
+
+        <Paper className={styles.searchContainer}>
+          <Group justify="space-between">
+            <TextInput
+              placeholder="Search users..."
+              leftSection={<IconSearch size={16} stroke={1.5} />}
+              value={search}
+              onChange={(event) => setSearch(event.currentTarget.value)}
+              style={{ flexGrow: 1, maxWidth: 400 }}
+            />
+            <Button
+              leftSection={<IconUserPlus size={16} />}
+              className={styles.createButton}
+              onClick={() => setModalOpened(true)}
+            >
+              Create User
+            </Button>
+          </Group>
+        </Paper>
+
+        <Paper className={styles.tableContainer}>
+          <ScrollArea>
+            <Table horizontalSpacing="md" verticalSpacing="sm" striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>ID</Table.Th>
+                  <Table.Th>Name</Table.Th>
+                  <Table.Th>Email</Table.Th>
+                  <Table.Th>Organization</Table.Th>
+                  <Table.Th style={{ textAlign: 'center' }}>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => (
+                    <Table.Tr key={user.id}>
+                      <Table.Td>
+                        <Badge variant="light">{user.id}</Badge>
+                      </Table.Td>
+                      <Table.Td>{user.name}</Table.Td>
+                      <Table.Td>{user.email}</Table.Td>
+                      <Table.Td>{user.organization}</Table.Td>
+                      <Table.Td>
+                        <Group justify="center" gap="xs">
+                          <Button
+                            className={styles.deleteButton}
+                            size="sm"
+                            leftSection={<IconTrash size={16} />}
+                            onClick={() => openDeleteModal(user)}
+                          >
+                            Delete
+                          </Button>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                ) : (
+                  <Table.Tr>
+                    <Table.Td colSpan={5}>
+                      <Text fw={500} ta="center" c="dimmed">
+                        No users found
+                      </Text>
                     </Table.Td>
                   </Table.Tr>
-                ))
-              ) : (
-                <Table.Tr>
-                  <Table.Td colSpan={5}>
-                    <Text fw={500} ta="center">
-                      Nothing found
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
-        </ScrollArea>
+                )}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Paper>
 
         <Modal
           opened={modalOpened}
           onClose={() => setModalOpened(false)}
-          title="Create User"
+          title={<Text size="lg" fw={600}>Create New User</Text>}
+          size="lg"
         >
           <form onSubmit={form.onSubmit(handleSubmit)}>
-            <TextInput
-              label="Name"
-              placeholder="Enter your name"
-              {...form.getInputProps('name')}
-              required
-            />
-            <TextInput
-              label="Email"
-              placeholder="Enter your email"
-              {...form.getInputProps('email')}
-              required
-            />
-            <PasswordInput
-              label="Password"
-              placeholder="Enter your password"
-              {...form.getInputProps('password')}
-              required
-            />
-            <PasswordInput
-              label="Confirm Password"
-              placeholder="Repeat your password"
-              {...form.getInputProps('confirmPassword')}
-              required
-            />
-            <TextInput
-              label="Organization"
-              placeholder="Enter your organization"
-              {...form.getInputProps('organization')}
-              required
-            />
-            <Text>Customize Profile Picture (optional)</Text>
-            <Center>
-              <Tooltip label="Input Profile Picture" withArrow position="top">
-                <div
-                  style={{ position: 'relative', cursor: 'pointer' }}
-                  onClick={() => document.getElementById('file-input')?.click()}
-                >
-                  <Avatar
-                    size={120}
-                    radius={120}
-                    src={profilePicturePreview}
-                    alt="Profile Picture"
-                    style={{ border: '2px solid white' }}
+            <div className={styles.formSection}>
+              <Center mb="md">
+                <Tooltip label="Upload Profile Picture" withArrow position="top">
+                  <div
+                    className={styles.avatar}
+                    onClick={() => document.getElementById('file-input')?.click()}
+                  >
+                    <Avatar
+                      size={120}
+                      radius={120}
+                      src={profilePicturePreview}
+                      alt="Profile Picture"
+                      style={{ border: '2px solid #228BE6' }}
+                    >
+                      <IconUpload size={36} />
+                    </Avatar>
+                    <FileInput
+                      id="file-input"
+                      onChange={(file: File | null) => {
+                        form.setFieldValue('profilePicture', file);
+                        handleProfilePictureChange(file);
+                      }}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                </Tooltip>
+              </Center>
+
+              <Group grow>
+                <TextInput
+                  label="Name"
+                  placeholder="Enter full name"
+                  {...form.getInputProps('name')}
+                  required
+                />
+                <TextInput
+                  label="Email"
+                  placeholder="email@example.com"
+                  {...form.getInputProps('email')}
+                  required
+                />
+              </Group>
+
+              <Group grow mt="md">
+                <PasswordInput
+                  label="Password"
+                  placeholder="Min. 8 characters"
+                  {...form.getInputProps('password')}
+                  required
+                />
+                <PasswordInput
+                  label="Confirm Password"
+                  placeholder="Repeat password"
+                  {...form.getInputProps('confirmPassword')}
+                  required
+                />
+              </Group>
+
+              <TextInput
+                label="Organization"
+                placeholder="Enter organization name"
+                {...form.getInputProps('organization')}
+                required
+                mt="md"
+              />
+            </div>
+
+            <Divider label="Device Specifications" labelPosition="center" my="lg" />
+
+            <div className={styles.formSection}>
+              <Select
+                label="Device Type"
+                placeholder="Select device type"
+                value={device}
+                onChange={setDevice}
+                data={[
+                  { label: 'Personal Computer', value: 'Personal Computer' },
+                  { label: 'Laptop', value: 'Laptop' },
+                ]}
+                required
+              />
+
+              {device && (
+                <Group grow mt="md">
+                  <Select
+                    label="CPU"
+                    placeholder="Select CPU"
+                    {...form.getInputProps('cpu')}
+                    data={cpuOptions}
+                    required
                   />
-                  <FileInput
-                    id="file-input"
-                    label="Profile Picture"
-                    placeholder="Upload your profile picture"
-                    onChange={(file: File | null) => {
-                      form.setFieldValue('profilePicture', file);
-                      handleProfilePictureChange(file);
-                    }}
-                    accept="image/*"
-                    style={{ display: 'none' }}
+                  <Select
+                    label="GPU"
+                    placeholder="Select GPU"
+                    {...form.getInputProps('gpu')}
+                    data={gpuOptions}
+                    required
                   />
-                </div>
-              </Tooltip>
-            </Center>
-            <Select
-              label="Device"
-              placeholder="Select device type"
-              value={device}
-              onChange={setDevice}
-              data={[
-                { label: 'Personal Computer', value: 'Personal Computer' },
-                { label: 'Laptop', value: 'Laptop' },
-              ]}
-              required
-              mb="sm"
-            />
-            {device && (
-              <>
-                <Select
-                  label="CPU"
-                  placeholder="Select your CPU"
-                  {...form.getInputProps('cpu')}
-                  data={cpuOptions}
-                  required
-                  mb="sm"
-                />
-                <Select
-                  label="GPU"
-                  placeholder="Select your GPU"
-                  {...form.getInputProps('gpu')}
-                  data={gpuOptions}
-                  required
-                  mb="sm"
-                />
-                <Select
-                  label="RAM Type"
-                  placeholder="Select RAM type"
-                  {...form.getInputProps('ramType')}
-                  data={ramOptions}
-                  required
-                  mb="sm"
-                />
-                <TextInput
-                  label="RAM Capacity (GB)"
-                  placeholder="Enter RAM capacity"
-                  {...form.getInputProps('ramCapacity')}
-                  required
-                  mb="sm"
-                />
-                <TextInput
-                  label="Motherboard"
-                  placeholder="Enter motherboard"
-                  {...form.getInputProps('motherboard')}
-                  required
-                  mb="sm"
-                />
-                <TextInput
-                  label="PSU"
-                  placeholder="Enter PSU"
-                  {...form.getInputProps('psu')}
-                  required
-                  mb="sm"
-                />
-              </>
-            )}
-            <Group align="right" mt="md">
-              <Button type="submit">Create</Button>
+                </Group>
+              )}
+
+              {device && (
+                <>
+                  <Group grow mt="md">
+                    <Select
+                      label="RAM Type"
+                      placeholder="Select RAM type"
+                      {...form.getInputProps('ramType')}
+                      data={ramOptions}
+                      required
+                    />
+                    <TextInput
+                      label="RAM Capacity (GB)"
+                      placeholder="Enter capacity"
+                      {...form.getInputProps('ramCapacity')}
+                      required
+                    />
+                  </Group>
+
+                  <Group grow mt="md">
+                    <TextInput
+                      label="Motherboard"
+                      placeholder="Enter motherboard model"
+                      {...form.getInputProps('motherboard')}
+                      required
+                    />
+                    <TextInput
+                      label="Power Supply Unit"
+                      placeholder="Enter PSU details"
+                      {...form.getInputProps('psu')}
+                      required
+                    />
+                  </Group>
+                </>
+              )}
+            </div>
+
+            <Group justify="flex-end" mt="xl">
+              <Button variant="light" onClick={() => setModalOpened(false)}>Cancel</Button>
+              <Button type="submit" className={styles.createButton}>Create User</Button>
             </Group>
           </form>
         </Modal>
-      </div>
+
+        <Modal
+          opened={deleteModalOpened}
+          onClose={() => setDeleteModalOpened(false)}
+          title={<Text size="lg" fw={600} c="red">Delete User</Text>}
+          size="sm"
+        >
+          <Text size="sm" mb="lg">
+            Are you sure you want to delete user <Text span fw={600}>{userToDelete?.name}</Text>? 
+            This action cannot be undone.
+          </Text>
+
+          <Group justify="flex-end" mt="xl">
+            <Button variant="light" onClick={() => setDeleteModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button 
+              color="red"
+              onClick={handleDeleteConfirm}
+              leftSection={<IconTrash size={16} />}
+            >
+              Delete User
+            </Button>
+          </Group>
+        </Modal>
+      </Container>
     </AdminLayout>
   );
 };

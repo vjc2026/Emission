@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from './AdminLayout';
-import { IconChevronDown, IconChevronUp, IconSearch, IconSelector } from '@tabler/icons-react';
+import { IconSearch, IconChevronUp, IconChevronDown, IconSelector, IconPlus, IconTrash, IconEdit, IconX } from '@tabler/icons-react';
 import {
-  Center,
+  Badge,
+  Modal,
+  Button,
   Group,
-  keys,
-  ScrollArea,
-  Table,
   Text,
   TextInput,
+  ScrollArea,
+  Collapse,
+  Table,
   UnstyledButton,
-  Button, // Import Button component
-  Modal, // Import Modal component
-  Collapse, // Import Collapse component
+  Center,
+  Select,
+  Textarea,
+  Paper
 } from '@mantine/core';
 import classes from './AdminDashboard.module.css';
 
@@ -29,6 +32,12 @@ interface Project {
   organization: string; // Add organization field
   members: string[]; // Add members field
   created_at: string; // Add created_at field
+  stage_duration?: number;  // Add optional fields for timeline
+  stage_start_date?: string;
+  stage_due_date?: string;
+  project_start_date?: string;
+  project_due_date?: string;
+  carbonEmit?: number;
 }
 
 interface ThProps {
@@ -59,7 +68,7 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
 function filterData(data: Project[], search: string) {
   const query = search.toLowerCase().trim();
   return data.filter((item) =>
-    keys(data[0]).some((key) => item[key].toString().toLowerCase().includes(query))
+    data.length > 0 && Object.keys(data[0]).some((key) => item[key as keyof Project]?.toString().toLowerCase().includes(query))
   );
 }
 
@@ -76,10 +85,10 @@ function sortData(
   return filterData(
     [...data].sort((a, b) => {
       if (payload.reversed) {
-        return b[sortBy].toString().localeCompare(a[sortBy].toString());
+        return (b[sortBy]?.toString() ?? '').localeCompare(a[sortBy]?.toString() ?? '');
       }
 
-      return a[sortBy].toString().localeCompare(b[sortBy].toString());
+      return (a[sortBy]?.toString() ?? '').localeCompare(b[sortBy]?.toString() ?? '');
     }),
     payload.search
   );
@@ -130,16 +139,57 @@ const fetchProjectMembers = async (projectId: number) => {
     }
 
     const data = await response.json();
-    return data.members.map((member: { name: string }) => member.name).join(', ');
+    // Ensure we're returning an array of strings
+    return Array.isArray(data.members) ? data.members.map((member: { name: string, email: string }) => member.email) : [];
   } catch (error) {
     console.error('Error fetching project members:', error);
-    return 'Error fetching members';
+    return [];
   }
 };
 
 // Add a function to format the date nicely
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString();
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return 'Not set';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Add a function to calculate days remaining
+const calculateDaysRemaining = (dueDate: string | undefined, status?: string) => {
+  if (!dueDate) return 'No due date';
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffTime = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays <= 0 && status !== 'Complete') {
+    return <span className={classes.pastDue}>Past due</span>;
+  }
+  return diffDays > 0 ? `${diffDays} days remaining` : 'Past due';
+};
+
+const renderAssignees = (members: string[] | undefined) => {
+  if (!members || !Array.isArray(members)) return null;
+  const displayedMembers = members.slice(0, 3);
+
+  return (
+    <div className={classes.assignees}>
+      {displayedMembers.map((member, index) => (
+        <div key={index} className={classes.assignee}>
+          <img 
+            src={`https://www.gravatar.com/avatar/${member}?d=identicon`}
+            alt={member}
+            className={classes.assigneeAvatar}
+          />
+          <span>{member.includes('@') ? member.split('@')[0] : member}</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const AdminDashboard: React.FC = () => {
@@ -152,6 +202,40 @@ const AdminDashboard: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null); // Add state for selected project
   const [isModalOpen, setIsModalOpen] = useState(false); // Add state for modal visibility
   const [expandedProjectId, setExpandedProjectId] = useState<number | null>(null); // Add state for expanded project
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // Add state for edit modal visibility
+  const [editTitle, setEditTitle] = useState(''); // Add state for edit title
+  const [editDescription, setEditDescription] = useState(''); // Add state for edit description
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // Add state for create modal visibility
+  const [newProject, setNewProject] = useState({
+    project_name: '',
+    project_description: '',
+    status: 'In Progress',
+    stage: 'Design: Creating the software architecture',
+    carbon_emit: 0,
+    session_duration: 0,
+    owner: '',
+    organization: '', // This will be set automatically based on owner
+    members: [] as string[],
+    created_at: new Date().toISOString(),
+    stage_duration: 14, // Default 14 days
+    stage_start_date: new Date().toISOString().split('T')[0], // Today's date
+    stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0], // Today + 14 days
+    project_start_date: new Date().toISOString().split('T')[0], // Today's date
+    project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0], // Today + 42 days
+  });
+  const [newProjectAssignee, setNewProjectAssignee] = useState('');
+  const [assigneeEmail, setAssigneeEmail] = useState(''); // Add state for assignee email
+  const [assigneeError, setAssigneeError] = useState<string>('');
+  const [newProjectAssigneeError, setNewProjectAssigneeError] = useState<string>('');
+  const [createErrors, setCreateErrors] = useState({
+    project_name: '',
+    project_description: '',
+    owner: ''
+  });
+  const [editStatus, setEditStatus] = useState('');
+  const [editStageStartDate, setEditStageStartDate] = useState('');
+  const [editStageDueDate, setEditStageDueDate] = useState('');
+  const [editProjectDueDate, setEditProjectDueDate] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -257,167 +341,1130 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const toggleMembers = (projectId: number) => {
-    setExpandedProjectId(expandedProjectId === projectId ? null : projectId);
+  const calculateProgress = (project: Project) => {
+    // Assuming each stage has equal weight
+    const stages = [
+      'Design: Creating the software architecture',
+      'Development: Writing the actual code',
+      'Testing: Ensuring the software works as expected'
+    ];
+    
+    const currentStageIndex = stages.indexOf(project.stage);
+    if (currentStageIndex === -1) return 0;
+    
+    return ((currentStageIndex + 1) / stages.length) * 100;
   };
+
+  const closePanel = () => {
+    setSelectedProject(null);
+  };
+
+  // Function to handle opening the edit modal
+  const handleEditProject = () => {
+    if (selectedProject) {
+      setEditTitle(selectedProject.project_name);
+      setEditDescription(selectedProject.project_description);
+      setEditStatus(selectedProject.status);
+      setEditStageStartDate(selectedProject.stage_start_date || '');
+      setEditStageDueDate(selectedProject.stage_due_date || '');
+      setEditProjectDueDate(selectedProject.project_due_date || '');
+      setIsEditModalOpen(true);
+    }
+  };
+
+  // Function to handle saving the edited project
+  const handleSaveEdit = async () => {
+    if (selectedProject) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No token found');
+        }
+
+        const response = await fetch(`http://localhost:5000/update_project/${selectedProject.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectName: editTitle,
+            projectDescription: editDescription,
+            status: editStatus,
+            stage_start_date: editStageStartDate,
+            stage_due_date: editStageDueDate,
+            project_due_date: editProjectDueDate,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update project');
+        }
+
+        const updatedProject = {
+          ...selectedProject,
+          project_name: editTitle,
+          project_description: editDescription,
+          status: editStatus,
+          stage_start_date: editStageStartDate,
+          stage_due_date: editStageDueDate,
+          project_due_date: editProjectDueDate,
+        };
+
+        setProjects(projects.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSortedData(sortedData.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSelectedProject(updatedProject);
+        setIsEditModalOpen(false);
+      } catch (error) {
+        console.error('Error updating project:', error);
+        // You might want to show an error message to the user here
+      }
+    }
+  };
+
+  const handleCreateProject = async () => {
+    // Reset all errors first
+    setCreateErrors({
+      project_name: '',
+      project_description: '',
+      owner: ''
+    });
+
+    // Validate required fields
+    let hasError = false;
+    const newErrors = {
+      project_name: '',
+      project_description: '',
+      owner: ''
+    };
+
+    if (!newProject.project_name.trim()) {
+      newErrors.project_name = 'Project title is required';
+      hasError = true;
+    }
+
+    if (!newProject.project_description.trim()) {
+      newErrors.project_description = 'Project description is required';
+      hasError = true;
+    }
+
+    if (!newProject.owner.trim()) {
+      newErrors.owner = 'Owner email is required';
+      hasError = true;
+    }
+
+    if (hasError) {
+      setCreateErrors(newErrors);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      // First, fetch the owner's organization
+      const ownerResponse = await fetch(`http://localhost:5000/user_organization/${newProject.owner}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!ownerResponse.ok) {
+        throw new Error(`Error fetching owner organization: ${ownerResponse.status}`);
+      }
+
+      const ownerData = await ownerResponse.json();
+      const ownerOrganization = ownerData.organization;
+
+      // Create project with the owner's organization
+      const projectToCreate = {
+        ...newProject,
+        organization: ownerOrganization,
+        members: [...newProject.members],
+      };
+
+      const response = await fetch('http://localhost:5000/admin/create_project', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectToCreate),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+
+      const createdProject = await response.json();
+      setProjects([...projects, createdProject]);
+      setSortedData([...projects, createdProject]);
+      setIsCreateModalOpen(false);
+      
+      // Reset form
+      setNewProject({
+        project_name: '',
+        project_description: '',
+        status: 'In Progress',
+        stage: 'Design: Creating the software architecture',
+        carbon_emit: 0,
+        session_duration: 0,
+        owner: '',
+        organization: '',
+        members: [],
+        created_at: new Date().toISOString(),
+        stage_duration: 14, // Default 14 days
+        stage_start_date: new Date().toISOString().split('T')[0], // Today's date
+        stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0], // Today + 14 days
+        project_start_date: new Date().toISOString().split('T')[0], // Today's date
+        project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0], // Today + 42 days
+      });
+      setNewProjectAssignee('');
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+      console.error('Error creating project:', error);
+    }
+  };
+
+  const validateEmail = async (email: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      const response = await fetch(`http://localhost:5000/validate_user_email/${email}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      return data.exists;
+    } catch (error) {
+      console.error('Error validating email:', error);
+      return false;
+    }
+  };
+
+  const handleAddAssignee = async () => {
+    if (selectedProject && assigneeEmail) {
+      try {
+        // Reset error message at the start
+        setAssigneeError('');
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setAssigneeError('Authentication error');
+          return;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(assigneeEmail)) {
+          setAssigneeError('Invalid email format');
+          return;
+        }
+
+        // Check if user exists in database
+        const userExists = await validateEmail(assigneeEmail);
+        if (!userExists) {
+          setAssigneeError('User not found in the system');
+          return;
+        }
+
+        // If we get here, the email is valid, so clear any error
+        setAssigneeError('');
+
+        const response = await fetch('http://localhost:5000/add_project_member', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectId: selectedProject.id,
+            userEmail: assigneeEmail,
+            role: 'member',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          setAssigneeError(errorData.error || 'Failed to add member');
+          return;
+        }
+
+        const data = await response.json();
+        
+        const updatedProject = {
+          ...selectedProject,
+          members: data.members.map((member: { email: string }) => member.email)
+        };
+
+        setProjects(projects.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSortedData(sortedData.map(project => 
+          project.id === selectedProject.id ? updatedProject : project
+        ));
+        setSelectedProject(updatedProject);
+        setAssigneeEmail('');
+        setAssigneeError('');
+      } catch (error) {
+        console.error('Error adding assignee:', error);
+        setAssigneeError(error instanceof Error ? error.message : "An error occurred");
+      }
+    }
+  };
+
+  const handleAddNewProjectAssignee = async () => {
+    if (newProjectAssignee) {
+      try {
+        // Reset error message at the start
+        setNewProjectAssigneeError('');
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newProjectAssignee)) {
+          setNewProjectAssigneeError('Invalid email format');
+          return;
+        }
+
+        // Check if user exists in database
+        const userExists = await validateEmail(newProjectAssignee);
+        if (!userExists) {
+          setNewProjectAssigneeError('User not found in the system');
+          return;
+        }
+
+        // If we get here, the email is valid, so clear any error
+        setNewProjectAssigneeError('');
+
+        if (!newProject.members.includes(newProjectAssignee)) {
+          setNewProject({
+            ...newProject,
+            members: [...newProject.members, newProjectAssignee]
+          });
+          setNewProjectAssignee('');
+        }
+      } catch (error) {
+        setNewProjectAssigneeError(error instanceof Error ? error.message : "An error occurred");
+      }
+    }
+  };
+
+  const columns = [
+    { key: 'project_name', label: 'Project' },
+    { key: 'status', label: 'Status' },
+    { key: 'stage', label: 'Stage' },
+    { key: 'carbon_emit', label: 'Carbon' },
+    { key: 'owner', label: 'Owner' },
+    { key: 'timeline', label: 'Timeline' }
+  ];
 
   const rows = sortedData.map((project) => (
     <React.Fragment key={project.id}>
-      <Table.Tr
+      <tr 
         onClick={() => setSelectedProject(project)}
-        className={`${classes.projectRow} ${selectedProject?.id === project.id ? classes.selectedRow : ''}`} // Highlight selected project and apply cursor style
+        className={`${classes.projectRow} ${selectedProject?.id === project.id ? classes.selectedRow : ''}`}
       >
-        <Table.Td>{project.project_name}</Table.Td>
-        <Table.Td>{project.project_description}</Table.Td>
-        <Table.Td className={getStatusClass(project.status)}>{project.status}</Table.Td> {/* Apply color to status */}
-        <Table.Td>{project.stage}</Table.Td>
-        <Table.Td>{project.carbon_emit.toFixed(3)}</Table.Td>
-        <Table.Td>{formatDuration(project.session_duration)}</Table.Td> {/* Format session duration */}
-        <Table.Td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.owner}</Table.Td> {/* Handle text overflow for owner */}
-        <Table.Td>{project.organization}</Table.Td> {/* Display organization */}
-        <Table.Td onClick={() => toggleMembers(project.id)} style={{ cursor: 'pointer' }}>
-          {expandedProjectId === project.id ? 'Hide Members' : 'Show Members'}
-        </Table.Td> {/* Toggle members dropdown */}
-        <Table.Td>{formatDate(project.created_at)}</Table.Td> {/* Add created_at column */}
-      </Table.Tr>
-      <Table.Tr>
-        <Table.Td colSpan={10} style={{ padding: 0 }}>
-          <Collapse in={expandedProjectId === project.id}>
-            <div style={{ padding: '10px 20px' }}>
-              <Text fw={500} mb="xs">Members</Text> {/* Add Members header */}
-              {project.members}
+        <td>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ 
+                width: '32px', 
+                height: '32px', 
+                borderRadius: '6px',
+                background: `hsl(${project.id * 40}, 70%, 90%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: '500',
+                color: `hsl(${project.id * 40}, 70%, 30%)`
+              }}>
+                {project.project_name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div>{project.project_name}</div>
+                <Text size="xs" color="dimmed" style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {project.project_description}
+                </Text>
+              </div>
             </div>
-          </Collapse>
-        </Table.Td>
-      </Table.Tr>
+          </div>
+        </td>
+        <td>
+          <Badge 
+            variant="light"
+            radius="sm"
+            size="sm"
+            color={
+              project.status === 'Complete' ? 'blue' :
+              project.status === 'Archived' ? 'gray' :
+              'green'
+            }
+          >
+            {project.status}
+          </Badge>
+        </td>
+        <td style={{ maxWidth: '200px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: project.stage.includes('Design') ? '#22c55e' :
+                          project.stage.includes('Development') ? '#3b82f6' :
+                          '#a855f7'
+              }} />
+              {project.stage.split(':')[0]}
+            </div>
+            <div className={classes.progressBar}>
+              <div 
+                className={classes.progressFill} 
+                style={{ 
+                  width: `${calculateProgress(project)}%`,
+                  backgroundColor: project.status === 'Complete' ? '#3b82f6' : '#22c55e'
+                }} 
+              />
+              <span>{Math.round(calculateProgress(project))}%</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          <Text size="sm" fw={500} color={project.carbon_emit > 10 ? 'red' : 'green'}>
+            {project.carbon_emit.toFixed(2)} kg CO2
+          </Text>
+        </td>
+        <td>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img 
+                src={`https://www.gravatar.com/avatar/${project.owner}?d=identicon&s=24`}
+                alt={project.owner}
+                style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+              />
+              <div>
+                <div>{project.owner.split('@')[0]}</div>
+                <Badge variant="dot" size="xs" color="gray">
+                  {project.organization}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <Text size="xs">Stage: {formatDate(project.stage_due_date)}</Text>
+            <Text size="xs" c="dimmed">{calculateDaysRemaining(project.stage_due_date, project.status)}</Text>
+          </div>
+        </td>
+      </tr>
     </React.Fragment>
   ));
 
   return (
     <AdminLayout>
-      <div>
-        <h1>Admin Dashboard</h1>
-        <h2>All Projects</h2>
-        {error ? (
-          <div style={{ color: 'red' }}>{error}</div>
-        ) : (
-          <ScrollArea>
+      <div className={classes.container}>
+        <div className={classes.header}>
+          <Group>
+            <h1>Admin Dashboard</h1>
+            <Badge size="lg" variant="dot" color="blue">
+              {projects.length} Projects
+            </Badge>
+          </Group>
+          <Group>
             <TextInput
               placeholder="Search by any field"
-              mb="md"
               leftSection={<IconSearch size={16} stroke={1.5} />}
               value={search}
               onChange={handleSearchChange}
+              style={{ width: '300px' }}
             />
-            <Table className={classes.table} horizontalSpacing="md" verticalSpacing="xs" miw={700} layout="fixed">
-              <Table.Tbody>
-                <Table.Tr>
-                  <Th
-                    sorted={sortBy === 'project_name'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('project_name')}
-                  >
-                    Project Name
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'project_description'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('project_description')}
-                  >
-                    Description
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'status'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('status')}
-                  >
-                    Status
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'stage'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('stage')}
-                  >
-                    Stage
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'carbon_emit'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('carbon_emit')}
-                  >
-                    Carbon Emit
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'session_duration'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('session_duration')}
-                  >
-                    Session Duration
-                  </Th>
-                  <Th
-                    sorted={sortBy === 'owner'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('owner')}
-                  >
-                    Owner
-                  </Th> {/* Add owner email column */}
-                  <Th
-                    sorted={sortBy === 'organization'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('organization')}
-                  >
-                    Organization
-                  </Th> {/* Add organization column */}
-                  <Th
-                    sorted={sortBy === 'members'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('members')}
-                  >
-                    Members
-                  </Th> {/* Add members column */}
-                  <Th 
-                    sorted={sortBy === 'created_at'}
-                    reversed={reverseSortDirection}
-                    onSort={() => setSorting('created_at')}
-                  >
-                    Created At
-                  </Th>
-                </Table.Tr>
-              </Table.Tbody>
-              <Table.Tbody>
-                {rows.length > 0 ? (
-                  rows
-                ) : (
-                  <Table.Tr>
-                    <Table.Td colSpan={10}>
-                      <Text fw={500} ta="center">
-                        Nothing found
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        )}
-        {selectedProject && (
-          <>
-            <Button color="red" onClick={() => setIsModalOpen(true)} style={{ marginTop: '20px' }}>
-              Delete Selected Project
-            </Button>
-            <Modal
-              opened={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              title="Confirm Deletion"
+            <Button 
+              onClick={() => setIsCreateModalOpen(true)} 
+              variant="gradient" 
+              gradient={{ from: 'indigo', to: 'cyan' }}
+              leftSection={<IconPlus size={16} />}
             >
-              <Text>Are you sure you want to delete this project?</Text>
-              <Group align="apart" mt="md">
-                <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button color="red" onClick={handleDeleteProject}>Delete</Button>
-              </Group>
-            </Modal>
-          </>
+              Create Project
+            </Button>
+          </Group>
+        </div>
+
+        <ScrollArea>
+          <Table className={classes.taskTable}>
+            <thead>
+              <tr>
+                <Th sorted={sortBy === 'project_name'} reversed={reverseSortDirection} onSort={() => setSorting('project_name')}>Project</Th>
+                <Th sorted={sortBy === 'status'} reversed={reverseSortDirection} onSort={() => setSorting('status')}>Status</Th>
+                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage & Progress</Th>
+                <Th sorted={sortBy === 'carbon_emit'} reversed={reverseSortDirection} onSort={() => setSorting('carbon_emit')}>Carbon</Th>
+                <Th sorted={sortBy === 'owner'} reversed={reverseSortDirection} onSort={() => setSorting('owner')}>Owner</Th>
+                <Th sorted={sortBy === 'stage_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_due_date')}>Timeline</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length > 0 ? (
+                rows
+              ) : (
+                <tr>
+                  <td colSpan={6}>
+                    <Text fw={500} ta="center">
+                      Nothing found
+                    </Text>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </ScrollArea>
+
+        {selectedProject && (
+          <div className={classes.panel}>
+            <div className={classes.panelHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  borderRadius: '8px',
+                  background: `hsl(${selectedProject.id * 40}, 70%, 90%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  fontWeight: '500',
+                  color: `hsl(${selectedProject.id * 40}, 70%, 30%)`
+                }}>
+                  {selectedProject.project_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2>{selectedProject.project_name}</h2>
+                  <Text size="sm" color="dimmed">Created {formatDate(selectedProject.created_at)}</Text>
+                </div>
+              </div>
+              <button className={classes.exitButton} onClick={closePanel}>✖</button>
+            </div>
+            
+            <div className={classes.panelContent}>
+              <Paper p="md" radius="md" withBorder mb="md">
+                <Group mb="md">
+                  <div>
+                    <Text size="sm" fw={500} c="dimmed">Owner</Text>
+                    <Group>
+                      <img 
+                        src={`https://www.gravatar.com/avatar/${selectedProject.owner}?d=identicon&s=24`}
+                        alt={selectedProject.owner}
+                        style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                      />
+                      <Text>{selectedProject.owner}</Text>
+                    </Group>
+                  </div>
+                </Group>
+                <Text>{selectedProject.project_description}</Text>
+              </Paper>
+              
+              <div className={classes.timelineDetails}>
+                <h3>Project Details</h3>
+                <div className={classes.timelineGrid}>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Status</Text>
+                    <Badge 
+                      size="lg"
+                      variant="light"
+                      color={
+                        selectedProject.status === 'Complete' ? 'blue' :
+                        selectedProject.status === 'Archived' ? 'gray' :
+                        'green'
+                      }
+                    >
+                      {selectedProject.status}
+                    </Badge>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Stage</Text>
+                    <Group>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: selectedProject.stage.includes('Design') ? '#22c55e' :
+                                  selectedProject.stage.includes('Development') ? '#3b82f6' :
+                                  '#a855f7'
+                      }} />
+                      {selectedProject.stage}
+                    </Group>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Organization</Text>
+                    <Badge variant="dot" size="lg" color="gray">
+                      {selectedProject.organization}
+                    </Badge>
+                  </Paper>
+                  <Paper p="md" radius="md" withBorder>
+                    <Text size="sm" fw={500} c="dimmed">Carbon Emissions</Text>
+                    <Text size="lg" fw={500} c={selectedProject.carbon_emit > 10 ? 'red' : 'green'}>
+                      {selectedProject.carbon_emit.toFixed(2)} kg CO2
+                    </Text>
+                  </Paper>
+                </div>
+
+                <Paper p="md" radius="md" withBorder mt="md">
+                  <Text size="sm" fw={500} c="dimmed" mb="xs">Timeline</Text>
+                  <div className={classes.timelineDates}>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Stage Start</Text>
+                      <Text>{formatDate(selectedProject.stage_start_date)}</Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Stage Due</Text>
+                      <Text>{formatDate(selectedProject.stage_due_date)}</Text>
+                      <Text size="xs" c="dimmed">
+                        {calculateDaysRemaining(selectedProject.stage_due_date, selectedProject.status)}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Project Start</Text>
+                      <Text>{formatDate(selectedProject.project_start_date)}</Text>
+                    </div>
+                    <div>
+                      <Text size="sm" fw={500} c="dimmed">Project Due</Text>
+                      <Text>{formatDate(selectedProject.project_due_date)}</Text>
+                      <Text size="xs" c="dimmed">
+                        {calculateDaysRemaining(selectedProject.project_due_date, selectedProject.status)}
+                      </Text>
+                    </div>
+                  </div>
+                </Paper>
+
+                <Paper p="md" radius="md" withBorder mt="md">
+                  <Text size="sm" fw={500} c="dimmed" mb="xs">Progress</Text>
+                  <div className={classes.progressBar}>
+                    <div 
+                      className={classes.progressFill} 
+                      style={{ 
+                        width: `${calculateProgress(selectedProject)}%`,
+                        backgroundColor: selectedProject.status === 'Complete' ? '#3b82f6' : '#22c55e'
+                      }} 
+                    />
+                    <span>{Math.round(calculateProgress(selectedProject))}%</span>
+                  </div>
+                </Paper>
+              </div>
+
+              <Paper p="md" radius="md" withBorder mt="md">
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm" fw={500} c="dimmed">Team Members</Text>
+                  <Button 
+                    variant="subtle" 
+                    size="xs"
+                    onClick={() => setIsEditModalOpen(true)}
+                  >
+                    Manage Team
+                  </Button>
+                </Group>
+                {renderAssignees(selectedProject.members)}
+              </Paper>
+
+              <div className={classes.panelButtons}>
+                <Button 
+                  color="red" 
+                  variant="light"
+                  onClick={() => setIsModalOpen(true)}
+                  leftSection={<IconTrash size={16} />}
+                >
+                  Delete Project
+                </Button>
+                <Button 
+                  color="blue"
+                  onClick={handleEditProject}
+                  leftSection={<IconEdit size={16} />}
+                >
+                  Edit Project
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
+
+        <Modal
+          opened={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Confirm Deletion"
+        >
+          <Text>Are you sure you want to delete this project?</Text>
+          <Text size="sm" c="dimmed" mt="sm">
+            This action cannot be undone. The project and all its data will be permanently deleted.
+          </Text>
+          <Group align="apart" mt="xl">
+            <Button variant="light" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button color="red" onClick={handleDeleteProject}>Delete Project</Button>
+          </Group>
+        </Modal>
+
+        <Modal
+          opened={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Manage Team Members"
+        >
+          <TextInput
+            label="Add Member by Email"
+            placeholder="Enter member email"
+            value={assigneeEmail}
+            onChange={(e) => {
+              setAssigneeEmail(e.target.value);
+              // Clear error when user starts typing
+              if (assigneeError) setAssigneeError('');
+            }}
+            type="email"
+            required
+          />
+          <Button 
+            onClick={handleAddAssignee} 
+            mt="sm"
+            disabled={!assigneeEmail.includes('@')}
+          >
+            Add Member
+          </Button>
+          {assigneeError && (
+            <p className={classes.errorText}>{assigneeError}</p>
+          )}
+
+          <Paper p="md" mt="md" withBorder>
+            <Text size="sm" fw={500} mb="xs">Current Members</Text>
+            <div className={classes.assignees}>
+              {(selectedProject?.members || []).map((member, index) => (
+                <Badge
+                  key={index}
+                  variant="light"
+                  color="blue"
+                  mr={4}
+                  mb={4}
+                  rightSection={
+                    <IconX 
+                      size={12} 
+                      onClick={() => {
+                        // Add remove member functionality here if needed
+                      }} 
+                      style={{ cursor: 'pointer' }}
+                    />
+                  }
+                >
+                  {member}
+                </Badge>
+              ))}
+            </div>
+          </Paper>
+
+          <Group justify="flex-end" mt="xl">
+            <Button 
+              variant="light" 
+              onClick={() => setIsEditModalOpen(false)}
+            >
+              Close
+            </Button>
+          </Group>
+        </Modal>
+
+        <Modal
+          opened={isCreateModalOpen}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setCreateErrors({
+              project_name: '',
+              project_description: '',
+              owner: ''
+            });
+          }}
+          title="Create New Project"
+          size="lg"
+        >
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div>
+              <TextInput
+                label="Project Title"
+                value={newProject.project_name}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, project_name: event.currentTarget.value });
+                  if (createErrors.project_name) {
+                    setCreateErrors({ ...createErrors, project_name: '' });
+                  }
+                }}
+                required
+                error={createErrors.project_name}
+              />
+            </div>
+
+            <div>
+              <Textarea
+                label="Project Description"
+                value={newProject.project_description}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, project_description: event.currentTarget.value });
+                  if (createErrors.project_description) {
+                    setCreateErrors({ ...createErrors, project_description: '' });
+                  }
+                }}
+                required
+                error={createErrors.project_description}
+              />
+            </div>
+
+            <div>
+              <TextInput
+                label="Owner Email"
+                value={newProject.owner}
+                onChange={(event) => {
+                  setNewProject({ ...newProject, owner: event.currentTarget.value });
+                  if (createErrors.owner) {
+                    setCreateErrors({ ...createErrors, owner: '' });
+                  }
+                }}
+                required
+                error={createErrors.owner}
+              />
+            </div>
+
+            {/* Timeline Section */}
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Timeline Settings</Text>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <Group grow>
+                  <TextInput
+                    type="number"
+                    label="Stage Duration (days)"
+                    value={newProject.stage_duration}
+                    onChange={(event) => {
+                      // Handle empty or invalid input
+                      const inputValue = event.currentTarget.value;
+                      const duration = inputValue === '' ? 0 : Math.max(0, parseInt(inputValue));
+                      
+                      // Calculate new due date based on start date and duration
+                      const stageStart = new Date(newProject.stage_start_date);
+                      const stageDue = new Date(stageStart);
+                      stageDue.setDate(stageStart.getDate() + duration);
+                      
+                      setNewProject({
+                        ...newProject,
+                        stage_duration: duration,
+                        stage_due_date: stageDue.toISOString().split('T')[0]
+                      });
+                    }}
+                    min={0}
+                    error={newProject.stage_duration === 0 ? "Duration cannot be 0 days" : null}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Start Date"
+                    value={newProject.stage_start_date}
+                    onChange={(event) => {
+                      const startDate = event.currentTarget.value;
+                      const start = new Date(startDate);
+                      const due = new Date(start);
+                      due.setDate(start.getDate() + newProject.stage_duration);
+                      
+                      // Ensure project start date is not after stage start date
+                      const projectStart = new Date(newProject.project_start_date);
+                      if (start < projectStart) {
+                        start.setHours(0, 0, 0, 0);
+                      }
+                      
+                      setNewProject({
+                        ...newProject,
+                        stage_start_date: startDate,
+                        stage_due_date: due.toISOString().split('T')[0],
+                        project_start_date: start < projectStart ? startDate : newProject.project_start_date
+                      });
+                    }}
+                    min={new Date().toISOString().split('T')[0]} // Cannot select past dates
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Due Date"
+                    value={newProject.stage_due_date}
+                    onChange={(event) => {
+                      const dueDate = event.currentTarget.value;
+                      const start = new Date(newProject.stage_start_date);
+                      const due = new Date(dueDate);
+                      
+                      // Calculate duration based on selected dates
+                      const diffTime = due.getTime() - start.getTime();
+                      const duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      
+                      // Only update if due date is after start date
+                      if (duration >= 0) {
+                        setNewProject({
+                          ...newProject,
+                          stage_due_date: dueDate,
+                          stage_duration: duration
+                        });
+                      }
+                    }}
+                    min={newProject.stage_start_date} // Cannot select date before start date
+                    error={new Date(newProject.stage_due_date) <= new Date(newProject.stage_start_date) ? 
+                      "Due date must be after start date" : null}
+                  />
+                </Group>
+
+                <Group grow>
+                  <TextInput
+                    type="date"
+                    label="Project Start Date"
+                    value={newProject.project_start_date}
+                    onChange={(event) => {
+                      const startDate = event.currentTarget.value;
+                      const start = new Date(startDate);
+                      const due = new Date(newProject.project_due_date);
+                      
+                      // Only update if project start is before project due
+                      if (start <= due) {
+                        setNewProject({ ...newProject, project_start_date: startDate });
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]} // Cannot select past dates
+                  />
+                  <TextInput
+                    type="date"
+                    label="Project Due Date"
+                    value={newProject.project_due_date}
+                    onChange={(event) => {
+                      const dueDate = event.currentTarget.value;
+                      const start = new Date(newProject.project_start_date);
+                      const due = new Date(dueDate);
+                      
+                      // Only update if project due is after project start
+                      if (due >= start) {
+                        setNewProject({ ...newProject, project_due_date: dueDate });
+                      }
+                    }}
+                    min={newProject.project_start_date} // Cannot select date before project start
+                    error={new Date(newProject.project_due_date) <= new Date(newProject.project_start_date) ? 
+                      "Project due date must be after start date" : null}
+                  />
+                </Group>
+              </div>
+            </Paper>
+
+            <div className={classes.assigneeSection}>
+              <TextInput
+                label="Add Assignee (Email)"
+                value={newProjectAssignee}
+                onChange={(e) => {
+                  setNewProjectAssignee(e.target.value);
+                  // Clear error when user starts typing
+                  if (newProjectAssigneeError) setNewProjectAssigneeError('');
+                }}
+                placeholder="Enter email"
+                className={`p-2 border rounded flex-1 ${
+                  newProjectAssigneeError ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
+                Add Assignee
+              </Button>
+              {newProjectAssigneeError && (
+                <p className={classes.errorText}>{newProjectAssigneeError}</p>
+              )}
+            </div>
+
+            {newProject.members.length > 0 && (
+              <div className={classes.assigneesList}>
+                <Text fw={500} mt="md">Added Assignees:</Text>
+                {newProject.members.map((member, index) => (
+                  <Badge 
+                    key={index}
+                    mr={5}
+                    mb={5}
+                    rightSection={
+                      <Center onClick={() => {
+                        setNewProject({
+                          ...newProject,
+                          members: newProject.members.filter((_, i) => i !== index)
+                        });
+                      }} style={{ cursor: 'pointer' }}>
+                        ×
+                      </Center>
+                    }
+                  >
+                    {member}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <Select
+              label="Status"
+              value={newProject.status}
+              onChange={(value) => setNewProject({ ...newProject, status: value ?? '' })}
+              data={['In Progress', 'Complete', 'Archived']}
+              required
+            />
+            <Select
+              label="Stage"
+              value={newProject.stage}
+              onChange={(value) => setNewProject({ ...newProject, stage: value ?? '' })}
+              data={['Design: Creating the software architecture', 'Development: Writing the actual code', 'Testing: Ensuring the software works as expected']}
+              required
+            />
+
+            <Group align="apart" mt="xl">
+              <Button variant="light" onClick={() => {
+                setIsCreateModalOpen(false);
+                setCreateErrors({
+                  project_name: '',
+                  project_description: '',
+                  owner: ''
+                });
+              }}>Cancel</Button>
+              <Button color="blue" onClick={handleCreateProject}>Create</Button>
+            </Group>
+          </div>
+        </Modal>
+
+        <Modal
+          opened={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Project"
+          size="lg"
+        >
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <TextInput
+              label="Project Title"
+              value={editTitle}
+              onChange={(event) => setEditTitle(event.currentTarget.value)}
+              required
+            />
+
+            <Textarea
+              label="Project Description"
+              value={editDescription}
+              onChange={(event) => setEditDescription(event.currentTarget.value)}
+              required
+              minRows={3}
+            />
+
+            <Select
+              label="Status"
+              value={editStatus}
+              onChange={(value) => setEditStatus(value || '')}
+              data={['In Progress', 'Complete', 'Archived']}
+              required
+            />
+
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Timeline Settings</Text>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <Group grow>
+                  <TextInput
+                    type="date"
+                    label="Stage Start Date"
+                    value={editStageStartDate}
+                    onChange={(event) => setEditStageStartDate(event.currentTarget.value)}
+                  />
+                  <TextInput
+                    type="date"
+                    label="Stage Due Date"
+                    value={editStageDueDate}
+                    onChange={(event) => setEditStageDueDate(event.currentTarget.value)}
+                    min={editStageStartDate}
+                    error={editStageDueDate && editStageStartDate && new Date(editStageDueDate) <= new Date(editStageStartDate) ? 
+                      "Due date must be after start date" : null}
+                  />
+                </Group>
+
+                <TextInput
+                  type="date"
+                  label="Project Due Date"
+                  value={editProjectDueDate}
+                  onChange={(event) => setEditProjectDueDate(event.currentTarget.value)}
+                  min={editStageStartDate}
+                  error={editProjectDueDate && editStageStartDate && new Date(editProjectDueDate) <= new Date(editStageStartDate) ? 
+                    "Project due date must be after stage start date" : null}
+                />
+              </div>
+            </Paper>
+
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Team Members</Text>
+              <TextInput
+                label="Add Member by Email"
+                placeholder="Enter member email"
+                value={assigneeEmail}
+                onChange={(e) => {
+                  setAssigneeEmail(e.target.value);
+                  if (assigneeError) setAssigneeError('');
+                }}
+                type="email"
+                required
+              />
+              <Button 
+                onClick={handleAddAssignee} 
+                mt="sm"
+                disabled={!assigneeEmail.includes('@')}
+              >
+                Add Member
+              </Button>
+              {assigneeError && (
+                <p className={classes.errorText}>{assigneeError}</p>
+              )}
+
+              <Paper p="md" mt="md" withBorder>
+                <Text size="sm" fw={500} mb="xs">Current Members</Text>
+                <div className={classes.assignees}>
+                  {(selectedProject?.members || []).map((member, index) => (
+                    <Badge
+                      key={index}
+                      variant="light"
+                      color="blue"
+                      mr={4}
+                      mb={4}
+                      rightSection={
+                        <IconX 
+                          size={12} 
+                          onClick={() => {
+                            // Add remove member functionality here if needed
+                          }} 
+                          style={{ cursor: 'pointer' }}
+                        />
+                      }
+                    >
+                      {member}
+                    </Badge>
+                  ))}
+                </div>
+              </Paper>
+            </Paper>
+
+            <Group justify="flex-end" mt="xl">
+              <Button 
+                variant="light" 
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button color="blue" onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </Group>
+          </div>
+        </Modal>
       </div>
     </AdminLayout>
   );

@@ -1854,20 +1854,24 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
   const userId = req.user.id;
 
   const userProjectsQuery = `
-    SELECT id, organization, project_name, project_description, 
-           session_duration, carbon_emit, stage, status,
-           stage_duration, stage_start_date, stage_due_date,
-           project_start_date, project_due_date
-    FROM user_history 
-    WHERE user_id = ? AND status NOT IN ('Complete', 'Archived')
+    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, 
+           uh.session_duration, uh.carbon_emit, uh.stage, uh.status,
+           uh.stage_duration, uh.stage_start_date, uh.stage_due_date,
+           uh.project_start_date, uh.project_due_date,
+           u.email as owner_email, u.name as owner_name
+    FROM user_history uh
+    JOIN users u ON uh.user_id = u.id 
+    WHERE uh.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
   `;
 
   const invitedProjectsQuery = `
     SELECT uh.id, uh.organization, uh.project_name, uh.project_description, 
            uh.session_duration, uh.carbon_emit, uh.stage, uh.status,
            uh.stage_duration, uh.stage_start_date, uh.stage_due_date,
-           uh.project_start_date, uh.project_due_date
+           uh.project_start_date, uh.project_due_date,
+           u.email as owner_email, u.name as owner_name
     FROM user_history uh
+    JOIN users u ON uh.user_id = u.id
     JOIN project_members pm ON uh.id = pm.project_id
     WHERE pm.user_id = ? AND uh.status NOT IN ('Complete', 'Archived')
   `;
@@ -2008,7 +2012,22 @@ app.get('/user_devices', authenticateToken, (req, res) => {
 // View all the users projects
 app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
   const query = `
-    SELECT uh.id, uh.organization, uh.project_name, uh.project_description, uh.session_duration, uh.carbon_emit, uh.stage, uh.status, uh.created_at, u.email AS owner
+    SELECT 
+      uh.id, 
+      uh.organization, 
+      uh.project_name, 
+      uh.project_description, 
+      uh.session_duration, 
+      uh.carbon_emit, 
+      uh.stage, 
+      uh.status, 
+      uh.created_at,
+      uh.stage_duration,
+      uh.stage_start_date,
+      uh.stage_due_date,
+      uh.project_start_date,
+      uh.project_due_date,
+      u.email AS owner
     FROM user_history uh
     JOIN users u ON uh.user_id = u.id
     ORDER BY uh.created_at DESC
@@ -2016,11 +2035,21 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
 
   connection.query(query, (err, results) => {
     if (err) {
-      console.error('Error querying the database:', err);
+      console.error('Error fetching projects:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    res.status(200).json({ projects: results }); // Send back all projects with owner email
+    // Format dates to ISO string format for consistent handling
+    const formattedResults = results.map(project => ({
+      ...project,
+      stage_start_date: project.stage_start_date ? project.stage_start_date.toISOString().split('T')[0] : null,
+      stage_due_date: project.stage_due_date ? project.stage_due_date.toISOString().split('T')[0] : null,
+      project_start_date: project.project_start_date ? project.project_start_date.toISOString().split('T')[0] : null,
+      project_due_date: project.project_due_date ? project.project_due_date.toISOString().split('T')[0] : null,
+      created_at: project.created_at ? project.created_at.toISOString() : null
+    }));
+
+    res.status(200).json({ projects: formattedResults });
   });
 });
 
@@ -2334,5 +2363,405 @@ app.post('/initialize_timeline_dates', authenticateAdmin, (req, res) => {
       message: 'Timeline dates initialized successfully',
       recordsUpdated: results.affectedRows 
     });
+  });
+});
+
+// Endpoint to add a project member
+app.post('/add_project_member', authenticateAdmin, async (req, res) => {
+  const { projectId, userEmail, role } = req.body;
+
+  // Validate required fields
+  if (!projectId || !userEmail || !role) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    // First find the user ID from email
+    const findUserQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(findUserQuery, [userEmail], (err, userResults) => {
+      if (err) {
+        console.error('Error finding user:', err);
+        return res.status(500).json({ error: 'Database error while finding user' });
+      }
+
+      if (userResults.length === 0) {
+        return res.status(404).json({ error: 'User not found with the provided email' });
+      }
+
+      const userId = userResults[0].id;
+
+      // Check if user is already a member of the project
+      const checkMemberQuery = 'SELECT * FROM project_members WHERE project_id = ? AND user_id = ?';
+      
+      connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
+        if (err) {
+          console.error('Error checking existing member:', err);
+          return res.status(500).json({ error: 'Database error while checking existing member' });
+        }
+
+        if (memberResults.length > 0) {
+          return res.status(400).json({ error: 'User is already a member of this project' });
+        }
+
+        // Add the new project member
+        const addMemberQuery = `
+          INSERT INTO project_members (project_id, user_id, role, joined_at)
+          VALUES (?, ?, ?, NOW())
+        `;
+
+        connection.query(addMemberQuery, [projectId, userId, role], (err, results) => {
+          if (err) {
+            console.error('Error adding project member:', err);
+            return res.status(500).json({ error: 'Database error while adding member' });
+          }
+
+          // Fetch updated members list
+          const getMembersQuery = `
+            SELECT u.name, u.email
+            FROM project_members pm
+            JOIN users u ON pm.user_id = u.id
+            WHERE pm.project_id = ?
+          `;
+
+          connection.query(getMembersQuery, [projectId], (err, membersList) => {
+            if (err) {
+              console.error('Error fetching updated members list:', err);
+              return res.status(500).json({ error: 'Database error while fetching members' });
+            }
+
+            res.status(200).json({ 
+              message: 'Member added successfully',
+              members: membersList.map(member => ({ name: member.name, email: member.email }))
+            });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Error in add_project_member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Endpoint to remove a project member
+app.delete('/remove_project_member', authenticateAdmin, (req, res) => {
+  const { projectId, userId } = req.body;
+
+  const query = `
+    DELETE FROM project_members
+    WHERE project_id = ? AND user_id = ?
+  `;
+
+  connection.query(query, [projectId, userId], (err, results) => {
+    if (err) {
+      console.error('Error removing project member:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Project member removed successfully' });
+  });
+});
+
+// Endpoint to fetch project members
+app.get('/project_members/:projectId', authenticateToken, (req, res) => {
+  const projectId = req.params.projectId;
+
+  const query = `
+    SELECT u.id, u.name, u.email, u.profile_image, pm.role, pm.joined_at
+    FROM project_members pm
+    JOIN users u ON pm.user_id = u.id
+    WHERE pm.project_id = ?
+  `;
+
+  connection.query(query, [projectId], (err, results) => {
+    if (err) {
+      console.error('Error fetching project members:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const members = results.map(member => ({
+      ...member,
+      profile_image: member.profile_image 
+        ? `http://localhost:5000/uploads/${member.profile_image}`
+        : null
+    }));
+
+    res.status(200).json({ members });
+  });
+});
+
+// Endpoint to add project member by email (admin only)
+app.post('/add_project_member', authenticateAdmin, (req, res) => {
+  const { projectId, userEmail, role } = req.body;
+
+  // First find the user ID from email
+  const findUserQuery = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(findUserQuery, [userEmail], (err, userResults) => {
+    if (err) {
+      console.error('Error finding user:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (userResults.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResults[0].id;
+    
+    // Check if member already exists
+    const checkMemberQuery = `
+      SELECT * FROM project_members 
+      WHERE project_id = ? AND user_id = ?
+    `;
+
+    connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
+      if (err) {
+        console.error('Error checking membership:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (memberResults.length > 0) {
+        return res.status(409).json({ error: 'User is already a project member' });
+      }
+
+      // Insert new member
+      const insertQuery = `
+        INSERT INTO project_members (project_id, user_id, role)
+        VALUES (?, ?, ?)
+      `;
+
+      connection.query(insertQuery, [projectId, userId, role], (err, results) => {
+        if (err) {
+          console.error('Error adding project member:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        res.status(200).json({ 
+          message: 'Project member added successfully',
+          memberId: results.insertId
+        });
+      });
+    });
+  });
+});
+
+// Endpoint to get user's organization by email
+app.get('/user_organization/:email', authenticateAdmin, (req, res) => {
+  const { email } = req.params;
+  
+  const query = 'SELECT organization FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.status(200).json({ organization: results[0].organization });
+  });
+});
+
+// Endpoint to create a new project with members
+app.post('/admin/create_project', authenticateAdmin, (req, res) => {
+  const { 
+    project_name, 
+    project_description, 
+    status, 
+    stage, 
+    owner, 
+    members, 
+    organization,
+    stage_duration = 14, // Default 14 days if not provided
+    stage_start_date = new Date().toISOString().split('T')[0], // Default to today if not provided
+    stage_due_date,
+    project_start_date = stage_start_date, // Default to stage start date if not provided
+    project_due_date 
+  } = req.body;
+
+  // Calculate default due dates if not provided
+  const defaultStageDueDate = new Date(stage_start_date);
+  defaultStageDueDate.setDate(defaultStageDueDate.getDate() + stage_duration);
+  const finalStageDueDate = stage_due_date || defaultStageDueDate.toISOString().split('T')[0];
+
+  const defaultProjectDueDate = new Date(project_start_date);
+  defaultProjectDueDate.setDate(defaultProjectDueDate.getDate() + 42); // Default 42 days for project
+  const finalProjectDueDate = project_due_date || defaultProjectDueDate.toISOString().split('T')[0];
+
+  // Start a transaction since we need to make multiple related database changes
+  connection.beginTransaction(err => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction start failed' });
+    }
+
+    // First find the owner's user ID from email
+    const findOwnerQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(findOwnerQuery, [owner], (err, ownerResults) => {
+      if (err) {
+        return connection.rollback(() => {
+          console.error('Error finding owner:', err);
+          res.status(500).json({ error: 'Error finding owner' });
+        });
+      }
+
+      if (ownerResults.length === 0) {
+        return connection.rollback(() => {
+          res.status(404).json({ error: 'Owner not found' });
+        });
+      }
+
+      const ownerId = ownerResults[0].id;
+
+      // Create the project with timeline fields
+      const createProjectQuery = `
+        INSERT INTO user_history (
+          user_id, organization, project_name, project_description, 
+          status, stage, carbon_emit, session_duration,
+          stage_duration, stage_start_date, stage_due_date,
+          project_start_date, project_due_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, NOW())
+      `;
+
+      connection.query(createProjectQuery, 
+        [
+          ownerId, 
+          organization, 
+          project_name, 
+          project_description, 
+          status, 
+          stage,
+          stage_duration,
+          stage_start_date,
+          finalStageDueDate,
+          project_start_date,
+          finalProjectDueDate
+        ],
+        (err, projectResult) => {
+          if (err) {
+            return connection.rollback(() => {
+              console.error('Error creating project:', err);
+              res.status(500).json({ error: 'Failed to create project' });
+            });
+          }
+
+          const projectId = projectResult.insertId;
+
+          // If there are members to add
+          if (members && members.length > 0) {
+            // Find all member IDs from their emails
+            const findMembersQuery = 'SELECT id FROM users WHERE email IN (?)';
+            connection.query(findMembersQuery, [members], (err, memberResults) => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error finding members:', err);
+                  res.status(500).json({ error: 'Failed to find members' });
+                });
+              }
+
+              // Create values for batch insert
+              const memberValues = memberResults.map(member => [projectId, member.id, 'member', new Date()]);
+
+              // Insert all members
+              const addMembersQuery = `
+                INSERT INTO project_members (project_id, user_id, role, joined_at)
+                VALUES ?
+              `;
+
+              connection.query(addMembersQuery, [memberValues], (err) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    console.error('Error adding members:', err);
+                    res.status(500).json({ error: 'Failed to add project members' });
+                  });
+                }
+
+                // If everything succeeded, commit the transaction
+                connection.commit(err => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      console.error('Error committing transaction:', err);
+                      res.status(500).json({ error: 'Failed to commit transaction' });
+                    });
+                  }
+
+                  res.status(200).json({
+                    id: projectId,
+                    project_name,
+                    project_description,
+                    status,
+                    stage,
+                    carbon_emit: 0,
+                    session_duration: 0,
+                    owner,
+                    organization,
+                    members,
+                    stage_duration,
+                    stage_start_date,
+                    stage_due_date: finalStageDueDate,
+                    project_start_date,
+                    project_due_date: finalProjectDueDate,
+                    created_at: new Date().toISOString()
+                  });
+                });
+              });
+            });
+          } else {
+            // If no members to add, just commit the transaction
+            connection.commit(err => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error committing transaction:', err);
+                  res.status(500).json({ error: 'Failed to commit transaction' });
+                });
+              }
+
+              res.status(200).json({
+                id: projectId,
+                project_name,
+                project_description,
+                status,
+                stage,
+                carbon_emit: 0,
+                session_duration: 0,
+                owner,
+                organization,
+                members: [],
+                stage_duration,
+                stage_start_date,
+                stage_due_date: finalStageDueDate,
+                project_start_date,
+                project_due_date: finalProjectDueDate,
+                created_at: new Date().toISOString()
+              });
+            });
+          }
+        }
+      );
+    });
+  });
+});
+
+// Endpoint to validate if a user email exists
+app.get('/validate_user_email/:email', authenticateToken, (req, res) => {
+  const { email } = req.params;
+
+  // Check if email exists in the database
+  const query = 'SELECT * FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error validating user email:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    // Return whether the email exists
+    res.json({ exists: results.length > 0 });
   });
 });
