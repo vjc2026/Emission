@@ -11,7 +11,11 @@ import {
   Stack, 
   Title, 
   Modal,
-  Select
+  Select,
+  Badge,
+  Grid,
+  Paper,
+  Flex
 } from '@mantine/core';
 import styles from './History.module.css';
 import { showNotification } from '@mantine/notifications';
@@ -555,7 +559,7 @@ useEffect(() => {
   }, [isSessionActive]);
 
   return (
-    <Container className={styles.container}>
+    <Container className={styles.container} size="xl">
       <Title order={1} className={styles.title}>
         Session Tracker
       </Title>
@@ -569,168 +573,241 @@ useEffect(() => {
       {loading ? (
         <Loader size="lg" style={{ display: 'block', margin: '0 auto' }} />
       ) : (
-        <Stack mt="md">
-          <TextInput
-            placeholder="Project Name"
-            label="Project Title"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            style={{ width: '100%' }}
-            readOnly
-          />
+        <Grid gutter="md">
+          <Grid.Col span={12}>
+            <Paper p="md" shadow="xs" radius="md" withBorder>
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 8 }}>
+                  <Stack gap="xs">
+                    <TextInput
+                      placeholder="Project Name"
+                      label="Project Title"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      style={{ width: '100%' }}
+                      readOnly
+                    />
+                    
+                    <TextInput
+                      placeholder="Project Description"
+                      label="Project Description"
+                      value={projectDescription}
+                      onChange={(e) => setProjectDescription(e.target.value)}
+                      style={{ width: '100%' }}
+                      readOnly
+                    />
+                    
+                    <Select
+                      label="Project Stage"
+                      placeholder="Select a stage"
+                      data={[
+                        { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
+                        { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
+                        { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
+                      ]}
+                      value={projectStage}
+                      onChange={setProjectStage}
+                      className={styles.projectStageDropdown}
+                      readOnly
+                    />
+                  </Stack>
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 4 }}>
+                  <Stack gap="md" align="center" justify="center" h="100%">
+                    <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+                      Current Duration: {formatDuration(sessionDuration)}
+                    </Text>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+                      Current Device: {currentDevice || 'N/A'}
+                    </Text>
+                    <Button 
+                      onClick={() => setIsCreateModalOpen(true)} 
+                      style={{ backgroundColor: '#006400', color: '#fff', width: '100%' }}
+                    >
+                      Create Project
+                    </Button>
+                    <Group grow style={{ width: '100%' }}>
+                      <Button 
+                        onClick={startSession} 
+                        disabled={isTimerRunning} 
+                        style={{ backgroundColor: '#006400', color: '#fff' }}
+                      >
+                        Start Session
+                      </Button>
+                      <Button 
+                        onClick={endSession} 
+                        disabled={!isTimerRunning} 
+                        color="red"
+                      >
+                        End Session
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Grid.Col>
+              </Grid>
+            </Paper>
+          </Grid.Col>
           
-          <TextInput
-            placeholder="Project Description"
-            label="Project Description"
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
-            style={{ width: '100%' }}
-            readOnly
-          />
+          <Grid.Col span={12}>
+            <Divider label="Project History" labelPosition="center" size="md" />
+            
+            <Grid gutter="md">
+              {projects.map((project) => {
+                const totalCarbonEmissions = sessionHistory
+                  .filter(session => session.projectName === project.project_name)
+                  .reduce((acc, session) => acc + session.carbonEmissions, 0);
 
-          <Select
-            label="Project Stage"
-            placeholder="Select a stage"
-            data={[
-              { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
-              { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
-              { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
-            ]}
-            value={projectStage}
-            onChange={setProjectStage}
-            className={styles.projectStageDropdown}
-            readOnly
-          />
-
-          <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-            Current Duration: {formatDuration(sessionDuration)}
-          </Text>
-          <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-            Current Device: {currentDevice || 'N/A'}
-          </Text>
-          <Button onClick={() => setIsCreateModalOpen(true)} style={{ backgroundColor: '#006400', color: '#fff'}}>
-            Create Project
-            </Button>
-          <Group mt="md" align="center" style={{ marginTop: 15 }}>
-          
-            <Button onClick={startSession} disabled={isTimerRunning} style={{ backgroundColor: '#006400', color: '#fff' }}>
-              Start Session
-            </Button>
-            <Button onClick={endSession} disabled={!isTimerRunning} color="red">
-              End Session
-            </Button>
-          </Group>    
-          
-          <Divider style={{ width: '100%', margin: '20px 0' }} />
-          
-          <Title order={3} className={styles.historyTitle}>
-            Project History
-          </Title>
-          
-          {projects.map((project) => {
-            const totalCarbonEmissions = sessionHistory
-              .filter(session => session.projectName === project.project_name)
-              .reduce((acc, session) => acc + session.carbonEmissions, 0);
-
-            return (
-                <Card key={project.id} className={styles.projectCard}>
-                <Text className={styles.projectName}>Project Name: {project.project_name}</Text>
-                <Text className={styles.projectDescription}>Description: {project.project_description}</Text>
-                <Text className={styles.historyDetails}>Session Duration: {formatDuration(project.session_duration)}</Text>
-                <Text className={styles.historyDetails}>Carbon Emissions: {project.carbon_emit.toFixed(2)} kg CO2</Text>
-                <Text className={styles.projectStage}>Project Stage: {project.stage}</Text>
-                <Group className={styles.buttonGroup}>
-                <Button size="xs" onClick={() => {
-              setProjectName(project.project_name);
-              setProjectDescription(project.project_description);
-              setProjectStage(project.stage);
-              }}>
-              Select
-              </Button>
-                <Button size="xs" onClick={() => handleEditProject(project.id)} style={{ backgroundColor: '#006400', color: '#fff' }}>
-                Edit
-                </Button>
-                <Button 
-                size="xs" 
-                color="blue" 
-                onClick={() => {
-                setProjectName(project.project_name);
-                setProjectDescription(project.project_description);
-                setProjectStage(project.stage);
-                handleCompleteStage(project.id);
-                }}>
-                Complete Stage
-                </Button>
-                <Button size="xs" onClick={() => handleOpenInviteModal(project.id)} className={styles.inviteButton}>
-                  Invite
-                </Button>
-                </Group>
-                </Card>
-            );
-          })}
-        </Stack>
+                return (
+                  <Grid.Col key={project.id} span={{ base: 12, sm: 6, lg: 4 }}>
+                    <Card shadow="sm" radius="md" withBorder className={styles.projectCard}>
+                      <Card.Section p="md" withBorder style={{ backgroundColor: 'rgba(0, 100, 0, 0.05)' }}>
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text fw={700} size="lg" lineClamp={1} style={{ flex: 1 }}>
+                            {project.project_name}
+                          </Text>
+                          <Badge
+                            color={
+                              project.stage.includes('Design') ? 'green' :
+                              project.stage.includes('Development') ? 'blue' : 'violet'
+                            }
+                            variant="light"
+                          >
+                            {project.stage.split(':')[0]}
+                          </Badge>
+                        </Group>
+                      </Card.Section>
+                      
+                      <Stack gap="xs" p="md" pb={0}>
+                        <Text lineClamp={2} size="sm" color="dimmed">
+                          {project.project_description}
+                        </Text>
+                        
+                        <Grid>
+                          <Grid.Col span={6}>
+                            <Text size="xs" color="dimmed">Session Duration</Text>
+                            <Text size="sm" fw={500}>{formatDuration(project.session_duration)}</Text>
+                          </Grid.Col>
+                          <Grid.Col span={6}>
+                            <Text size="xs" color="dimmed">Carbon Emissions</Text>
+                            <Text size="sm" fw={500} color={project.carbon_emit > 10 ? 'red' : 'green'}>
+                              {project.carbon_emit.toFixed(2)} kg CO2
+                            </Text>
+                          </Grid.Col>
+                        </Grid>
+                        
+                        <Text size="xs" color="dimmed" mt={5}>
+                          Project Owner: {project.owner_email || project.owner || 'N/A'}
+                        </Text>
+                      </Stack>
+                      
+                      <Card.Section p="md" mt="md" withBorder style={{ backgroundColor: '#f9f9f9' }}>
+                        <Group grow>
+                          <Button size="xs" onClick={() => {
+                            setProjectName(project.project_name);
+                            setProjectDescription(project.project_description);
+                            setProjectStage(project.stage);
+                          }}>
+                            Select
+                          </Button>
+                          <Button 
+                            size="xs" 
+                            onClick={() => handleEditProject(project.id)} 
+                            style={{ backgroundColor: '#006400', color: '#fff' }}
+                          >
+                            Edit
+                          </Button>
+                        </Group>
+                        <Group grow mt="xs">
+                          <Button 
+                            size="xs" 
+                            color="blue" 
+                            onClick={() => {
+                              setProjectName(project.project_name);
+                              setProjectDescription(project.project_description);
+                              setProjectStage(project.stage);
+                              handleCompleteStage(project.id);
+                            }}
+                          >
+                            Complete Stage
+                          </Button>
+                          <Button 
+                            size="xs" 
+                            onClick={() => handleOpenInviteModal(project.id)} 
+                            variant="outline"
+                          >
+                            Invite
+                          </Button>
+                        </Group>
+                      </Card.Section>
+                    </Card>
+                  </Grid.Col>
+                );
+              })}
+            </Grid>
+          </Grid.Col>
+        </Grid>
       )}
-      <>
-        {/* Floating Help Button */}
-        <Button
-          title="Help"  // This adds a basic tooltip
-          onClick={() => setIsHelpOpen(true)}
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            borderRadius: '50%',
-            width: '60px',
-            height: '60px',
-            backgroundColor: '#006400',
-            color: 'white',
-            fontSize: '16px',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-            zIndex: 1000,
-            transition: 'transform 0.2s',
-            cursor: 'pointer',
-            ':hover': {
-              transform: 'scale(1.1)'
-            }
-          }}
-        >
-          ?
-        </Button>
+      
+      {/* Floating Help Button */}
+      <Button
+        title="Help"
+        onClick={() => setIsHelpOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          borderRadius: '50%',
+          width: '60px',
+          height: '60px',
+          backgroundColor: '#006400',
+          color: 'white',
+          fontSize: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          transition: 'transform 0.2s',
+          cursor: 'pointer',
+          ':hover': {
+            transform: 'scale(1.1)'
+          }
+        }}
+      >
+        ?
+      </Button>
 
-        {/* Help Modal */}
-        <Modal 
-          opened={isHelpOpen} 
-          onClose={() => setIsHelpOpen(false)} 
-          title="How the System Works" 
-          centered
-          styles={{
-        title: {
-          fontSize: '24px',
-          fontWeight: 'bold',
-          color: '#006400',
-          marginBottom: '20px'
-        },
-        body: {
-          padding: '24px'
-        }
-          }}
-        >
-          <Text style={{ lineHeight: 1.6, fontSize: '16px' }}>
-        This system allows you to manage your projects and track carbon emissions during development.
-        <br /><br />
-        1. Create a project by clicking the "Create Project" button which allows you to set a name and a description for your project. It is recommended to start your Project stage in Design.
-        <br /><br />
-        2. Start a session to track time and emissions.
-        <br /><br />
-        3. Complete stages to progress through the project lifecycle.
-        <br /><br />
-        4. Monitor your project history for insights and records.
-          </Text>
-        </Modal>
-      </>
+      {/* Help Modal */}
+      <Modal 
+        opened={isHelpOpen} 
+        onClose={() => setIsHelpOpen(false)} 
+        title="How the System Works" 
+        centered
+        styles={{
+          title: {
+            fontSize: '24px',
+            fontWeight: 'bold',
+            color: '#006400',
+            marginBottom: '20px'
+          },
+          body: {
+            padding: '24px'
+          }
+        }}
+      >
+        <Text style={{ lineHeight: 1.6, fontSize: '16px' }}>
+          This system allows you to manage your projects and track carbon emissions during development.
+          <br /><br />
+          1. Create a project by clicking the "Create Project" button which allows you to set a name and a description for your project. It is recommended to start your Project stage in Design.
+          <br /><br />
+          2. Start a session to track time and emissions.
+          <br /><br />
+          3. Complete stages to progress through the project lifecycle.
+          <br /><br />
+          4. Monitor your project history for insights and records.
+        </Text>
+      </Modal>
 
-        {/* Create Project Modal */}
-        <Modal opened={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Project">
+      {/* Create Project Modal */}
+      <Modal opened={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Project">
         <TextInput
           label="Project Name"
           placeholder="Project Name"

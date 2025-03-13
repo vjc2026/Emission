@@ -5,7 +5,7 @@ import {
   Text, 
   Card, 
   Image, 
-  Grid, 
+  Grid,
   Loader, 
   Stack,
   Modal,
@@ -13,13 +13,21 @@ import {
   Flex,
   Select,
   SimpleGrid,
-  Skeleton,
   Group,
   TextInput,
+  Paper,
+  Badge,
+  Transition,
+  Box,
+  ThemeIcon,
+  RingProgress,
+  ActionIcon,
+  Avatar,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import { IconDeviceLaptop, IconCpu, IconDeviceDesktop, IconPlus, IconArchive, IconDevices } from '@tabler/icons-react';
 
 export function HELPComponent() {
   const [user, setUser] = useState<{
@@ -299,206 +307,239 @@ export function HELPComponent() {
     : projects.filter(project => project.status.toLowerCase() === filter.toLowerCase());
 
   return (
-    <Container my="md">
-      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
-      <Card
-        shadow="sm"
-        padding={isMobile ? 'md' : 'xl'}
-        style={{ backgroundColor: '#006747', color: 'white', borderRadius: '10px' }}
+    <Container size="xl" py="xl">
+      {/* Hero Section with User Profile */}
+      <Paper 
+        radius="lg" 
+        p="xl" 
+        mb="xl"
+        styles={(theme) => ({
+          root: {
+            background: 'linear-gradient(135deg, #006747 0%, #004a33 100%)',
+            boxShadow: '0 8px 16px rgba(0, 103, 71, 0.2)',
+          }
+        })}
       >
-        <Stack align="center" gap="md">
-          {user && user.profile_image && (
-            <Image
-              src={`${user.profile_image}`}
-              alt="Profile Image"
-              mx="auto"
-              mb="md"
-              radius={50}
-            />
-          )}
-          <Text c="white" ta="center" style={{ fontWeight: 600, fontSize: isMobile ? '18px' : '24px' }}>
-            {user?.name || 'N/A'}
-          </Text>
-          <Text c="white" style={{ fontSize: isMobile ? '14px' : '18px' }}>
-            {user?.organization || 'N/A'}
-          </Text>
-        </Stack>
-      </Card>
-
-      <Card
-        shadow="sm"
-        padding={isMobile ? 'md' : 'xl'}
-        style={{ backgroundColor: '#ffffff', color: '#333', borderRadius: '10px', marginTop: '1rem' }}
-      >
-        {error && <Text c="red" size="lg">{error}</Text>}
-        {loading ? (
-          <Loader size="xl" style={{ display: 'block', margin: '2rem auto' }} />
-        ) : (
-          <Stack gap="md">
-            <Title order={4}>Organization</Title>
-            <Text size={isMobile ? 'md' : 'lg'}>{user?.organization || 'N/A'}</Text>
-            <Title order={3}>User Device Specifications</Title>
-            <Grid>
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>Device Using:</strong> {selectedDevice?.device || deviceType || 'N/A'}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>PSU/Charger Watts:</strong> {selectedDevice?.psu || user?.specifications?.PSU || 'N/A'}
-                </Text>
-              </Grid.Col>
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>Motherboard:</strong> {selectedDevice?.motherboard || user?.specifications?.motherboard || 'N/A'}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>RAM:</strong> {selectedDevice?.ram || user?.specifications?.RAM || 'N/A'}
-                </Text>
-              </Grid.Col>
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>GPU:</strong> {selectedDevice?.gpu || user?.specifications?.GPU || 'N/A'}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>GPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? selectedDevice?.gpu_watts ?? user?.specifications?.gpu_watts ?? 'N/A' : selectedDevice?.GPU_avg_watt_usage ?? user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W
-                </Text>
-              </Grid.Col>
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>CPU:</strong> {selectedDevice?.cpu || user?.specifications?.CPU || 'N/A'}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>CPU Average Watt Usage:</strong> {deviceType === 'Laptop' ? selectedDevice?.cpu_watts ?? user?.specifications?.cpu_watts ?? 'N/A' : selectedDevice?.CPU_avg_watt_usage ?? user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W
-                </Text>
-              </Grid.Col>
-            </Grid>
+        <Flex direction={isMobile ? 'column' : 'row'} align="center" gap="xl">
+          <Box style={{ flex: 1 }}>
+            {user && user.profile_image ? (
+              <Avatar
+                src={user.profile_image}
+                size={150}
+                radius={75}
+                mx="auto"
+                styles={{
+                  root: {
+                    border: '4px solid white'
+                  }
+                }}
+              />
+            ) : (
+              <Avatar
+                size={150}
+                radius={75}
+                color="green"
+                mx="auto"
+              >{user?.name?.charAt(0) || 'U'}</Avatar>
+            )}
+          </Box>
+          <Stack style={{ flex: 2 }} gap="xs">
+            <Text c="white" size="xl" fw={700}>{user?.name || 'N/A'}</Text>
+            <Badge size="lg" variant="light">{user?.organization || 'N/A'}</Badge>
+            <Text c="white" size="sm" opacity={0.9}>Device Type: {deviceType || 'N/A'}</Text>
           </Stack>
-        )}
-      </Card>
+        </Flex>
+      </Paper>
 
-      <Card
-        shadow="sm"
-        padding={isMobile ? 'md' : 'xl'}
-        style={{ backgroundColor: '#ffffff', color: '#333', borderRadius: '10px', marginTop: '1rem' }}
-      >
-        <Title order={4}>Switch Device</Title>
-        <Select
-          value={currentDeviceId?.toString() || ''}
-          onChange={(value) => handleDeviceSwitch(Number(value))}
-          data={devices.map((device) => ({
-            value: device.id.toString(),
-            label: `${device.device} - ${device.cpu} - ${device.gpu}`,
-          }))}
-          placeholder="Select a device"
-          mb="sm"
-        />
-      </Card>
+      <SimpleGrid cols={isMobile ? 1 : 2} spacing="xl">
+        {/* Device Specifications Card */}
+        <Card shadow="sm" radius="md" withBorder p="xl">
+          <Group justify="space-between" mb="md">
+            <Title order={3} c="#006747">Current Device</Title>
+            <ThemeIcon size="lg" radius="md" variant="light" color="green">
+              <IconDevices size={20} />
+            </ThemeIcon>
+          </Group>
+          
+          <Stack gap="md">
+            <Select
+              label="Switch Device"
+              value={currentDeviceId?.toString() || ''}
+              onChange={(value) => handleDeviceSwitch(Number(value))}
+              data={devices.map((device) => ({
+                value: device.id.toString(),
+                label: `${device.device} - ${device.cpu}`,
+              }))}
+              rightSection={<IconDeviceLaptop size={16} />}
+            />
+
+            <SimpleGrid cols={2} spacing="sm">
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">CPU</Text>
+                <Text size="sm">{selectedDevice?.cpu || user?.specifications?.CPU || 'N/A'}</Text>
+                <Text size="xs" c="dimmed" mt={4}>
+                  {deviceType === 'Laptop' 
+                    ? `${selectedDevice?.cpu_watts ?? user?.specifications?.cpu_watts ?? 'N/A'} W` 
+                    : `${selectedDevice?.CPU_avg_watt_usage ?? user?.specifications?.CPU_avg_watt_usage ?? 'N/A'} W`}
+                </Text>
+              </Paper>
+
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">GPU</Text>
+                <Text size="sm">{selectedDevice?.gpu || user?.specifications?.GPU || 'N/A'}</Text>
+                <Text size="xs" c="dimmed" mt={4}>
+                  {deviceType === 'Laptop'
+                    ? `${selectedDevice?.gpu_watts ?? user?.specifications?.gpu_watts ?? 'N/A'} W`
+                    : `${selectedDevice?.GPU_avg_watt_usage ?? user?.specifications?.GPU_avg_watt_usage ?? 'N/A'} W`}
+                </Text>
+              </Paper>
+
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">RAM</Text>
+                <Text size="sm">{selectedDevice?.ram || user?.specifications?.RAM || 'N/A'}</Text>
+              </Paper>
+
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">PSU</Text>
+                <Text size="sm">{selectedDevice?.psu || user?.specifications?.PSU || 'N/A'}</Text>
+              </Paper>
+            </SimpleGrid>
+
+            <Button 
+              variant="light" 
+              color="green" 
+              fullWidth 
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setAddDeviceModalOpened(true)}
+            >
+              Add New Device
+            </Button>
+          </Stack>
+        </Card>
+
+        {/* Projects Overview Card */}
+        <Card shadow="sm" radius="md" withBorder p="xl">
+          <Group justify="space-between" mb="md">
+            <Title order={3} style={{ color: '#006747' }}>Projects Overview</Title>
+            <Select
+              size="sm"
+              value={filter}
+              onChange={(value) => value && setFilter(value)}
+              data={[
+                { value: 'All', label: 'All Projects' },
+                { value: 'In-Progress', label: 'In Progress' },
+                { value: 'Complete', label: 'Completed' },
+                { value: 'Archived', label: 'Archived' },
+              ]}
+              styles={{ root: { width: 150 } }}
+            />
+          </Group>
+
+          <Stack gap="md">
+            {filteredProjects.length === 0 ? (
+              <Text ta="center" c="dimmed">No projects found</Text>
+            ) : (
+              filteredProjects.map((project) => (
+                <Paper
+                  key={project.id}
+                  p="md"
+                  radius="md"
+                  withBorder
+                  styles={(theme) => ({
+                    root: {
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                      },
+                    }
+                  })}
+                  onClick={() => handleProjectClick(project)}
+                >
+                  <Group justify="space-between">
+                    <Box>
+                      <Text fw={500}>{project.project_name}</Text>
+                      <Text size="sm" c="dimmed" lineClamp={1}>
+                        Stage: {project.stage}
+                      </Text>
+                    </Box>
+                    <Badge
+                      color={
+                        project.status.toLowerCase() === 'complete' ? 'green' :
+                        project.status.toLowerCase() === 'in-progress' ? 'blue' :
+                        project.status.toLowerCase() === 'archived' ? 'gray' : 'yellow'
+                      }
+                    >
+                      {project.status}
+                    </Badge>
+                  </Group>
+                </Paper>
+              ))
+            )}
+          </Stack>
+        </Card>
       </SimpleGrid>
 
-      <Title
-        order={2}
-        style={{
-          color: '#006747',
-          fontWeight: 600,
-          textAlign: 'center',
-          margin: '2rem 0',
-          fontSize: isMobile ? '24px' : '32px',
-        }}
-      >
-        Your Projects
-      </Title>
-
-      <Select
-        value={filter}
-        onChange={(value) => value && setFilter(value)}
-        data={[
-          { value: 'All', label: 'All' },
-          { value: 'In-Progress', label: 'In-Progress' },
-          { value: 'Complete', label: 'Complete' },
-          { value: 'Archived', label: 'Archived' },
-        ]}
-        placeholder="Filter by status"
-        style={{ marginBottom: '1rem' }}
-      />
-
-      <Grid gutter={isMobile ? 'sm' : 'xl'} style={{ width: '100%' }}>
-        {filteredProjects.length === 0 ? (
-          <Grid.Col>
-            <Text size="lg" ta="center">No projects found.</Text>
-          </Grid.Col>
-        ) : (
-          filteredProjects.map((project) => (
-            <Grid.Col span={isMobile ? 12 : 4} key={project.id}>
-              <Card
-                shadow="sm"
-                padding="lg"
-                style={{
-                  cursor: 'pointer',
-                  borderColor: '#006747',
-                  borderWidth: 2,
-                  borderRadius: '10px',
-                  transition: 'all 0.3s ease',
-                  height: '100%',
-                }}
-                onClick={() => handleProjectClick(project)}
-              >
-                <Text fw={700} size={isMobile ? 'lg' : 'xl'} mb="md" style={{ color: '#006747' }}>
-                  Project Title: {project.project_name}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>Stage:</strong> {project.stage.length > 35 ? `${project.stage.substring(0, 35)}...` : project.stage}
-                </Text>
-                <Text size={isMobile ? 'md' : 'lg'}>
-                  <strong>Status:</strong> {project.status}
-                </Text>
-              </Card>
-            </Grid.Col>
-          ))
-        )}
-      </Grid>
-
+      {/* Project Details Modal */}
       <Modal
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
-        title="Project Details"
-        size="xl"
-        styles={{
-          root: { backgroundColor: '#f5f5f5' },
-          content: {
-            maxWidth: '90%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            padding: isMobile ? '1rem' : '2rem',
-          },
-          title: {
-            color: '#006747',
-            fontSize: isMobile ? '20px' : '24px',
-          },
-        }}
+        title={
+          <Group>
+            <Title order={4} style={{ color: '#006747' }}>Project Details</Title>
+            <Badge size="lg">{selectedProject?.status}</Badge>
+          </Group>
+        }
+        size="lg"
+        radius="md"
       >
         {selectedProject && (
           <Stack gap="lg">
-            <Text size={isMobile ? 'xl' : '2xl'} fw={700}>
-              {selectedProject.project_name}
-            </Text>
-            <Text size={isMobile ? 'md' : 'lg'}>
-              <strong>Description:</strong> {selectedProject.project_description}
-            </Text>
-            <Text size={isMobile ? 'md' : 'lg'}>
-              <strong>Status:</strong> {selectedProject.status}
-            </Text>
-            <Text size={isMobile ? 'md' : 'lg'}>
-              <strong>Stage:</strong> {selectedProject.stage}
-            </Text>
-            <Text size={isMobile ? 'md' : 'lg'}>
-              <strong>Carbon Emissions:</strong> {selectedProject.carbon_emit} kg CO2e
-            </Text>
-            <Text size={isMobile ? 'md' : 'lg'}>
-              <strong>Session Duration:</strong> {selectedProject.session_duration} seconds
-            </Text>
+            <Title order={3}>{selectedProject.project_name}</Title>
+            
+            <Paper p="md" radius="md" withBorder>
+              <Text size="sm" fw={500} c="dimmed">Description</Text>
+              <Text mt={4}>{selectedProject.project_description}</Text>
+            </Paper>
+
+            <SimpleGrid cols={2} spacing="md">
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">Stage</Text>
+                <Text mt={4}>{selectedProject.stage}</Text>
+              </Paper>
+
+              <Paper p="md" radius="md" withBorder>
+                <Text size="sm" fw={500} c="dimmed">Duration</Text>
+                <Text mt={4}>{selectedProject.session_duration} seconds</Text>
+              </Paper>
+            </SimpleGrid>
+
+            <Paper p="md" radius="md" withBorder>
+              <Group justify="space-between">
+                <div>
+                  <Text size="sm" fw={500} c="dimmed">Carbon Emissions</Text>
+                  <Text size="xl" fw={700} c="green">
+                    {selectedProject.carbon_emit} kg CO2e
+                  </Text>
+                </div>
+                <RingProgress
+                  size={80}
+                  thickness={8}
+                  sections={[{ value: (selectedProject.carbon_emit / 10) * 100, color: '#006747' }]}
+                  label={
+                    <Text size="xs" ta="center">
+                      {Math.round((selectedProject.carbon_emit / 10) * 100)}%
+                    </Text>
+                  }
+                />
+              </Group>
+            </Paper>
+
             <Button
               color="red"
-              size={isMobile ? 'md' : 'lg'}
+              variant="light"
+              leftSection={<IconArchive size={16} />}
               disabled={selectedProject.status.toLowerCase() === 'archived'}
               onClick={async () => {
                 const token = localStorage.getItem('token');
@@ -525,36 +566,60 @@ export function HELPComponent() {
         )}
       </Modal>
 
+      {/* Add Device Modal */}
       <Modal
         opened={addDeviceModalOpened}
         onClose={() => setAddDeviceModalOpened(false)}
-        title="Add Another Device"
+        title={
+          <Title order={4} style={{ color: '#006747' }}>
+            Add New Device
+          </Title>
+        }
         size="lg"
-        styles={{
-          root: { backgroundColor: '#f5f5f5' },
-          content: {
-            maxWidth: '90%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            padding: isMobile ? '1rem' : '2rem',
-          },
-          title: {
-            color: '#006747',
-            fontSize: isMobile ? '20px' : '24px',
-          },
-        }}
+        radius="md"
       >
         {!newDevice ? (
-          <Group ta="center" mt="md">
-            <Button fullWidth size="md" onClick={() => setNewDevice('Personal Computer')} color="green">
-              Personal Computer
-            </Button>
-            <Button fullWidth size="md" onClick={() => setNewDevice('Laptop')} color="green">
-              Laptop
-            </Button>
-          </Group>
+          <SimpleGrid cols={2} spacing="md">
+            <Paper
+              p="xl"
+              radius="md"
+              withBorder
+              styles={{
+                root: {
+                  cursor: 'pointer'
+                }
+              }}
+              onClick={() => setNewDevice('Personal Computer')}
+            >
+              <Stack align="center" gap="md">
+                <ThemeIcon size={48} radius="md" color="green">
+                  <IconDeviceDesktop size={24} />
+                </ThemeIcon>
+                <Text fw={500}>Personal Computer</Text>
+              </Stack>
+            </Paper>
+
+            <Paper
+              p="xl"
+              radius="md"
+              withBorder
+              styles={{
+                root: {
+                  cursor: 'pointer'
+                }
+              }}
+              onClick={() => setNewDevice('Laptop')}
+            >
+              <Stack align="center" gap="md">
+                <ThemeIcon size={48} radius="md" color="green">
+                  <IconDeviceLaptop size={24} />
+                </ThemeIcon>
+                <Text fw={500}>Laptop</Text>
+              </Stack>
+            </Paper>
+          </SimpleGrid>
         ) : (
-          <>
+          <Stack gap="md">
             <Select
               label="CPU"
               placeholder="Select your CPU"
@@ -562,7 +627,7 @@ export function HELPComponent() {
               onChange={(value) => setCpu(value || '')}
               data={cpuOptions}
               required
-              mb="sm"
+              rightSection={<IconCpu size={16} />}
             />
             <Select
               label="GPU"
@@ -606,15 +671,12 @@ export function HELPComponent() {
               required
               mb="lg"
             />
-            <Button fullWidth mt="sm" onClick={handleAddDevice} color="green">
+            <Button color="green" onClick={handleAddDevice}>
               Add Device
             </Button>
-          </>
+          </Stack>
         )}
       </Modal>
-      <Button fullWidth mt="sm" onClick={() => setAddDeviceModalOpened(true)} color="green">
-        Add Another Device
-      </Button>
     </Container>
   );
 }

@@ -56,16 +56,16 @@ const History = () => {
   ]);
   const [now, setNow] = useState(Date.now());
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTask, setNewTask] = useState({
+  const [newRequest, setNewRequest] = useState({
     title: '',
     description: '',
     type: 'Design: Creating the software architecture',
-    assignees: [] as string[],
     stage_duration: 14,
     stage_start_date: new Date().toISOString().split('T')[0],
     stage_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     project_start_date: new Date().toISOString().split('T')[0],
-    project_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    project_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    assignees: [] as { email: string; role: string }[]
   });
   const [selectedTask, setSelectedTask] = useState(null as any);
   const [isEditing, setIsEditing] = useState(false);
@@ -362,24 +362,20 @@ const History = () => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Define the project stages in order
     const projectStages = [
       'Design: Creating the software architecture',
       'Development: Writing the actual code',
       'Testing: Ensuring the software works as expected'
     ];
 
-    // Find the current stage index
     const currentStageIndex = projectStages.indexOf(task.type);
     const nextStage = currentStageIndex < projectStages.length - 1 ? projectStages[currentStageIndex + 1] : null;
 
     try {
-      // First stop the timer if it's running
       if (task.isRunning) {
         await handleTimer(taskId);
       }
 
-      // Call the complete_project endpoint
       const completeResponse = await fetch(`http://localhost:5000/complete_project/${taskId}`, {
         method: 'POST',
         headers: {
@@ -387,7 +383,9 @@ const History = () => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ 
-          nextStage
+          nextStage,
+          owner: task.leader?.email, // Preserve the original owner
+          project_leader: task.leader?.email // Preserve the project leader
         }),
       });
 
@@ -403,27 +401,24 @@ const History = () => {
             return { 
               ...t,
               status: completionData.status,
-              type: completionData.stage
+              type: completionData.stage,
+              leader: t.leader // Preserve existing leader
             };
           }
           return t;
         });
         
-        // Update selected task if it's currently selected
         const updatedTask = updatedTasks.find(t => t.id === taskId);
         if (selectedTask?.id === taskId && updatedTask) {
           setSelectedTask(updatedTask);
         }
-
         return updatedTasks;
       });
 
-      // Close the panel if the project is completed
       if (completionData.status === 'Complete') {
         setSelectedTask(null);
       }
 
-      // Refresh the task list if needed
       if (user?.email) {
         await fetchUserTasks(user.email);
       }
@@ -434,45 +429,49 @@ const History = () => {
     }
   };
 
-  const handleAddTask = async () => {
-    if (!newTask.title || !newTask.description || !newTask.type) {
+  const handleProjectRequest = async () => {
+    if (!newRequest.title || !newRequest.description || !newRequest.type) {
       return;
     }
 
     const token = localStorage.getItem('token');
-    if (!token) return;
-
+    
     try {
-      const stage_duration = parseInt(newTask.stage_duration.toString()) || 14;
-      const now = new Date();
-      const stage_start_date = now.toISOString().split('T')[0];
-      const due_date = new Date(now);
-      due_date.setDate(now.getDate() + stage_duration);
-      const stage_due_date = due_date.toISOString().split('T')[0];
+      // First check if project with same name exists
+      const checkResponse = await fetch('http://localhost:5000/check_existing_projectname', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          projectName: newRequest.title
+        })
+      });
 
-      const projectData = {
-        projectName: newTask.title,
-        projectDescription: newTask.description,
-        organization,
-        projectStage: newTask.type,
-        sessionDuration: 0,
-        carbonEmit: 0,
-        status: "In-Progress",
-        stage_duration,
-        stage_start_date,
-        stage_due_date,
-        project_start_date: stage_start_date,
-        project_due_date: stage_due_date
-      };
+      const checkData = await checkResponse.json();
+      
+      if (checkData.exists) {
+        setError('A project with this name already exists');
+        return;
+      }
 
-      // Create the project first
+      // If no duplicate, create the project
       const response = await fetch('http://localhost:5000/user_history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(projectData),
+        body: JSON.stringify({
+          projectName: newRequest.title,
+          projectDescription: newRequest.description,
+          projectStage: 'Design: Creating the software architecture',
+          status: 'In Progress',
+          organization: organization,
+          sessionDuration: 0,
+          carbonEmit: 0
+        })
       });
 
       if (!response.ok) {
@@ -480,66 +479,53 @@ const History = () => {
       }
 
       const data = await response.json();
-      const projectId = data.projectId;
 
-      // Send invitations to all assignees
-      const invitationPromises = newTask.assignees.map(async (assigneeEmail) => {
-        try {
-          const inviteResponse = await fetch('http://localhost:5000/send-invitation', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              recipientEmail: assigneeEmail,
-              projectId: projectId,
-              message: `You have been invited to join the project: ${newTask.title}`
-            }),
-          });
+      // Update the tasks list with the new project
+      const newProject = {
+        id: data.projectId,
+        project_id: data.projectId.toString(),
+        title: newRequest.title,
+        description: newRequest.description,
+        type: 'Design: Creating the software architecture',
+        status: 'In Progress',
+        assignees: [],
+        spentTime: 0,
+        isRunning: false,
+        startTime: null,
+        carbonEmit: 0,
+        leader: null,
+        stage_duration: newRequest.stage_duration,
+        stage_start_date: newRequest.stage_start_date,
+        stage_due_date: newRequest.stage_due_date,
+        project_start_date: newRequest.project_start_date,
+        project_due_date: newRequest.project_due_date
+      };
 
-          if (!inviteResponse.ok) {
-            console.error(`Failed to send invitation to ${assigneeEmail}`);
-          }
-        } catch (err) {
-          console.error(`Error sending invitation to ${assigneeEmail}:`, err);
-        }
+      setTasks(prevTasks => [...prevTasks, newProject]);
+
+      // Reset the form with all required fields
+      setNewRequest({
+        title: '',
+        description: '',
+        type: 'Design: Creating the software architecture',
+        stage_duration: 14,
+        stage_start_date: new Date().toISOString().split('T')[0],
+        stage_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        project_start_date: new Date().toISOString().split('T')[0],
+        project_due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        assignees: []
       });
 
-      // Wait for all invitations to be sent
-      await Promise.all(invitationPromises);
+      setShowAddModal(false);
       
+      // Fetch updated tasks list
       if (user?.email) {
         await fetchUserTasks(user.email);
       }
 
-      // Show success notification
-      notifications.show({
-        title: 'Project Created',
-        message: 'Project created successfully and invitations sent to team members',
-        color: 'green',
-      });
-
-      setShowAddModal(false);
-      setNewTask({
-        title: '',
-        description: '',
-        type: 'Design: Creating the software architecture',
-        assignees: [],
-        stage_duration: 14,
-        stage_start_date: new Date().toISOString().split('T')[0],
-        stage_due_date: '',
-        project_start_date: new Date().toISOString().split('T')[0],
-        project_due_date: ''
-      });
     } catch (err) {
       console.error('Error creating project:', err);
-      // Show error notification
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to create project or send invitations',
-        color: 'red',
-      });
+      setError('Failed to create project');
     }
   };
 
@@ -581,9 +567,9 @@ const History = () => {
         }
       } else {
         // Adding assignee to new task
-        setNewTask(prevTask => ({
+        setNewRequest(prevTask => ({
           ...prevTask,
-          assignees: [...prevTask.assignees, assigneeEmail]
+          assignees: [...prevTask.assignees, { email: assigneeEmail, role: 'Member' }]
         }));
       }
 
@@ -602,6 +588,12 @@ const History = () => {
     if (!token) return;
 
     try {
+      // Format dates to YYYY-MM-DD before sending to server
+      const formatDateForServer = (dateString: string) => {
+        if (!dateString) return null;
+        return new Date(dateString).toISOString().split('T')[0];
+      };
+
       // Update project details
       const updateResponse = await fetch(`http://localhost:5000/update_project/${selectedTask.id}`, {
         method: 'PUT',
@@ -614,16 +606,16 @@ const History = () => {
           projectDescription: selectedTask.description,
           projectStage: selectedTask.type,
           stage_duration: selectedTask.stage_duration,
-          stage_start_date: selectedTask.stage_start_date,
-          stage_due_date: selectedTask.stage_due_date,
-          project_due_date: selectedTask.project_due_date
+          stage_start_date: formatDateForServer(selectedTask.stage_start_date),
+          stage_due_date: formatDateForServer(selectedTask.stage_due_date),
+          project_due_date: formatDateForServer(selectedTask.project_due_date)
         }),
       });
 
       const responseData = await updateResponse.json();
 
       if (!updateResponse.ok) {
-        throw new Error(responseData.error || 'Failed to update project');
+        throw new Error(responseData.error || responseData.details || responseData.message || 'Failed to update project');
       }
 
       // Refresh tasks list to get updated data
@@ -634,8 +626,7 @@ const History = () => {
       setIsEditing(false);
     } catch (err) {
       console.error('Error updating project:', err);
-      // Show error to user (you might want to add a state for error messages)
-      alert('Failed to update project: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert(err instanceof Error ? err.message : 'Unknown error occurred while updating project');
     }
   };
 
@@ -653,8 +644,10 @@ const History = () => {
   };
 
   const renderAssignees = (assignees: any[]) => {
-    const displayedAssignees = assignees.slice(0, 3);
-    const remainingCount = assignees.length - displayedAssignees.length;
+    // Filter out assignees with role "project_owner"
+    const filteredAssignees = assignees.filter(assignee => assignee.role !== 'project_owner');
+    const displayedAssignees = filteredAssignees.slice(0, 3);
+    const remainingCount = filteredAssignees.length - displayedAssignees.length;
 
     return (
       <div className={styles.taskAssignees}>
@@ -719,16 +712,16 @@ const History = () => {
 
   // Add useEffect to update stage_due_date when stage_duration changes
   useEffect(() => {
-    if (newTask.stage_start_date && newTask.stage_duration) {
-      const startDate = new Date(newTask.stage_start_date);
+    if (newRequest.stage_start_date && newRequest.stage_duration) {
+      const startDate = new Date(newRequest.stage_start_date);
       const dueDate = new Date(startDate);
-      dueDate.setDate(startDate.getDate() + newTask.stage_duration);
-      setNewTask(prev => ({
+      dueDate.setDate(startDate.getDate() + newRequest.stage_duration);
+      setNewRequest(prev => ({
         ...prev,
         stage_due_date: dueDate.toISOString().split('T')[0]
       }));
     }
-  }, [newTask.stage_start_date, newTask.stage_duration]);
+  }, [newRequest.stage_start_date, newRequest.stage_duration]);
 
   const handleDateChange = (date: DateValue, field: keyof Task) => {
     if (!selectedTask || !date) return;
@@ -754,29 +747,29 @@ const History = () => {
       <Modal
         opened={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Add New Project"
+        title="Create New Project"
         centered
       >
         <div className={styles.addForm}>
           <TextInput
             label="Task Title"
             placeholder="Task title"
-            value={newTask.title}
-            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            value={newRequest.title}
+            onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })}
             required
           />
           <Textarea
             label="Task Description"
             placeholder="Task description"
-            value={newTask.description}
-            onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+            value={newRequest.description}
+            onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
             required
           />
           <Select
             label="Project Stage"
             placeholder="Select type"
-            value={newTask.type}
-            onChange={(value) => setNewTask({ ...newTask, type: value || 'Design: Creating the software architecture' })}
+            value={newRequest.type}
+            onChange={(value) => setNewRequest({ ...newRequest, type: value || 'Design: Creating the software architecture' })}
             data={[
               { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
               { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
@@ -786,15 +779,15 @@ const History = () => {
           />
           <NumberInput
             label="Stage Duration (days)"
-            value={newTask.stage_duration}
+            value={newRequest.stage_duration}
             onChange={(value) => {
               const duration = Number(value) || 14;
               const startDate = new Date();
               const dueDate = new Date(startDate);
               dueDate.setDate(startDate.getDate() + duration);
               
-              setNewTask({
-                ...newTask,
+              setNewRequest({
+                ...newRequest,
                 stage_duration: duration,
                 stage_start_date: startDate.toISOString().split('T')[0],
                 stage_due_date: dueDate.toISOString().split('T')[0],
@@ -808,26 +801,11 @@ const History = () => {
           />
           <div className={styles.dateGrid}>
             <Text size="sm" fw={500} style={{ marginTop: '1rem' }}>Timeline Dates</Text>
-            <Text size="xs" color="dimmed">Start Date: {formatDate(newTask.stage_start_date)}</Text>
-            <Text size="xs" color="dimmed">Due Date: {formatDate(newTask.stage_due_date)}</Text>
-          </div>
-          <TextInput
-            label="Assignee Email"
-            placeholder="Enter assignee email"
-            value={assigneeEmail}
-            onChange={(e) => setAssigneeEmail(e.target.value)}
-          />
-          <Button onClick={handleAddAssignee}>Add Assignee</Button>
-          <div className={styles.assigneesList}>
-            {newTask.assignees.map((assignee, index) => (
-              <div key={index} className={styles.assignee}>
-                <img src={`https://www.gravatar.com/avatar/${assignee}?d=identicon`} alt="Assignee" />
-                <span>{assignee}</span>
-              </div>
-            ))}
+            <Text size="xs" color="dimmed">Start Date: {formatDate(newRequest.stage_start_date)}</Text>
+            <Text size="xs" color="dimmed">Due Date: {formatDate(newRequest.stage_due_date)}</Text>
           </div>
           <Group align="right" mt="md">
-            <Button onClick={handleAddTask} style={{ backgroundColor: '#006400', color: '#fff' }}>Create</Button>
+            <Button onClick={handleProjectRequest} style={{ backgroundColor: '#006400', color: '#fff' }}>Submit Request</Button>
           </Group>
         </div>
       </Modal>

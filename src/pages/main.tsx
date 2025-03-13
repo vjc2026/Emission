@@ -26,7 +26,7 @@ import History from './Components/CarbonCalculator';
 import Dashboard from './Components/Dashboard';
 import Compare from './Components/Compare';
 import TEST from './Components/TEST';
-import UserSpecs from './Components/UserSpecs';
+import ProjectAnalytics from './Components/ProjectAnalytics';
 import '@mantine/core/styles.css';
 import StatisticsComponent from './Components/Statistics';
 import CodeCalculator from './Components/CodeCalculator';
@@ -38,14 +38,12 @@ const dlsuLightGreen = '#008C4C';
 
 const primaryData = [
   { link: '/main', label: 'All Projects', icon: IconDashboard },
-  { link: '/main', label: 'My Projects', icon: IconUser },
   { link: '/main', label: 'Joined Projects', icon: IconAccessPoint },
 ];
 
 const secondaryData = [
   { link: '/main', label: 'Dashboard', icon: IconBell },
   { link: '/main', label: 'Statistics', icon: IconChartBar },
-  { link: '/main', label: 'Team Projects', icon: IconDashboard },
   { link: '/main', label: 'Projects Session Tracker', icon: IconHistory },
   { link: '/main', label: 'Code Optimizer', icon: Icon3dCubeSphere },
   { link: '/main', label: 'Compare Devices', icon: IconAccessPoint },

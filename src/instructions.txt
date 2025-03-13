@@ -1,0 +1,31 @@
+/**
+ * Feature: Fix Complete Button Behavior & Preserve Project History
+ *
+ * Background:
+ * - The front-end displays projects with the following columns:
+ *   "Name, Status, Type, Owner, Assignees, Timeline, Progress, Spent Time, Carbon Emissions"
+ * - The "Owner" column should display the external project owner (client), while the "Assignees" column shows the team members.
+ *
+ * Problem:
+ * - When a user clicks the "Complete" button:
+ *   1. The project stage is updated, but the logic mistakenly sets the project_leader's email as the new project owner, causing the owner to display twice (once in "Owner" and again in "Assignees").
+ *   2. The existing project record is simply updated, thereby overwriting the previous project stage instead of preserving the history.
+ *
+ * Requirements:
+ * - Modify the complete button functionality so that:
+ *   a. Only the project's stage (and necessary related fields) is updated without overwriting the original project owner (client) information.
+ *   b. The previous project stage remains saved in the database (e.g., by archiving or creating a new record for the completed stage) while the current project continues.
+ *   c. The UI correctly shows the client as the "Owner" and the team members (without duplicating the owner in the "Assignees" column).
+ *
+ * Task:
+ * - Refactor the front-end and back-end code to:
+ *   1. Ensure that when the "Complete" button is clicked, the update does not replace the project owner with the project leader.
+ *   2. Implement logic to preserve the historical data of the completed project stage, instead of overwriting the current project record.
+ *   3. Adjust any API endpoints, database queries, and UI components as needed to reflect these changes.
+ *
+ * Acceptance Criteria:
+ * - After clicking the "Complete" button:
+ *   * The "Owner" column displays the external client (project owner) correctly.
+ *   * The "Assignees" column shows only the team members.
+ *   * The project stage is updated, and the completed stage is archived or saved as a new record so that historical data is preserved.
+ */

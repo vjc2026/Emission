@@ -106,6 +106,59 @@
   min-height: 100vh;
 }
 
+.roleTitle {
+  font-size: 0.8rem;
+  margin-top: 4px;
+  color: var(--mantine-color-gray-6);
+}
+
+.projectOwner {
+  background-color: #ebf8ff;
+  border: 1px solid #90cdf4;
+  color: #2b6cb0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.projectLeader {
+  background-color: #f0fff4;
+  border: 1px solid #9ae6b4;
+  color: #2f855a;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.teamMember {
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  color: #4a5568;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.memberContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.memberName {
+  font-weight: 500;
+}
+
+.memberEmail {
+  font-size: 0.8rem;
+  color: var(--mantine-color-gray-6);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -126,6 +179,7 @@
   margin: 0;
   background: linear-gradient(120deg, #006F3C, #009951);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -434,6 +488,7 @@
 .emissionHeader h1 {
   font-size: 2.5rem;
   background: linear-gradient(120deg, #2563eb, #3b82f6);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 1rem;

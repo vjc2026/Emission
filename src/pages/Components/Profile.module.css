@@ -1,86 +1,198 @@
 .container {
-  padding: 1.5rem;
-  background-color: #f9f9f9;
+  padding: 2rem;
+  background-color: #f5f8f5;
+  min-height: 100vh;
+  border-radius: 12px;
 }
 
+.errorBox {
+  background-color: #ffecec;
+  border-color: #f5c6cb;
+  margin-bottom: 1.5rem;
+}
+
+/* Profile Card */
 .profileCard {
   text-align: center;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 2rem 1.5rem;
-  background-color: #fff;
+  background: linear-gradient(145deg, #ffffff, #f8fff8);
+  box-shadow: 0 8px 20px rgba(0, 100, 0, 0.1);
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  border: 2px solid #006400; /* DLSU green border */
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.profileCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #006400, #00a000);
 }
 
 .profileImage {
   width: 120px;
   height: 120px;
-  border: 3px solid #006400; /* DLSU green border */
+  box-shadow: 0 4px 12px rgba(0, 100, 0, 0.2);
+  border: 3px solid #ffffff;
   padding: 0.3rem;
-  border-radius: 50%;
   object-fit: cover;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.profileImage:hover {
+  transform: scale(1.05);
 }
 
 .profileName {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: #006400; /* DLSU green */
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #004d00;
   margin-top: 0.5rem;
+  letter-spacing: -0.5px;
 }
 
 .profileRole {
-  font-size: 1rem;
-  color: #777;
-}
-
-.infoCard {
-  padding: 1.5rem;
-  border-radius: 8px;
-  background-color: #fff;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border: 2px solid #006400; /* DLSU green border */
-}
-
-.sectionTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #006400; /* DLSU green */
-  margin: 0.5rem 0 0.3rem;
-}
-
-.infoText {
-  font-size: 0.95rem;
-  color: #333;
-  line-height: 1.4;
-}
-
-.infoText strong {
-  color: #006400; /* DLSU green */
+  font-size: 1.1rem;
+  color: #555;
   font-weight: 500;
 }
 
+/* Info Card */
+.infoCard {
+  padding: 1.8rem;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff, #f8fff8);
+  box-shadow: 0 8px 20px rgba(0, 100, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.infoCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #006400, #00a000);
+}
+
+.sectionTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #006400;
+  margin: 0.7rem 0 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+.infoText {
+  font-size: 1rem;
+  color: #444;
+  line-height: 1.6;
+  margin-bottom: 0.3rem;
+}
+
+.infoText strong {
+  color: #006400;
+  font-weight: 600;
+}
+
+/* Project Card */
 .projectCard {
-  border: 2px solid #006400; /* DLSU green border */
-  background-color: #f0fff0; /* Light green background */
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff, #f8fff8);
+  box-shadow: 0 4px 15px rgba(0, 100, 0, 0.08);
+  transition: all 0.3s ease;
+  border: none;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.projectCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(180deg, #006400, #00a000);
 }
 
 .projectCard:hover {
-  background-color: #e0ffe0; /* Slightly darker green on hover */
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 100, 0, 0.15);
 }
 
+/* Buttons */
 .button {
-  background-color: #006400; /* DLSU green */
+  background: linear-gradient(145deg, #006400, #008000);
   color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 100, 0, 0.2);
+  border: none;
 }
 
 .button:hover {
-  background-color: #004d00; /* Darker green on hover */
+  background: linear-gradient(145deg, #008000, #006400);
+  box-shadow: 0 6px 15px rgba(0, 100, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Modals and other elements */
+.modalTitle {
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: #006400;
+  letter-spacing: -0.5px;
+}
+
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0.3rem 0.6rem;
+}
+
+.deviceSwitch {
+  margin-top: 0.5rem;
+}
+
+.paper {
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .profileName {
+    font-size: 1.4rem;
+  }
+  
+  .sectionTitle {
+    font-size: 1.1rem;
+  }
 }

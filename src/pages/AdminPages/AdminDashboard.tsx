@@ -16,7 +16,8 @@ import {
   Center,
   Select,
   Textarea,
-  Paper
+  Paper,
+  Stack
 } from '@mantine/core';
 import classes from './AdminDashboard.module.css';
 
@@ -32,6 +33,7 @@ interface Project {
   organization: string; // Add organization field
   members: string[]; // Add members field
   created_at: string; // Add created_at field
+  project_leader?: string;
   stage_duration?: number;  // Add optional fields for timeline
   stage_start_date?: string;
   stage_due_date?: string;
@@ -214,6 +216,7 @@ const AdminDashboard: React.FC = () => {
     carbon_emit: 0,
     session_duration: 0,
     owner: '',
+    project_leader: '', // Add project leader field
     organization: '', // This will be set automatically based on owner
     members: [] as string[],
     created_at: new Date().toISOString(),
@@ -381,7 +384,7 @@ const AdminDashboard: React.FC = () => {
           throw new Error('No token found');
         }
 
-        const response = await fetch(`http://localhost:5000/update_project/${selectedProject.id}`, {
+        const response = await fetch(`http://localhost:5000/admin/update_project/${selectedProject.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -394,11 +397,16 @@ const AdminDashboard: React.FC = () => {
             stage_start_date: editStageStartDate,
             stage_due_date: editStageDueDate,
             project_due_date: editProjectDueDate,
+            // Add these fields to preserve ownership
+            owner_email: selectedProject.owner,
+            project_leader: selectedProject.project_leader
           }),
         });
 
+        const responseData = await response.json();
+
         if (!response.ok) {
-          throw new Error('Failed to update project');
+          throw new Error(responseData.error || responseData.details || responseData.message || 'Failed to update project');
         }
 
         const updatedProject = {
@@ -421,74 +429,59 @@ const AdminDashboard: React.FC = () => {
         setIsEditModalOpen(false);
       } catch (error) {
         console.error('Error updating project:', error);
-        // You might want to show an error message to the user here
+        alert(error instanceof Error ? error.message : 'Unknown error occurred while updating project');
       }
     }
   };
 
   const handleCreateProject = async () => {
-    // Reset all errors first
     setCreateErrors({
       project_name: '',
       project_description: '',
       owner: ''
     });
-
-    // Validate required fields
+  
     let hasError = false;
     const newErrors = {
       project_name: '',
       project_description: '',
       owner: ''
     };
-
+  
     if (!newProject.project_name.trim()) {
       newErrors.project_name = 'Project title is required';
       hasError = true;
     }
-
+  
     if (!newProject.project_description.trim()) {
       newErrors.project_description = 'Project description is required';
       hasError = true;
     }
-
+  
     if (!newProject.owner.trim()) {
       newErrors.owner = 'Owner email is required';
       hasError = true;
     }
-
+  
     if (hasError) {
       setCreateErrors(newErrors);
       return;
     }
-
+  
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No token found');
       }
-
-      // First, fetch the owner's organization
-      const ownerResponse = await fetch(`http://localhost:5000/user_organization/${newProject.owner}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!ownerResponse.ok) {
-        throw new Error(`Error fetching owner organization: ${ownerResponse.status}`);
-      }
-
-      const ownerData = await ownerResponse.json();
-      const ownerOrganization = ownerData.organization;
-
-      // Create project with the owner's organization
+  
+      // Create project with both owner and leader roles
       const projectToCreate = {
         ...newProject,
-        organization: ownerOrganization,
-        members: [...newProject.members],
+        owner_email: newProject.owner,
+        leader_email: newProject.project_leader,
+        members: [...newProject.members]
       };
-
+  
       const response = await fetch('http://localhost:5000/admin/create_project', {
         method: 'POST',
         headers: {
@@ -497,11 +490,12 @@ const AdminDashboard: React.FC = () => {
         },
         body: JSON.stringify(projectToCreate),
       });
-
+  
       if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create project');
       }
-
+  
       const createdProject = await response.json();
       setProjects([...projects, createdProject]);
       setSortedData([...projects, createdProject]);
@@ -516,25 +510,24 @@ const AdminDashboard: React.FC = () => {
         carbon_emit: 0,
         session_duration: 0,
         owner: '',
+        project_leader: '',
         organization: '',
         members: [],
         created_at: new Date().toISOString(),
-        stage_duration: 14, // Default 14 days
-        stage_start_date: new Date().toISOString().split('T')[0], // Today's date
-        stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0], // Today + 14 days
-        project_start_date: new Date().toISOString().split('T')[0], // Today's date
-        project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0], // Today + 42 days
+        stage_duration: 14,
+        stage_start_date: new Date().toISOString().split('T')[0],
+        stage_due_date: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
+        project_start_date: new Date().toISOString().split('T')[0],
+        project_due_date: new Date(new Date().setDate(new Date().getDate() + 42)).toISOString().split('T')[0],
       });
       setNewProjectAssignee('');
+  
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('An unknown error occurred');
-      }
       console.error('Error creating project:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
     }
   };
+  
 
   const validateEmail = async (email: string) => {
     try {
@@ -1127,20 +1120,74 @@ const AdminDashboard: React.FC = () => {
               />
             </div>
 
-            <div>
-              <TextInput
-                label="Owner Email"
-                value={newProject.owner}
-                onChange={(event) => {
-                  setNewProject({ ...newProject, owner: event.currentTarget.value });
-                  if (createErrors.owner) {
-                    setCreateErrors({ ...createErrors, owner: '' });
-                  }
-                }}
-                required
-                error={createErrors.owner}
-              />
-            </div>
+            <Paper p="md" withBorder mb="lg">
+              <Text fw={500} size="sm" mb="md">Project Leadership</Text>
+              <Stack gap="md">
+                <div>
+                  <TextInput
+                    label="Project Owner (Client)"
+                    description="External stakeholder who commissioned the project"
+                    placeholder="Enter client's email"
+                    value={newProject.owner}
+                    onChange={(event) => {
+                      setNewProject({ ...newProject, owner: event.currentTarget.value });
+                      if (createErrors.owner) {
+                        setCreateErrors({ ...createErrors, owner: '' });
+                      }
+                    }}
+                    required
+                    error={createErrors.owner}
+                  />
+                  <Text size="xs" color="dimmed" mt={4}>This person will handle business decisions and project objectives</Text>
+                </div>
+                
+                <div>
+                  <TextInput
+                    label="Project Leader (Team Manager)"
+                    description="Internal team manager responsible for project execution"
+                    placeholder="Enter team manager's email"
+                    value={newProject.project_leader}
+                    onChange={(event) => {
+                      setNewProject({ ...newProject, project_leader: event.currentTarget.value });
+                    }}
+                    required
+                  />
+                  <Text size="xs" color="dimmed" mt={4}>This person will manage daily operations and team productivity</Text>
+                </div>
+              </Stack>
+            </Paper>
+
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Project Roles</Text>
+              
+              <div>
+                <TextInput
+                  label="Project Owner Email"
+                  description="Client or person who requested the project"
+                  value={newProject.owner}
+                  onChange={(event) => {
+                    setNewProject({ ...newProject, owner: event.currentTarget.value });
+                    if (createErrors.owner) {
+                      setCreateErrors({ ...createErrors, owner: '' });
+                    }
+                  }}
+                  required
+                  error={createErrors.owner}
+                />
+              </div>
+              
+              <div style={{ marginTop: '1rem' }}>
+                <TextInput
+                  label="Project Leader Email"
+                  description="Employee who will lead the project execution"
+                  placeholder="Enter email of project leader"
+                  value={newProject.project_leader}
+                  onChange={(event) => {
+                    setNewProject({ ...newProject, project_leader: event.currentTarget.value });
+                  }}
+                />
+              </div>
+            </Paper>
 
             {/* Timeline Section */}
             <Paper p="md" withBorder>
@@ -1262,52 +1309,55 @@ const AdminDashboard: React.FC = () => {
               </div>
             </Paper>
 
-            <div className={classes.assigneeSection}>
-              <TextInput
-                label="Add Assignee (Email)"
-                value={newProjectAssignee}
-                onChange={(e) => {
-                  setNewProjectAssignee(e.target.value);
-                  // Clear error when user starts typing
-                  if (newProjectAssigneeError) setNewProjectAssigneeError('');
-                }}
-                placeholder="Enter email"
-                className={`p-2 border rounded flex-1 ${
-                  newProjectAssigneeError ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
-                Add Assignee
-              </Button>
-              {newProjectAssigneeError && (
-                <p className={classes.errorText}>{newProjectAssigneeError}</p>
-              )}
-            </div>
-
-            {newProject.members.length > 0 && (
-              <div className={classes.assigneesList}>
-                <Text fw={500} mt="md">Added Assignees:</Text>
-                {newProject.members.map((member, index) => (
-                  <Badge 
-                    key={index}
-                    mr={5}
-                    mb={5}
-                    rightSection={
-                      <Center onClick={() => {
-                        setNewProject({
-                          ...newProject,
-                          members: newProject.members.filter((_, i) => i !== index)
-                        });
-                      }} style={{ cursor: 'pointer' }}>
-                        ×
-                      </Center>
-                    }
-                  >
-                    {member}
-                  </Badge>
-                ))}
+            <Paper p="md" withBorder>
+              <Text size="sm" fw={500} mb="md">Team Members</Text>
+              <div className={classes.assigneeSection}>
+                <TextInput
+                  label="Add Team Member (Email)"
+                  value={newProjectAssignee}
+                  onChange={(e) => {
+                    setNewProjectAssignee(e.target.value);
+                    // Clear error when user starts typing
+                    if (newProjectAssigneeError) setNewProjectAssigneeError('');
+                  }}
+                  placeholder="Enter team member email"
+                  className={`p-2 border rounded flex-1 ${
+                    newProjectAssigneeError ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                <Button onClick={handleAddNewProjectAssignee} size="sm" mt="sm">
+                  Add Team Member
+                </Button>
+                {newProjectAssigneeError && (
+                  <p className={classes.errorText}>{newProjectAssigneeError}</p>
+                )}
               </div>
-            )}
+
+              {newProject.members.length > 0 && (
+                <div className={classes.assigneesList}>
+                  <Text fw={500} mt="md">Added Team Members:</Text>
+                  {newProject.members.map((member, index) => (
+                    <Badge 
+                      key={index}
+                      mr={5}
+                      mb={5}
+                      rightSection={
+                        <Center onClick={() => {
+                          setNewProject({
+                            ...newProject,
+                            members: newProject.members.filter((_, i) => i !== index)
+                          });
+                        }} style={{ cursor: 'pointer' }}>
+                          ×
+                        </Center>
+                      }
+                    >
+                      {member}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </Paper>
 
             <Select
               label="Status"

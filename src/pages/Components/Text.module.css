@@ -1,5 +1,5 @@
 .container {
-  padding: 24px;
+  padding: 32px;
   position: relative;
   max-width: 1400px;
   margin: 0 auto;
@@ -11,11 +11,13 @@
   background: linear-gradient(145deg, #f6f8fa, #ffffff);
   padding: 12px 16px;
   border-radius: 8px;
-  margin-bottom: 20px;
   font-size: 14px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   border: 1px solid #eaecef;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .deviceInfo:hover {
@@ -39,6 +41,18 @@
   margin: 0;
   background: linear-gradient(120deg, #006F3C, #009951);
   -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.title {
+  font-size: 2.5rem;
+  color: #1a1a1a;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(120deg, #006F3C, #009951);
+  -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -731,4 +745,122 @@
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.projectOwner {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  font-size: 12px;
+  color: #6e7681;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #f6f8fa;
+  padding: 5px 10px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.projectOwner span {
+  font-weight: 500;
+  color: #006F3C;
+}
+
+.summaryCards {
+  margin-bottom: 32px;
+}
+
+.projectTabs {
+  margin-top: 24px;
+}
+
+.filterSection {
+  margin-top: 24px;
+}
+
+.stageFilter {
+  width: 240px;
+}
+
+.emptyState {
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.projectsTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.projectsTable th {
+  padding: 16px;
+  text-align: left;
+  color: #6e7681;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.projectsTable td {
+  padding: 16px;
+  background: #ffffff;
+  border-top: 1px solid #eaecef;
+  transition: all 0.2s ease;
+}
+
+.projectRow:hover td {
+  background: #f8f9fa;
+}
+
+.projectCell {
+  cursor: pointer;
+  padding-right: 16px;
+}
+
+.timelineInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.statsSection {
+  margin-top: 32px;
+  margin-bottom: 32px;
+}
+
+.loadingContainer,
+.errorContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .deviceInfo {
+    width: 100%;
+  }
+  
+  .timelineInfo {
+    font-size: 0.8rem;
+  }
 }
