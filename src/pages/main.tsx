@@ -322,24 +322,51 @@ const MainContent: React.FC = () => {
     <>
       {/* New Header */}
       <header style={{
-        background: dlsuGreen,
-        padding: '10px 20px',
+        background: `linear-gradient(135deg, ${dlsuGreen} 0%, ${dlsuLightGreen} 100%)`,
+        padding: '10px 24px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        height: '70px'
+        height: '70px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <img
-            src="https://i.ibb.co/5KcMwkj/with-bg-Icon.jpg"
-            alt="Website Icon"
-            style={{ width: '50px', height: '50px', borderRadius: '50%' }}
-          />
-          <Text size="xl" fw={700} style={{ color: 'white' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '16px'
+        }}>
+          <div style={{
+            padding: '2px',
+            background: 'white',
+            borderRadius: '50%',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <img
+              src="https://i.ibb.co/5KcMwkj/with-bg-Icon.jpg"
+              alt="Website Icon"
+              style={{ 
+                width: '46px', 
+                height: '46px', 
+                borderRadius: '50%',
+                objectFit: 'cover'
+              }}
+            />
+          </div>
+          <Text 
+            size="xl" 
+            fw={700} 
+            style={{ 
+              color: 'white',
+              textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+          >
             Emission Sense
           </Text>
         </div>
-        <Group align="md">
+        <Group align="center" gap="md">
           <Menu shadow="md" width={350} position="bottom-end">
             <Menu.Target>
               <Indicator 
@@ -354,10 +381,12 @@ const MainContent: React.FC = () => {
                   radius="xl"
                   size="lg"
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(8px)',
                     transition: 'all 0.2s ease',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                      transform: 'translateY(-2px)'
                     }
                   }}
                 >
@@ -441,17 +470,37 @@ const MainContent: React.FC = () => {
           </Menu>
           <Menu shadow="md" width={200}>
             <Menu.Target>
-              <Avatar
-                src={userData.profile_image}
-                radius="xl"
-                size="md"
-                styles={{
-                  root: {
-                    border: '1px solid white',
-                    '&:hover': { transform: 'scale(1.05)' },
-                  },
-                }}
-              />
+              <UnstyledButton>
+                <Group gap="xs">
+                  <Avatar
+                    src={userData.profile_image}
+                    radius="xl"
+                    size="md"
+                    styles={{
+                      root: {
+                        border: '2px solid rgba(255, 255, 255, 0.8)',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { 
+                          transform: 'scale(1.05)',
+                          border: '2px solid white'
+                        },
+                      },
+                    }}
+                  />
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'flex-start'
+                  }}>
+                    <Text size="sm" fw={500} c="white" style={{ lineHeight: 1 }}>
+                      {userData.name}
+                    </Text>
+                    <Text size="xs" c="rgba(255, 255, 255, 0.7)" style={{ lineHeight: 1 }}>
+                      {userData.organization}
+                    </Text>
+                  </div>
+                </Group>
+              </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Item ta="center" onClick={() => setCurrentComponent('component2')}>Your Profile</Menu.Item>
