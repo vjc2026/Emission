@@ -384,6 +384,15 @@ const AdminDashboard: React.FC = () => {
           throw new Error('No token found');
         }
 
+        // Validate required fields
+        if (!editTitle.trim()) {
+          throw new Error('Project title is required');
+        }
+
+        if (!editDescription.trim()) {
+          throw new Error('Project description is required');
+        }
+
         const response = await fetch(`http://localhost:5000/admin/update_project/${selectedProject.id}`, {
           method: 'PUT',
           headers: {
@@ -403,10 +412,10 @@ const AdminDashboard: React.FC = () => {
           }),
         });
 
-        const responseData = await response.json();
+        const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(responseData.error || responseData.details || responseData.message || 'Failed to update project');
+          throw new Error(data.error || 'Failed to update project');
         }
 
         const updatedProject = {
@@ -429,7 +438,9 @@ const AdminDashboard: React.FC = () => {
         setIsEditModalOpen(false);
       } catch (error) {
         console.error('Error updating project:', error);
-        alert(error instanceof Error ? error.message : 'Unknown error occurred while updating project');
+        // Show error message to the user
+        setError(error instanceof Error ? error.message : 'An unknown error occurred');
+        // Keep the modal open when there's an error
       }
     }
   };
@@ -473,8 +484,39 @@ const AdminDashboard: React.FC = () => {
       if (!token) {
         throw new Error('No token found');
       }
-  
-      // Create project with both owner and leader roles
+
+      // First, check if owner exists
+      const ownerExists = await validateEmail(newProject.owner);
+      if (!ownerExists) {
+        setCreateErrors({
+          ...newErrors,
+          owner: 'User does not exist in the system'
+        });
+        return;
+      }
+
+      // Then fetch the owner's organization
+      const ownerResponse = await fetch(`http://localhost:5000/user_organization/${newProject.owner}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!ownerResponse.ok) {
+        if (ownerResponse.status === 404) {
+          setCreateErrors({
+            ...newErrors,
+            owner: 'User organization not found'
+          });
+          return;
+        }
+        throw new Error(`Error fetching owner organization: ${ownerResponse.status}`);
+      }
+
+      const ownerData = await ownerResponse.json();
+      const ownerOrganization = ownerData.organization;
+
+      // Create project with the owner's organization
       const projectToCreate = {
         ...newProject,
         owner_email: newProject.owner,
@@ -566,6 +608,18 @@ const AdminDashboard: React.FC = () => {
           return;
         }
 
+        // Check if assignee email is the same as owner email
+        if (assigneeEmail.toLowerCase() === selectedProject.owner.toLowerCase()) {
+          setAssigneeError('Owner cannot be added as an assignee');
+          return;
+        }
+
+        // Check if user is already a member
+        if (selectedProject.members.includes(assigneeEmail)) {
+          setAssigneeError('User is already a member of this project');
+          return;
+        }
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(assigneeEmail)) {
@@ -631,6 +685,18 @@ const AdminDashboard: React.FC = () => {
         // Reset error message at the start
         setNewProjectAssigneeError('');
 
+        // Check if owner field is empty
+        if (!newProject.owner.trim()) {
+          setNewProjectAssigneeError('Please fill in the Owner Email field first');
+          return;
+        }
+
+        // Check if assignee email is the same as owner email
+        if (newProjectAssignee === newProject.owner) {
+          setNewProjectAssigneeError('Owner cannot be added as an assignee');
+          return;
+        }
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(newProjectAssignee)) {
@@ -645,16 +711,20 @@ const AdminDashboard: React.FC = () => {
           return;
         }
 
+        // Check if user is already added as a member
+        if (newProject.members.includes(newProjectAssignee)) {
+          setNewProjectAssigneeError('User is already added as a member');
+          return;
+        }
+
         // If we get here, the email is valid, so clear any error
         setNewProjectAssigneeError('');
 
-        if (!newProject.members.includes(newProjectAssignee)) {
-          setNewProject({
-            ...newProject,
-            members: [...newProject.members, newProjectAssignee]
-          });
-          setNewProjectAssignee('');
-        }
+        setNewProject({
+          ...newProject,
+          members: [...newProject.members, newProjectAssignee]
+        });
+        setNewProjectAssignee('');
       } catch (error) {
         setNewProjectAssigneeError(error instanceof Error ? error.message : "An error occurred");
       }
