@@ -2826,15 +2826,13 @@ app.get('/validate_user_email/:email', authenticateToken, (req, res) => {
 // Endpoint to update a project (admin only)
 app.put('/admin/update_project/:id', authenticateAdmin, (req, res) => {
   const projectId = req.params.id;
-  const { 
-    projectName, 
-    projectDescription, 
+  const {
+    projectName,
+    projectDescription,
     status,
     stage_start_date,
     stage_due_date,
-    project_due_date,
-    owner_email,
-    project_leader
+    project_due_date
   } = req.body;
 
   // Convert dates to YYYY-MM-DD format
@@ -2842,6 +2840,7 @@ app.put('/admin/update_project/:id', authenticateAdmin, (req, res) => {
   const formattedStageDueDate = stage_due_date ? new Date(stage_due_date).toISOString().split('T')[0] : null;
   const formattedProjectDueDate = project_due_date ? new Date(project_due_date).toISOString().split('T')[0] : null;
 
+  // Updated query to also update timeline fields
   const query = `
     UPDATE user_history 
     SET project_name = ?,
@@ -2871,19 +2870,11 @@ app.put('/admin/update_project/:id', authenticateAdmin, (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    console.log('Update successful:', results);
     res.status(200).json({ 
       message: 'Project updated successfully',
-      project: {
-        id: projectId,
-        project_name: projectName,
-        project_description: projectDescription,
-        status,
-        stage_start_date: formattedStageStartDate,
-        stage_due_date: formattedStageDueDate,
-        project_due_date: formattedProjectDueDate,
-        owner: owner_email,
-        project_leader: project_leader
-      }
+      projectId: projectId,
+      affectedRows: results.affectedRows
     });
   });
 });
