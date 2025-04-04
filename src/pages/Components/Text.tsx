@@ -133,6 +133,7 @@ const History = () => {
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
+      // Use the user_project_display_combined endpoint which should return projects with correct individual user stages
       const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -151,7 +152,7 @@ const History = () => {
           if (membersResponse.ok) {
             const { members: projectMembers } = await membersResponse.json();
             members = projectMembers.map((member: any) => {
-              if (member.role === 'Leader') {
+              if (member.role === 'project_leader' || member.role === 'project_owner') {
                 leader = {
                   email: member.email,
                   name: member.name,
@@ -163,37 +164,54 @@ const History = () => {
                 name: member.name,
                 role: member.role,
                 joinedAt: member.joined_at,
-                profileImage: member.profile_image
+                profileImage: member.profile_image,
+                progressStatus: member.progress_status || 'In Progress',
+                currentStage: member.current_stage || project.stage
               };
             });
           }
 
+          // If no leader was found among members, use the project owner
+          if (!leader && project.owner_email) {
+            leader = {
+              email: project.owner_email,
+              name: project.owner_name,
+              profileImage: null
+            };
+          }
+
+          // The task's stage should be the user's current stage (which might be different from project.stage)
+          // The backend should have already provided the appropriate stage for this user in the project.stage field
           return {
             id: project.id,
-            project_id: project.project_id,
+            project_id: project.project_id || project.id.toString(),
             title: project.project_name,
             description: project.project_description,
             status: project.status === 'Archived' ? 'Completed' : 'In Progress',
-            type: project.stage || 'Low',
+            type: project.stage, // This is the user's individual stage from the backend
             assignees: members,
-            leader: {
-              email: project.owner_email,
-              name: project.owner_name,
-              profileImage: null // Since this is the owner, we'll use Gravatar
-            },
-            spentTime: project.session_duration,
-            carbonEmit: project.carbon_emit,
+            leader: leader,
+            spentTime: project.session_duration || 0,
+            carbonEmit: project.carbon_emit || 0,
             isRunning: false,
             startTime: null,
-            stage_duration: project.stage_duration,
-            stage_start_date: project.stage_start_date,
-            stage_due_date: project.stage_due_date,
-            project_start_date: project.project_start_date,
-            project_due_date: project.project_due_date
+            userCompleted: project.progress_status === 'Stage Complete',
+            stage_duration: project.stage_duration || 14,
+            stage_start_date: project.stage_start_date || new Date().toISOString().split('T')[0],
+            stage_due_date: project.stage_due_date || '',
+            project_start_date: project.project_start_date || new Date().toISOString().split('T')[0],
+            project_due_date: project.project_due_date || ''
           };
         }));
 
-        setTasks(tasksWithMembers);
+        // Filter out projects that the user doesn't have access to (progress_status = 'Not Started')
+        const filteredTasks = tasksWithMembers.filter(task => 
+          !task.assignees.some((assignee: any) =>
+            assignee.email === user?.email && assignee.progressStatus === 'Not Started'
+          )
+        );
+
+        setTasks(filteredTasks);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -357,25 +375,35 @@ const History = () => {
     }
   };
 
+  // Function to handle completing a project stage
   const handleComplete = async (taskId: number) => {
     const token = localStorage.getItem('token');
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-
+  
     const projectStages = [
       'Design: Creating the software architecture',
       'Development: Writing the actual code',
       'Testing: Ensuring the software works as expected'
     ];
-
+  
     const currentStageIndex = projectStages.indexOf(task.type);
     const nextStage = currentStageIndex < projectStages.length - 1 ? projectStages[currentStageIndex + 1] : null;
-
+  
     try {
       if (task.isRunning) {
         await handleTimer(taskId);
       }
-
+  
+      const notificationId = notifications.show({
+        title: 'Completing stage...',
+        message: 'Please wait while we process your request',
+        loading: true,
+        autoClose: false,
+        withCloseButton: false,
+      });
+  
+      // Send both the current and next stage to the server
       const completeResponse = await fetch(`http://localhost:5000/complete_project/${taskId}`, {
         method: 'POST',
         headers: {
@@ -384,48 +412,140 @@ const History = () => {
         },
         body: JSON.stringify({ 
           nextStage,
-          owner: task.leader?.email, // Preserve the original owner
-          project_leader: task.leader?.email // Preserve the project leader
+          currentStage: task.type
         }),
       });
-
-      if (!completeResponse.ok) {
-        throw new Error('Failed to complete project stage');
-      }
-
-      const completionData = await completeResponse.json();
-
-      setTasks(prevTasks => {
-        const updatedTasks = prevTasks.map(t => {
-          if (t.id === taskId) {
-            return { 
-              ...t,
-              status: completionData.status,
-              type: completionData.stage,
-              leader: t.leader // Preserve existing leader
-            };
-          }
-          return t;
-        });
+  
+      try {
+        const responseData = await completeResponse.json();
         
-        const updatedTask = updatedTasks.find(t => t.id === taskId);
-        if (selectedTask?.id === taskId && updatedTask) {
-          setSelectedTask(updatedTask);
+        if (!completeResponse.ok) {
+          notifications.hide(notificationId);
+          notifications.show({
+            title: 'Error',
+            message: responseData.error || 'Failed to complete project stage',
+            color: 'red',
+          });
+          return; // Don't throw, just return to avoid the uncaught error
         }
-        return updatedTasks;
-      });
-
-      if (completionData.status === 'Complete') {
-        setSelectedTask(null);
+  
+        // Different status responses from the server
+        if (responseData.status === 'Stage-Completed') {
+          // All team members have completed this stage, and project has moved to next stage
+          notifications.hide(notificationId);
+          notifications.show({
+            title: 'Success!',
+            message: responseData.message,
+            color: 'green',
+          });
+  
+          // Refresh the tasks list to get the latest data
+          if (user?.email) {
+            await fetchUserTasks(user.email);
+          }
+  
+          if (responseData.newStageId && responseData.stage) {
+            // If there's a next stage, we might want to redirect or update UI
+            // The user's task list will now show the next stage for this project
+          }
+        } else if (responseData.status === 'Project-Completed') {
+          // All stages of this project have been completed successfully
+          notifications.hide(notificationId);
+          notifications.show({
+            title: 'Project Completed!',
+            message: 'All stages of this project have been completed successfully.',
+            color: 'green',
+          });
+  
+          setTasks(prevTasks => {
+            return prevTasks.filter(t => t.id !== taskId);
+          });
+          
+          setSelectedTask(null);
+        } else if (responseData.status === 'Stage-User-Completed' || responseData.status === 'Stage-Waiting') {
+          // This user has completed their part, but not all team members have finished
+          notifications.hide(notificationId);
+          
+          // Show the progress to the user
+          const completedMembers = responseData.completedMembers || 0;
+          const totalMembers = responseData.totalMembers || 0;
+          const progressPercentage = totalMembers > 0 ? Math.round((completedMembers / totalMembers) * 100) : 0;
+          
+          notifications.show({
+            title: 'Stage Partially Completed',
+            message: (
+              <div>
+                <p>{responseData.message}</p>
+                <p>{completedMembers} out of {totalMembers} team members have completed this stage.</p>
+                <div style={{ 
+                  height: '6px', 
+                  width: '100%', 
+                  backgroundColor: '#e0e0e0', 
+                  borderRadius: '3px',
+                  marginTop: '8px' 
+                }}>
+                  <div style={{ 
+                    height: '100%', 
+                    width: `${progressPercentage}%`, 
+                    backgroundColor: progressPercentage === 100 ? '#52c41a' : '#faad14', 
+                    borderRadius: '3px',
+                    transition: 'width 0.3s ease'
+                  }}/>
+                </div>
+              </div>
+            ),
+            color: 'blue',
+            autoClose: false,
+          });
+          
+          // Mark this task as completed for this user in the UI
+          setTasks(prevTasks => {
+            return prevTasks.map(t => {
+              if (t.id === taskId) {
+                return {
+                  ...t,
+                  userCompleted: true
+                };
+              }
+              return t;
+            });
+          });
+          
+          // Update the selected task if it's currently selected
+          if (selectedTask?.id === taskId) {
+            setSelectedTask((prev: Task) => ({ ...prev, userCompleted: true }));
+          }
+        } else {
+          // Handle other statuses
+          notifications.hide(notificationId);
+          notifications.show({
+            title: 'Status Updated',
+            message: responseData.message || 'Task status updated',
+            color: 'blue',
+          });
+        }
+  
+        // Always refresh the task list after any operation
+        if (user?.email) {
+          await fetchUserTasks(user.email);
+        }
+      } catch (parseError) {
+        // Handle JSON parsing error (if response isn't valid JSON)
+        notifications.hide(notificationId);
+        notifications.show({
+          title: 'Error',
+          message: 'Server returned an invalid response. Please try again later.',
+          color: 'red',
+        });
+        console.error('Error parsing server response:', parseError);
       }
-
-      if (user?.email) {
-        await fetchUserTasks(user.email);
-      }
-
     } catch (err) {
       console.error('Error completing project stage:', err);
-      setError('Failed to complete project stage');
+      notifications.show({
+        title: 'Error',
+        message: err instanceof Error ? err.message : 'Failed to complete project stage',
+        color: 'red',
+      });
     }
   };
 

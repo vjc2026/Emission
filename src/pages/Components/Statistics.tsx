@@ -78,7 +78,7 @@ export function StatisticsComponent() {
             {projects.map((project) => (
               <Grid.Col span={isMobile ? 12 : 6} key={project.id}>
                 <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: '100%' }}>
-                    <Group align="apart" style={{ marginBottom: 5 }}>
+                    <Group align="apart" style={{ marga: 5 }}>
                     <Text fw={500} style={{ fontSize: isMobile ? 'sm' : 'md' }}>
                       Project Title: {project.project_name}
                     </Text>
@@ -101,7 +101,7 @@ export function StatisticsComponent() {
                   <Text size="sm" color="dimmed" style={{ fontSize: isMobile ? 'sm' : 'md' }}>
                     Stage: {project.stage}
                   </Text>
-                </Card>
+               = </Card>
               </Grid.Col>
             ))}
           </Grid>

@@ -516,12 +516,15 @@ const AdminDashboard: React.FC = () => {
       const ownerData = await ownerResponse.json();
       const ownerOrganization = ownerData.organization;
 
-      // Create project with the owner's organization
+      // Create project with the owner's organization and explicitly set session_duration and carbon_emit to 0
       const projectToCreate = {
         ...newProject,
         owner_email: newProject.owner,
         leader_email: newProject.project_leader,
-        members: [...newProject.members]
+        members: [...newProject.members],
+        session_duration: 0,
+        carbon_emit: 0,
+        organization: ownerOrganization
       };
   
       const response = await fetch('http://localhost:5000/admin/create_project', {
@@ -533,14 +536,26 @@ const AdminDashboard: React.FC = () => {
         body: JSON.stringify(projectToCreate),
       });
   
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        throw new Error('Failed to parse server response');
+      }
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create project');
+        throw new Error(responseData.error || 'Failed to create project');
       }
   
-      const createdProject = await response.json();
-      setProjects([...projects, createdProject]);
-      setSortedData([...projects, createdProject]);
+      // Ensure the response data has session_duration and carbon_emit set to 0
+      const projectWithDefaults = {
+        ...responseData,
+        session_duration: responseData.session_duration || 0,
+        carbon_emit: responseData.carbon_emit || 0
+      };
+  
+      setProjects([...projects, projectWithDefaults]);
+      setSortedData([...projects, projectWithDefaults]);
       setIsCreateModalOpen(false);
       
       // Reset form
