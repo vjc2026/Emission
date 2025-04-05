@@ -20,6 +20,7 @@ import {
   Stack
 } from '@mantine/core';
 import classes from './AdminDashboard.module.css';
+import { notifications } from '@mantine/notifications';
 
 interface Project {
   id: number;
@@ -194,6 +195,117 @@ const renderAssignees = (members: string[] | undefined) => {
   );
 };
 
+const checkAndUpdateProjectStatus = async (projectId: number, 
+  projectsState: Project[], 
+  sortedDataState: Project[], 
+  selectedProjectState: Project | null, 
+  updateFunctions: {
+    setProjects: React.Dispatch<React.SetStateAction<Project[]>>,
+    setSortedData: React.Dispatch<React.SetStateAction<Project[]>>,
+    setSelectedProject: React.Dispatch<React.SetStateAction<Project | null>>
+  }
+) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    // First, fetch all project members
+    const response = await fetch(`http://localhost:5000/project_members/${projectId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const members = data.members || [];
+
+    // Filter out project owners as they don't contribute to project completion
+    const contributingMembers = members.filter(
+      (member: { role: string }) => member.role !== 'project_owner'
+    );
+
+    // If there are no contributing members, return early
+    if (contributingMembers.length === 0) {
+      return false;
+    }
+
+    // Check if all contributing members have completed their stages
+    const allCompleted = contributingMembers.every(
+      (member: { progress_status: string }) => member.progress_status === 'Stage Complete'
+    );
+
+    // If all members have completed their stages, update the project status to "Complete"
+    if (allCompleted) {
+      // Get current project data to preserve other fields
+      const currentProject = projectsState.find(p => p.id === projectId);
+      if (!currentProject) {
+        throw new Error('Project not found in state');
+      }
+
+      // Update project status to "Complete"
+      const updateResponse = await fetch(`http://localhost:5000/admin/update_project/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectName: currentProject.project_name,
+          projectDescription: currentProject.project_description,
+          status: 'Complete',
+          stage_start_date: currentProject.stage_start_date,
+          stage_due_date: currentProject.stage_due_date,
+          project_due_date: currentProject.project_due_date
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(`Failed to update project status: ${errorData.error || errorData.message || 'Unknown error'}`);
+      }
+
+      // Show notification to admin
+      notifications.show({
+        title: 'Project Completed',
+        message: `Project "${currentProject.project_name}" has been marked as Complete because all team members have completed their stages.`,
+        color: 'green',
+      });
+
+      // Update local state
+      updateFunctions.setProjects(projectsState.map(project => 
+        project.id === projectId ? { ...project, status: 'Complete' } : project
+      ));
+      
+      updateFunctions.setSortedData(sortedDataState.map(project => 
+        project.id === projectId ? { ...project, status: 'Complete' } : project
+      ));
+
+      // Update selected project if it's currently selected
+      if (selectedProjectState && selectedProjectState.id === projectId) {
+        updateFunctions.setSelectedProject({ ...selectedProjectState, status: 'Complete' });
+      }
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking project completion status:', error);
+    notifications.show({
+      title: 'Error',
+      message: error instanceof Error ? error.message : 'Failed to check project completion status',
+      color: 'red',
+    });
+    return false;
+  }
+};
+
 const AdminDashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +406,50 @@ const AdminDashboard: React.FC = () => {
 
     fetchProjects();
   }, [router]);
+
+  // Add an effect to check project completion status periodically
+  useEffect(() => {
+    // Don't run if there are no projects
+    if (projects.length === 0) return;
+    
+    // Check all projects on initial load
+    const checkAllProjects = async () => {
+      for (const project of projects) {
+        // Skip already completed projects
+        if (project.status === 'Complete') continue;
+        
+        // Check and update project status
+        await checkAndUpdateProjectStatus(
+          project.id, 
+          projects, 
+          sortedData, 
+          selectedProject, 
+          { setProjects, setSortedData, setSelectedProject }
+        );
+      }
+    };
+    
+    // Run immediately and set up interval
+    checkAllProjects();
+    
+    // Check every 2 minutes
+    const intervalId = setInterval(checkAllProjects, 2 * 60 * 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [projects, sortedData, selectedProject]);
+
+  // Add an effect to check selected project completion status when it changes
+  useEffect(() => {
+    if (selectedProject && selectedProject.status !== 'Complete') {
+      checkAndUpdateProjectStatus(
+        selectedProject.id, 
+        projects, 
+        sortedData, 
+        selectedProject, 
+        { setProjects, setSortedData, setSelectedProject }
+      );
+    }
+  }, [selectedProject?.id]);
 
   const setSorting = (field: keyof Project) => {
     const reversed = field === sortBy ? !reverseSortDirection : false;

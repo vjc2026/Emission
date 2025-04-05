@@ -1376,169 +1376,487 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
                 res.status(500).json({ error: 'Failed to update user progress' });
               });
             }
-            
-            // If there's no next stage, just mark this stage as complete for the user and finish
-            if (!nextProjectStage) {
-              return connection.commit(err => {
-                if (err) {
-                  return connection.rollback(() => {
-                    console.error('Error committing transaction:', err);
-                    res.status(500).json({ error: 'Failed to commit transaction' });
-                  });
-                }
-                
-                res.json({
-                  status: 'User-Stage-Completed',
-                  message: 'You have completed this project stage. There are no more stages.',
-                  stage: currentProject.stage
-                });
-              });
-            }
-            
-            // Check if there's already a project for the next stage
-            const checkExistingQuery = `
-              SELECT id 
-              FROM user_history 
-              WHERE 
-                project_name = ? AND 
-                project_description = ? AND 
-                stage = ? AND 
-                (project_id = ? OR project_id IS NULL)
-              LIMIT 1`;
-            
-            connection.query(checkExistingQuery, [
-              currentProject.project_name, 
-              currentProject.project_description,
-              nextProjectStage,
-              currentProject.project_id || projectId
-            ], (err, existingResults) => {
+
+            // Check if all contributing members have completed their stages
+            // Get all project members excluding those with role 'project_owner'
+            const getContributingMembersQuery = `
+              SELECT user_id, role, progress_status, current_stage
+              FROM project_members
+              WHERE project_id = ? AND role != 'project_owner'
+            `;
+
+            connection.query(getContributingMembersQuery, [projectId], (err, memberResults) => {
               if (err) {
                 return connection.rollback(() => {
-                  console.error('Error checking existing project:', err);
-                  res.status(500).json({ error: 'Failed to check existing project' });
+                  console.error('Error checking project members:', err);
+                  res.status(500).json({ error: 'Failed to check project members' });
                 });
               }
-              
-              let existingNextStageProject = existingResults.length > 0 ? existingResults[0].id : null;
-              
-              if (!existingNextStageProject) {
-                // Create a new project entry for the next stage
-                const now = new Date();
-                const stage_start_date = now.toISOString().split('T')[0];
-                const due_date = new Date(now);
-                due_date.setDate(now.getDate() + (currentProject.stage_duration || 14));
-                const stage_due_date = due_date.toISOString().split('T')[0];
-                
-                const createNewStageQuery = `
-                  INSERT INTO user_history (
-                    user_id, organization, project_name, project_description,
-                    session_duration, carbon_emit, stage, status,
-                    project_id, stage_duration, stage_start_date, stage_due_date,
-                    project_start_date, project_due_date
-                  ) VALUES (?, ?, ?, ?, 0, 0, ?, 'In Progress', ?, ?, ?, ?, ?, ?)`;
-                  
-                connection.query(createNewStageQuery, [
-                  currentProject.owner_id,
-                  currentProject.organization,
-                  currentProject.project_name,
-                  currentProject.project_description,
-                  nextProjectStage,
-                  currentProject.project_id || projectId,
-                  currentProject.stage_duration,
-                  stage_start_date,
-                  stage_due_date,
-                  currentProject.project_start_date,
-                  currentProject.project_due_date
-                ], (err, newStageResult) => {
-                  if (err) {
-                    return connection.rollback(() => {
-                      console.error('Error creating new stage project:', err);
-                      res.status(500).json({ error: 'Failed to create new stage project' });
-                    });
-                  }
-                  
-                  existingNextStageProject = newStageResult.insertId;
-                  
-                  // Create an "In Progress" entry for the next stage in project_stage_progress
-                  const startNextStageQuery = `
-                    INSERT INTO project_stage_progress (project_id, user_id, stage, status, start_date)
-                    VALUES (?, ?, ?, 'In Progress', NOW())
-                    ON DUPLICATE KEY UPDATE status = 'In Progress', start_date = NOW()
-                  `;
-                  
-                  connection.query(startNextStageQuery, [
-                    existingNextStageProject, 
-                    userId, 
-                    nextProjectStage
-                  ], (err) => {
+
+              // If there are no contributing members, proceed with regular flow
+              if (memberResults.length === 0) {
+                // If there's no next stage, just mark this stage as complete for the user and finish
+                if (!nextProjectStage) {
+                  return connection.commit(err => {
                     if (err) {
                       return connection.rollback(() => {
-                        console.error('Error starting next stage:', err);
-                        res.status(500).json({ error: 'Failed to start next stage' });
+                        console.error('Error committing transaction:', err);
+                        res.status(500).json({ error: 'Failed to commit transaction' });
                       });
                     }
                     
-                    // Get all project members to add them to the new stage
-                    const getMembersQuery = `
-                      SELECT user_id, role
-                      FROM project_members
-                      WHERE project_id = ?`;
-                      
-                    connection.query(getMembersQuery, [projectId], (err, members) => {
+                    res.json({
+                      status: 'User-Stage-Completed',
+                      message: 'You have completed this project stage. There are no more stages.',
+                      stage: currentProject.stage
+                    });
+                  });
+                }
+                
+                // Check if there's already a project for the next stage
+                const checkExistingQuery = `
+                  SELECT id 
+                  FROM user_history 
+                  WHERE 
+                    project_name = ? AND 
+                    project_description = ? AND 
+                    stage = ? AND 
+                    (project_id = ? OR project_id IS NULL)
+                  LIMIT 1`;
+                
+                connection.query(checkExistingQuery, [
+                  currentProject.project_name, 
+                  currentProject.project_description,
+                  nextProjectStage,
+                  currentProject.project_id || projectId
+                ], (err, existingResults) => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      console.error('Error checking existing project:', err);
+                      res.status(500).json({ error: 'Failed to check existing project' });
+                    });
+                  }
+
+                  if (existingResults.length > 0) {
+                    // A project for the next stage already exists
+                    const existingProjectId = existingResults[0].id;
+
+                    connection.commit(err => {
                       if (err) {
                         return connection.rollback(() => {
-                          console.error('Error fetching project members:', err);
-                          res.status(500).json({ error: 'Failed to fetch project members' });
+                          console.error('Error committing transaction:', err);
+                          res.status(500).json({ error: 'Failed to commit transaction' });
                         });
                       }
                       
-                      // Add all members to the new stage project with appropriate status
-                      // The current user gets 'In Progress', all others get 'Not Started'
-                      if (members && members.length > 0) {
-                        const memberValues = members.map(member => [
-                          existingNextStageProject,
-                          member.user_id,
-                          member.role,
-                          member.user_id === userId ? 'In Progress' : 'Not Started',
-                          nextProjectStage
-                        ]);
+                      res.json({
+                        status: 'Stage-Completed',
+                        message: 'You have completed this project stage. Moving to the next stage.',
+                        newStageId: existingProjectId,
+                        stage: nextProjectStage
+                      });
+                    });
+                  } else {
+                    // Calculate new due dates for the next stage
+                    const stageStartDate = new Date();
+                    const stageDueDate = new Date(stageStartDate);
+                    stageDueDate.setDate(stageStartDate.getDate() + (currentProject.stage_duration || 14));
+                    
+                    // Create a new project for the next stage
+                    const createNextStageQuery = `
+                      INSERT INTO user_history (
+                        user_id, organization, project_name, project_description, 
+                        stage, project_id, status, carbon_emit, session_duration,
+                        stage_duration, stage_start_date, stage_due_date,
+                        project_start_date, project_due_date
+                      )
+                      VALUES (?, ?, ?, ?, ?, ?, 'In Progress', 0, 0, ?, ?, ?, ?, ?)
+                    `;
+                    
+                    connection.query(createNextStageQuery, [
+                      currentProject.owner_id,
+                      currentProject.organization,
+                      currentProject.project_name,
+                      currentProject.project_description,
+                      nextProjectStage,
+                      currentProject.project_id || projectId,
+                      currentProject.stage_duration,
+                      stageStartDate.toISOString().split('T')[0],
+                      stageDueDate.toISOString().split('T')[0],
+                      currentProject.project_start_date,
+                      currentProject.project_due_date
+                    ], (err, insertResult) => {
+                      if (err) {
+                        return connection.rollback(() => {
+                          console.error('Error creating next stage project:', err);
+                          res.status(500).json({ error: 'Failed to create next stage project' });
+                        });
+                      }
+                      
+                      const newProjectId = insertResult.insertId;
+                      
+                      // Update members roles and progress in the new stage
+                      const transferMembersQuery = `
+                        SELECT user_id, role FROM project_members WHERE project_id = ?
+                      `;
+                      
+                      connection.query(transferMembersQuery, [projectId], (err, membersToTransfer) => {
+                        if (err) {
+                          return connection.rollback(() => {
+                            console.error('Error getting members to transfer:', err);
+                            res.status(500).json({ error: 'Failed to get members to transfer' });
+                          });
+                        }
                         
-                        const addMembersQuery = `
-                          INSERT INTO project_members 
-                            (project_id, user_id, role, progress_status, current_stage)
-                          VALUES ?`;
+                        // If there are members to transfer
+                        if (membersToTransfer.length > 0) {
+                          // Create an array of values for batch insert
+                          const memberValues = membersToTransfer.map(member => [
+                            newProjectId,
+                            member.user_id,
+                            member.role,
+                            nextProjectStage,
+                            'In Progress',
+                            new Date()
+                          ]);
                           
-                        connection.query(addMembersQuery, [memberValues], (err) => {
+                          // Add all members to the new project
+                          const addMembersQuery = `
+                            INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                            VALUES ?
+                          `;
+                          
+                          connection.query(addMembersQuery, [memberValues], (err) => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                console.error('Error transferring members:', err);
+                                res.status(500).json({ error: 'Failed to transfer members' });
+                              });
+                            }
+                            
+                            connection.commit(err => {
+                              if (err) {
+                                return connection.rollback(() => {
+                                  console.error('Error committing transaction:', err);
+                                  res.status(500).json({ error: 'Failed to commit transaction' });
+                                });
+                              }
+                              
+                              res.json({
+                                status: 'Stage-Completed',
+                                message: 'You have completed this project stage. Moving to the next stage.',
+                                newStageId: newProjectId,
+                                stage: nextProjectStage
+                              });
+                            });
+                          });
+                        } else {
+                          // No members to transfer
+                          connection.commit(err => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                console.error('Error committing transaction:', err);
+                                res.status(500).json({ error: 'Failed to commit transaction' });
+                              });
+                            }
+                            
+                            res.json({
+                              status: 'Stage-Completed',
+                              message: 'You have completed this project stage. Moving to the next stage.',
+                              newStageId: newProjectId,
+                              stage: nextProjectStage
+                            });
+                          });
+                        }
+                      });
+                    });
+                  }
+                });
+              } else {
+                // Check if all contributing members have completed their stages
+                const allCompleted = memberResults.every(member => member.progress_status === 'Stage Complete');
+                
+                // If all members have completed their stages, mark project as complete
+                if (allCompleted) {
+                  // First, handle the next stage for the last member, if a next stage exists
+                  if (nextProjectStage) {
+                    // Check if there's already a project for the next stage
+                    const checkNextStageQuery = `
+                      SELECT id 
+                      FROM user_history 
+                      WHERE 
+                        project_name = ? AND 
+                        project_description = ? AND 
+                        stage = ? AND 
+                        (project_id = ? OR project_id IS NULL)
+                      LIMIT 1`;
+                    
+                    connection.query(checkNextStageQuery, [
+                      currentProject.project_name, 
+                      currentProject.project_description,
+                      nextProjectStage,
+                      currentProject.project_id || projectId
+                    ], (err, nextStageResults) => {
+                      if (err) {
+                        return connection.rollback(() => {
+                          console.error('Error checking next stage project:', err);
+                          res.status(500).json({ error: 'Failed to check next stage project' });
+                        });
+                      }
+
+                      // If a next stage project exists, add the current user to it
+                      if (nextStageResults.length > 0) {
+                        const nextStageProjectId = nextStageResults[0].id;
+                        
+                        // Check if user is already a member
+                        const checkMembershipQuery = `
+                          SELECT id FROM project_members 
+                          WHERE project_id = ? AND user_id = ?
+                        `;
+                        
+                        connection.query(checkMembershipQuery, [nextStageProjectId, userId], (err, membershipResult) => {
                           if (err) {
                             return connection.rollback(() => {
-                              console.error('Error adding members to new stage:', err);
-                              res.status(500).json({ error: 'Failed to add members to new stage' });
+                              console.error('Error checking membership:', err);
+                              res.status(500).json({ error: 'Failed to check membership' });
                             });
                           }
                           
-                          // Create "Not Started" entries in project_stage_progress for other members
-                          if (members.length > 1) {
-                            const otherMembers = members.filter(member => member.user_id !== userId);
-                            const otherMemberStageValues = otherMembers.map(member => [
-                              existingNextStageProject,
-                              member.user_id,
-                              nextProjectStage,
-                              'Not Started',
-                              null
-                            ]);
-                            
-                            const addOtherMemberStagesQuery = `
-                              INSERT INTO project_stage_progress 
-                                (project_id, user_id, stage, status, start_date)
-                              VALUES ?
-                              ON DUPLICATE KEY UPDATE status = VALUES(status)
+                          // If the user is not yet a member of the next stage project, add them
+                          if (membershipResult.length === 0) {
+                            const addToNextStageQuery = `
+                              INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                              SELECT ?, user_id, role, ?, 'In Progress', NOW()
+                              FROM project_members
+                              WHERE project_id = ? AND user_id = ?
                             `;
                             
-                            connection.query(addOtherMemberStagesQuery, [otherMemberStageValues], (err) => {
+                            connection.query(addToNextStageQuery, [nextStageProjectId, nextProjectStage, projectId, userId], (err) => {
                               if (err) {
                                 return connection.rollback(() => {
-                                  console.error('Error adding other member stages:', err);
-                                  res.status(500).json({ error: 'Failed to add other member stages' });
+                                  console.error('Error adding to next stage:', err);
+                                  res.status(500).json({ error: 'Failed to add to next stage' });
+                                });
+                              }
+                              
+                              // Now update the current project to Complete
+                              updateProjectToComplete();
+                            });
+                          } else {
+                            // User is already a member of the next stage project
+                            updateProjectToComplete();
+                          }
+                        });
+                      } else {
+                        // No next stage exists yet, create one and add all team members
+                        const stageStartDate = new Date();
+                        const stageDueDate = new Date(stageStartDate);
+                        stageDueDate.setDate(stageStartDate.getDate() + (currentProject.stage_duration || 14));
+                        
+                        const createNextStageQuery = `
+                          INSERT INTO user_history (
+                            user_id, organization, project_name, project_description, 
+                            stage, project_id, status, carbon_emit, session_duration,
+                            stage_duration, stage_start_date, stage_due_date,
+                            project_start_date, project_due_date
+                          )
+                          VALUES (?, ?, ?, ?, ?, ?, 'In Progress', 0, 0, ?, ?, ?, ?, ?)
+                        `;
+                        
+                        connection.query(createNextStageQuery, [
+                          currentProject.owner_id,
+                          currentProject.organization,
+                          currentProject.project_name,
+                          currentProject.project_description,
+                          nextProjectStage,
+                          currentProject.project_id || projectId,
+                          currentProject.stage_duration,
+                          stageStartDate.toISOString().split('T')[0],
+                          stageDueDate.toISOString().split('T')[0],
+                          currentProject.project_start_date,
+                          currentProject.project_due_date
+                        ], (err, insertResult) => {
+                          if (err) {
+                            return connection.rollback(() => {
+                              console.error('Error creating next stage project:', err);
+                              res.status(500).json({ error: 'Failed to create next stage project' });
+                            });
+                          }
+                          
+                          const newProjectId = insertResult.insertId;
+                          
+                          // Transfer all team members to the new project
+                          const transferMembersQuery = `
+                            SELECT user_id, role FROM project_members WHERE project_id = ?
+                          `;
+                          
+                          connection.query(transferMembersQuery, [projectId], (err, membersToTransfer) => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                console.error('Error getting members to transfer:', err);
+                                res.status(500).json({ error: 'Failed to get members to transfer' });
+                              });
+                            }
+                            
+                            // Create an array of values for batch insert
+                            const memberValues = membersToTransfer.map(member => [
+                              newProjectId,
+                              member.user_id,
+                              member.role,
+                              nextProjectStage,
+                              'In Progress',
+                              new Date()
+                            ]);
+                            
+                            // Add all members to the new project
+                            const addMembersQuery = `
+                              INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                              VALUES ?
+                            `;
+                            
+                            connection.query(addMembersQuery, [memberValues], (err) => {
+                              if (err) {
+                                return connection.rollback(() => {
+                                  console.error('Error transferring members:', err);
+                                  res.status(500).json({ error: 'Failed to transfer members' });
+                                });
+                              }
+                              
+                              // Now update the current project to Complete
+                              updateProjectToComplete(newProjectId);
+                            });
+                          });
+                        });
+                      }
+                    });
+                  } else {
+                    // No next stage exists (this is the final stage), just complete the project
+                    updateProjectToComplete();
+                  }
+                  
+                  // Helper function to update the project to Complete status
+                  function updateProjectToComplete(newStageId = null) {
+                    // Update project status to "Complete"
+                    const updateProjectStatusQuery = `
+                      UPDATE user_history 
+                      SET status = 'Complete'
+                      WHERE id = ?
+                    `;
+                    
+                    connection.query(updateProjectStatusQuery, [projectId], (err, statusResult) => {
+                      if (err) {
+                        return connection.rollback(() => {
+                          console.error('Error updating project status:', err);
+                          res.status(500).json({ error: 'Failed to update project status' });
+                        });
+                      }
+                      
+                      connection.commit(err => {
+                        if (err) {
+                          return connection.rollback(() => {
+                            console.error('Error committing transaction:', err);
+                            res.status(500).json({ error: 'Failed to commit transaction' });
+                          });
+                        }
+                        
+                        // Send response indicating project is now complete
+                        // If we have a newStageId, include it in the response
+                        const response = {
+                          status: 'Project-Completed',
+                          message: 'All team members have completed their stages. The project is now marked as Complete.',
+                          stage: currentProject.stage
+                        };
+                        
+                        if (newStageId) {
+                          response.newStageId = newStageId;
+                          response.nextStage = nextProjectStage;
+                        }
+                        
+                        res.json(response);
+                      });
+                    });
+                  }
+                } else {
+                  // Not all members have completed their stages yet
+                  // Count completed vs total members for progress tracking
+                  const completedMembers = memberResults.filter(member => member.progress_status === 'Stage Complete').length;
+                  const totalMembers = memberResults.length;
+                  
+                  if (!nextProjectStage) {
+                    // No next stage, just complete this one
+                    connection.commit(err => {
+                      if (err) {
+                        return connection.rollback(() => {
+                          console.error('Error committing transaction:', err);
+                          res.status(500).json({ error: 'Failed to commit transaction' });
+                        });
+                      }
+                      
+                      res.json({
+                        status: 'Stage-User-Completed',
+                        message: 'You have completed your part of this stage. Waiting for other team members to complete their parts.',
+                        completedMembers,
+                        totalMembers,
+                        stage: currentProject.stage
+                      });
+                    });
+                  } else {
+                    // Check if there's already a project for the next stage
+                    const checkExistingQuery = `
+                      SELECT id 
+                      FROM user_history 
+                      WHERE 
+                        project_name = ? AND 
+                        project_description = ? AND 
+                        stage = ? AND 
+                        (project_id = ? OR project_id IS NULL)
+                      LIMIT 1`;
+                    
+                    connection.query(checkExistingQuery, [
+                      currentProject.project_name, 
+                      currentProject.project_description,
+                      nextProjectStage,
+                      currentProject.project_id || projectId
+                    ], (err, existingResults) => {
+                      if (err) {
+                        return connection.rollback(() => {
+                          console.error('Error checking existing project:', err);
+                          res.status(500).json({ error: 'Failed to check existing project' });
+                        });
+                      }
+
+                      if (existingResults.length > 0) {
+                        // A project for the next stage already exists
+                        const existingProjectId = existingResults[0].id;
+
+                        // Make sure this user is a member of the next stage project
+                        const checkMembershipQuery = `
+                          SELECT id FROM project_members 
+                          WHERE project_id = ? AND user_id = ?
+                        `;
+                        
+                        connection.query(checkMembershipQuery, [existingProjectId, userId], (err, membershipResult) => {
+                          if (err) {
+                            return connection.rollback(() => {
+                              console.error('Error checking membership:', err);
+                              res.status(500).json({ error: 'Failed to check membership' });
+                            });
+                          }
+                          
+                          // If the user is not yet a member of the next stage project, add them
+                          if (membershipResult.length === 0) {
+                            const addToNextStageQuery = `
+                              INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                              SELECT ?, user_id, role, ?, 'In Progress', NOW()
+                              FROM project_members
+                              WHERE project_id = ? AND user_id = ?
+                            `;
+                            
+                            connection.query(addToNextStageQuery, [existingProjectId, nextProjectStage, projectId, userId], (err) => {
+                              if (err) {
+                                return connection.rollback(() => {
+                                  console.error('Error adding to next stage:', err);
+                                  res.status(500).json({ error: 'Failed to add to next stage' });
                                 });
                               }
                               
@@ -1551,16 +1869,17 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
                                 }
                                 
                                 res.json({
-                                  status: 'Stage-Completed',
-                                  message: 'You have completed this stage and moved to the next stage.',
-                                  stage: nextProjectStage,
-                                  previousStage: currentProject.stage,
-                                  newStageId: existingNextStageProject
+                                  status: 'Stage-User-Completed',
+                                  message: 'You have completed your part of this stage. Moving to the next stage while waiting for other team members.',
+                                  completedMembers,
+                                  totalMembers,
+                                  newStageId: existingProjectId,
+                                  stage: nextProjectStage
                                 });
                               });
                             });
                           } else {
-                            // If no other members, just commit
+                            // User is already a member of the next stage project
                             connection.commit(err => {
                               if (err) {
                                 return connection.rollback(() => {
@@ -1570,152 +1889,93 @@ app.post('/complete_project/:id', authenticateToken, (req, res) => {
                               }
                               
                               res.json({
-                                status: 'Stage-Completed',
-                                message: 'You have completed this stage and moved to the next stage.',
-                                stage: nextProjectStage,
-                                previousStage: currentProject.stage,
-                                newStageId: existingNextStageProject
+                                status: 'Stage-User-Completed',
+                                message: 'You have completed your part of this stage. Waiting for other team members.',
+                                completedMembers,
+                                totalMembers,
+                                newStageId: existingProjectId,
+                                stage: nextProjectStage
                               });
                             });
                           }
                         });
                       } else {
-                        // If no members (unlikely), just commit
-                        connection.commit(err => {
+                        // Create a new project for the next stage
+                        const stageStartDate = new Date();
+                        const stageDueDate = new Date(stageStartDate);
+                        stageDueDate.setDate(stageStartDate.getDate() + (currentProject.stage_duration || 14));
+                        
+                        const createNextStageQuery = `
+                          INSERT INTO user_history (
+                            user_id, organization, project_name, project_description, 
+                            stage, project_id, status, carbon_emit, session_duration,
+                            stage_duration, stage_start_date, stage_due_date,
+                            project_start_date, project_due_date
+                          )
+                          VALUES (?, ?, ?, ?, ?, ?, 'In Progress', 0, 0, ?, ?, ?, ?, ?)
+                        `;
+                        
+                        connection.query(createNextStageQuery, [
+                          currentProject.owner_id,
+                          currentProject.organization,
+                          currentProject.project_name,
+                          currentProject.project_description,
+                          nextProjectStage,
+                          currentProject.project_id || projectId,
+                          currentProject.stage_duration,
+                          stageStartDate.toISOString().split('T')[0],
+                          stageDueDate.toISOString().split('T')[0],
+                          currentProject.project_start_date,
+                          currentProject.project_due_date
+                        ], (err, insertResult) => {
                           if (err) {
                             return connection.rollback(() => {
-                              console.error('Error committing transaction:', err);
-                              res.status(500).json({ error: 'Failed to commit transaction' });
+                              console.error('Error creating next stage project:', err);
+                              res.status(500).json({ error: 'Failed to create next stage project' });
                             });
                           }
                           
-                          res.json({
-                            status: 'Stage-Completed',
-                            message: 'You have completed this stage and moved to the next stage.',
-                            stage: nextProjectStage,
-                            previousStage: currentProject.stage,
-                            newStageId: existingNextStageProject
+                          const newProjectId = insertResult.insertId;
+                          
+                          // Only add the current user to the next stage project since not all members have completed
+                          const addToNextStageQuery = `
+                            INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                            SELECT ?, user_id, role, ?, 'In Progress', NOW()
+                            FROM project_members
+                            WHERE project_id = ? AND user_id = ?
+                          `;
+                          
+                          connection.query(addToNextStageQuery, [newProjectId, nextProjectStage, projectId, userId], (err) => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                console.error('Error adding to next stage:', err);
+                                res.status(500).json({ error: 'Failed to add to next stage' });
+                              });
+                            }
+                            
+                            connection.commit(err => {
+                              if (err) {
+                                return connection.rollback(() => {
+                                  console.error('Error committing transaction:', err);
+                                  res.status(500).json({ error: 'Failed to commit transaction' });
+                                });
+                              }
+                              
+                              res.json({
+                                status: 'Stage-User-Completed',
+                                message: 'You have completed your part of this stage. Moving to the next stage while waiting for other team members.',
+                                completedMembers,
+                                totalMembers,
+                                newStageId: newProjectId,
+                                stage: nextProjectStage
+                              });
+                            });
                           });
                         });
                       }
                     });
-                  });
-                });
-              } else {
-                // Project for next stage already exists
-                // Create an "In Progress" entry for the next stage in project_stage_progress
-                const startNextStageQuery = `
-                  INSERT INTO project_stage_progress (project_id, user_id, stage, status, start_date)
-                  VALUES (?, ?, ?, 'In Progress', NOW())
-                  ON DUPLICATE KEY UPDATE status = 'In Progress', start_date = NOW()
-                `;
-                
-                connection.query(startNextStageQuery, [
-                  existingNextStageProject, 
-                  userId, 
-                  nextProjectStage
-                ], (err) => {
-                  if (err) {
-                    return connection.rollback(() => {
-                      console.error('Error starting next stage:', err);
-                      res.status(500).json({ error: 'Failed to start next stage' });
-                    });
                   }
-                  
-                  // Check if the user already has a project_members entry for the next stage
-                  const checkMemberQuery = `
-                    SELECT id FROM project_members 
-                    WHERE project_id = ? AND user_id = ?
-                  `;
-                  
-                  connection.query(checkMemberQuery, [existingNextStageProject, userId], (err, memberResult) => {
-                    if (err) {
-                      return connection.rollback(() => {
-                        console.error('Error checking existing member:', err);
-                        res.status(500).json({ error: 'Failed to check existing member' });
-                      });
-                    }
-                    
-                    if (memberResult.length === 0) {
-                      // If no existing entry, create a new one
-                      const addMemberQuery = `
-                        INSERT INTO project_members 
-                          (project_id, user_id, role, progress_status, current_stage)
-                        VALUES 
-                          (?, ?, ?, 'In Progress', ?)
-                      `;
-                      
-                      connection.query(addMemberQuery, [
-                        existingNextStageProject, 
-                        userId, 
-                        userRole || 'member',
-                        nextProjectStage
-                      ], (err) => {
-                        if (err) {
-                          return connection.rollback(() => {
-                            console.error('Error adding member to existing project:', err);
-                            res.status(500).json({ error: 'Failed to add member to existing project' });
-                          });
-                        }
-                        
-                        connection.commit(err => {
-                          if (err) {
-                            return connection.rollback(() => {
-                              console.error('Error committing transaction:', err);
-                              res.status(500).json({ error: 'Failed to commit transaction' });
-                            });
-                          }
-                          
-                          res.json({
-                            status: 'Stage-Completed',
-                            message: 'You have completed this stage and moved to the next stage.',
-                            stage: nextProjectStage,
-                            previousStage: currentProject.stage,
-                            newStageId: existingNextStageProject
-                          });
-                        });
-                      });
-                    } else {
-                      // If there's an existing entry, update it
-                      const updateMemberQuery = `
-                        UPDATE project_members 
-                        SET progress_status = 'In Progress',
-                            current_stage = ?
-                        WHERE project_id = ? AND user_id = ?
-                      `;
-                      
-                      connection.query(updateMemberQuery, [
-                        nextProjectStage,
-                        existingNextStageProject, 
-                        userId
-                      ], (err) => {
-                        if (err) {
-                          return connection.rollback(() => {
-                            console.error('Error updating member status for next stage:', err);
-                            res.status(500).json({ error: 'Failed to update member status' });
-                          });
-                        }
-                        
-                        connection.commit(err => {
-                          if (err) {
-                            return connection.rollback(() => {
-                              console.error('Error committing transaction:', err);
-                              res.status(500).json({ error: 'Failed to commit transaction' });
-                            });
-                          }
-                          
-                          res.json({
-                            status: 'Stage-Completed',
-                            message: 'You have completed this stage and moved to the next stage.',
-                            stage: nextProjectStage,
-                            previousStage: currentProject.stage,
-                            newStageId: existingNextStageProject
-                          });
-                        });
-                      });
-                    }
-                  });
-                });
+                }
               }
             });
           });
