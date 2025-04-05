@@ -22,13 +22,14 @@ type Task = {
   stage_due_date: string;
   project_start_date: string;
   project_due_date: string;
+  owner: { email: string; name: string; profileImage: string } | null;  // Add owner property
 };
 
 const History = () => {
   // Existing task management state
   const [showActiveTasks, setShowActiveTasks] = useState(true);
   const [showCompletedTasks, setShowCompletedTasks] = useState(true);
-  const [tasks, setTasks] = useState([
+  const [tasks, setTasks] = useState<Task[]>([
     {
       id: 1,
       project_id: 'PRJ-1',
@@ -47,6 +48,7 @@ const History = () => {
       startTime: null as number | null,
       carbonEmit: 0,
       leader: null as { email: string; name: string; profileImage: string } | null,
+      owner: { email: 'example@example.com', name: 'Example User', profileImage: '' },
       stage_duration: 0,
       stage_start_date: new Date().toISOString().split('T')[0],
       stage_due_date: '',
@@ -133,7 +135,6 @@ const History = () => {
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
-      // Use the user_project_display_combined endpoint which should return projects with correct individual user stages
       const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -142,17 +143,22 @@ const History = () => {
       if (response.ok) {
         const data = await response.json();
         const tasksWithMembers = await Promise.all(data.projects.map(async (project: any) => {
-          // Fetch members for each project
           const membersResponse = await fetch(`http://localhost:5000/project/${project.id}/members`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           
           let members = [];
           let leader = null;
+          let owner = {
+            email: project.owner_email,
+            name: project.owner_name,
+            profileImage: null
+          };
+
           if (membersResponse.ok) {
             const { members: projectMembers } = await membersResponse.json();
             members = projectMembers.map((member: any) => {
-              if (member.role === 'project_leader' || member.role === 'project_owner') {
+              if (member.role === 'project_leader') {
                 leader = {
                   email: member.email,
                   name: member.name,
@@ -171,26 +177,16 @@ const History = () => {
             });
           }
 
-          // If no leader was found among members, use the project owner
-          if (!leader && project.owner_email) {
-            leader = {
-              email: project.owner_email,
-              name: project.owner_name,
-              profileImage: null
-            };
-          }
-
-          // The task's stage should be the user's current stage (which might be different from project.stage)
-          // The backend should have already provided the appropriate stage for this user in the project.stage field
           return {
             id: project.id,
             project_id: project.project_id || project.id.toString(),
             title: project.project_name,
             description: project.project_description,
             status: project.status === 'Archived' ? 'Completed' : 'In Progress',
-            type: project.stage, // This is the user's individual stage from the backend
+            type: project.stage,
             assignees: members,
             leader: leader,
+            owner: owner,
             spentTime: project.session_duration || 0,
             carbonEmit: project.carbon_emit || 0,
             isRunning: false,
@@ -601,7 +597,7 @@ const History = () => {
       const data = await response.json();
 
       // Update the tasks list with the new project
-      const newProject = {
+      const newProject: Task = {
         id: data.projectId,
         project_id: data.projectId.toString(),
         title: newRequest.title,
@@ -614,6 +610,11 @@ const History = () => {
         startTime: null,
         carbonEmit: 0,
         leader: null,
+        owner: user ? { 
+          email: user.email,
+          name: user.name,
+          profileImage: '' // Changed from null to empty string to match the type
+        } : null,
         stage_duration: newRequest.stage_duration,
         stage_start_date: newRequest.stage_start_date,
         stage_due_date: newRequest.stage_due_date,
@@ -943,6 +944,7 @@ const History = () => {
                   <th>Status</th>
                   <th>Type</th>
                   <th>Owner</th>
+                  <th>Leader</th>
                   <th>Assignees</th>
                   <th>Timeline</th>
                   <th>Progress</th>
@@ -974,6 +976,18 @@ const History = () => {
                         </Badge>
                       </td>
                       <td>{task.type}</td>
+                      <td>
+                        {task.owner && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <img 
+                              src={task.owner.profileImage || `https://www.gravatar.com/avatar/${task.owner.email}?d=identicon&s=24`}
+                              alt={task.owner.name}
+                              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                            />
+                            <span>{task.owner.name || task.owner.email}</span>
+                          </div>
+                        )}
+                      </td>
                       <td>
                         {task.leader && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1027,7 +1041,7 @@ const History = () => {
                   <th>Name</th>
                   <th>Status</th>
                   <th>Type</th>
-                  <th>Owner</th>
+                  <th>Leader</th>
                   <th>Assignees</th>
                   <th>Spent Time</th>
                   <th>Carbon Emissions</th>

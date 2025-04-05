@@ -262,7 +262,6 @@ const AdminDashboard: React.FC = () => {
         });
 
         if (response.status === 403) {
-          // Redirect to login if token is invalid or expired
           router.push('/');
           return;
         }
@@ -272,14 +271,22 @@ const AdminDashboard: React.FC = () => {
         }
 
         const data = await response.json();
+        console.log('Fetched projects:', data); // Debug log
 
+        // Process all projects with error handling
         const projectsWithMembers = await Promise.all(
-          data.projects.map(async (project: Project) => {
-            const members = await fetchProjectMembers(project.id);
-            return { ...project, members };
+          (data.projects || []).map(async (project: Project) => {
+            try {
+              const members = await fetchProjectMembers(project.id);
+              return { ...project, members };
+            } catch (error) {
+              console.error(`Error fetching members for project ${project.id}:`, error);
+              return { ...project, members: [] };
+            }
           })
         );
 
+        console.log('Total projects fetched:', projectsWithMembers.length); // Debug log
         setProjects(projectsWithMembers);
         setSortedData(projectsWithMembers);
       } catch (error) {
@@ -485,38 +492,26 @@ const AdminDashboard: React.FC = () => {
         throw new Error('No token found');
       }
 
-      // First, check if owner exists
-      const ownerExists = await validateEmail(newProject.owner);
-      if (!ownerExists) {
-        setCreateErrors({
-          ...newErrors,
-          owner: 'User does not exist in the system'
-        });
-        return;
-      }
-
-      // Then fetch the owner's organization
-      const ownerResponse = await fetch(`http://localhost:5000/user_organization/${newProject.owner}`, {
+      // First, create or get the temporary user for the owner
+      const createTempUserResponse = await fetch('http://localhost:5000/create_temp_user', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email: newProject.owner,
+          organization: "External" // Set organization as "External" for temporary users
+        }),
       });
 
-      if (!ownerResponse.ok) {
-        if (ownerResponse.status === 404) {
-          setCreateErrors({
-            ...newErrors,
-            owner: 'User organization not found'
-          });
-          return;
-        }
-        throw new Error(`Error fetching owner organization: ${ownerResponse.status}`);
+      if (!createTempUserResponse.ok) {
+        throw new Error('Failed to create/verify owner user');
       }
 
-      const ownerData = await ownerResponse.json();
-      const ownerOrganization = ownerData.organization;
+      const tempUserData = await createTempUserResponse.json();
 
-      // Create project with the owner's organization and explicitly set session_duration and carbon_emit to 0
+      // Now create the project with External organization
       const projectToCreate = {
         ...newProject,
         owner_email: newProject.owner,
@@ -524,7 +519,7 @@ const AdminDashboard: React.FC = () => {
         members: [...newProject.members],
         session_duration: 0,
         carbon_emit: 0,
-        organization: ownerOrganization
+        organization: "External" // Set organization as "External" for the project
       };
   
       const response = await fetch('http://localhost:5000/admin/create_project', {
@@ -546,7 +541,7 @@ const AdminDashboard: React.FC = () => {
       if (!response.ok) {
         throw new Error(responseData.error || 'Failed to create project');
       }
-  
+
       // Ensure the response data has session_duration and carbon_emit set to 0
       const projectWithDefaults = {
         ...responseData,
@@ -1048,16 +1043,7 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               <Paper p="md" radius="md" withBorder mt="md">
-                <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={500} c="dimmed">Team Members</Text>
-                  <Button 
-                    variant="subtle" 
-                    size="xs"
-                    onClick={() => setIsEditModalOpen(true)}
-                  >
-                    Manage Team
-                  </Button>
-                </Group>
+                <Text size="sm" fw={500} c="dimmed">Team Members</Text>
                 {renderAssignees(selectedProject.members)}
               </Paper>
 
@@ -1240,38 +1226,6 @@ const AdminDashboard: React.FC = () => {
                   <Text size="xs" color="dimmed" mt={4}>This person will manage daily operations and team productivity</Text>
                 </div>
               </Stack>
-            </Paper>
-
-            <Paper p="md" withBorder>
-              <Text size="sm" fw={500} mb="md">Project Roles</Text>
-              
-              <div>
-                <TextInput
-                  label="Project Owner Email"
-                  description="Client or person who requested the project"
-                  value={newProject.owner}
-                  onChange={(event) => {
-                    setNewProject({ ...newProject, owner: event.currentTarget.value });
-                    if (createErrors.owner) {
-                      setCreateErrors({ ...createErrors, owner: '' });
-                    }
-                  }}
-                  required
-                  error={createErrors.owner}
-                />
-              </div>
-              
-              <div style={{ marginTop: '1rem' }}>
-                <TextInput
-                  label="Project Leader Email"
-                  description="Employee who will lead the project execution"
-                  placeholder="Enter email of project leader"
-                  value={newProject.project_leader}
-                  onChange={(event) => {
-                    setNewProject({ ...newProject, project_leader: event.currentTarget.value });
-                  }}
-                />
-              </div>
             </Paper>
 
             {/* Timeline Section */}
@@ -1484,6 +1438,7 @@ const AdminDashboard: React.FC = () => {
               label="Project Title"
               value={editTitle}
               onChange={(event) => setEditTitle(event.currentTarget.value)}
+              placeholder={selectedProject?.project_name}
               required
             />
 
@@ -1491,6 +1446,7 @@ const AdminDashboard: React.FC = () => {
               label="Project Description"
               value={editDescription}
               onChange={(event) => setEditDescription(event.currentTarget.value)}
+              placeholder={selectedProject?.project_description}
               required
               minRows={3}
             />
@@ -1500,6 +1456,16 @@ const AdminDashboard: React.FC = () => {
               value={editStatus}
               onChange={(value) => setEditStatus(value || '')}
               data={['In Progress', 'Complete', 'Archived']}
+              placeholder={selectedProject?.status}
+              required
+            />
+
+            <Select
+              label="Stage"
+              value={selectedProject?.stage}
+              onChange={(value) => setEditStatus(value || '')}
+              data={['Design: Creating the software architecture', 'Development: Writing the actual code', 'Testing: Ensuring the software works as expected']}
+              placeholder={selectedProject?.stage}
               required
             />
 
@@ -1512,6 +1478,7 @@ const AdminDashboard: React.FC = () => {
                     label="Stage Start Date"
                     value={editStageStartDate}
                     onChange={(event) => setEditStageStartDate(event.currentTarget.value)}
+                    placeholder={selectedProject?.stage_start_date}
                   />
                   <TextInput
                     type="date"
@@ -1519,6 +1486,7 @@ const AdminDashboard: React.FC = () => {
                     value={editStageDueDate}
                     onChange={(event) => setEditStageDueDate(event.currentTarget.value)}
                     min={editStageStartDate}
+                    placeholder={selectedProject?.stage_due_date}
                     error={editStageDueDate && editStageStartDate && new Date(editStageDueDate) <= new Date(editStageStartDate) ? 
                       "Due date must be after start date" : null}
                   />
@@ -1530,6 +1498,7 @@ const AdminDashboard: React.FC = () => {
                   value={editProjectDueDate}
                   onChange={(event) => setEditProjectDueDate(event.currentTarget.value)}
                   min={editStageStartDate}
+                  placeholder={selectedProject?.project_due_date}
                   error={editProjectDueDate && editStageStartDate && new Date(editProjectDueDate) <= new Date(editStageStartDate) ? 
                     "Project due date must be after stage start date" : null}
                 />

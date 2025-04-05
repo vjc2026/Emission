@@ -25,7 +25,6 @@ import TextComponent from './Components/Text';
 import History from './Components/CarbonCalculator';
 import Dashboard from './Components/Dashboard';
 import Compare from './Components/Compare';
-import TEST from './Components/TEST';
 import ProjectAnalytics from './Components/ProjectAnalytics';
 import '@mantine/core/styles.css';
 import StatisticsComponent from './Components/Statistics';
