@@ -2622,6 +2622,7 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
   const query = `
     SELECT 
       uh.id, 
+      uh.user_id,
       uh.organization, 
       uh.project_name, 
       uh.project_description, 
@@ -2629,23 +2630,30 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
       uh.carbon_emit, 
       uh.stage, 
       uh.status, 
+      uh.project_id,
       uh.created_at,
       uh.stage_duration,
       uh.stage_start_date,
       uh.stage_due_date,
       uh.project_start_date,
       uh.project_due_date,
-      u.email AS owner
+      u.email AS owner,
+      u.name AS owner_name,
+      (SELECT COUNT(*) FROM project_members WHERE project_id = uh.id) as member_count
     FROM user_history uh
     JOIN users u ON uh.user_id = u.id
     ORDER BY uh.created_at DESC
   `;
 
+  console.log('Executing admin projects query...');
+
   connection.query(query, (err, results) => {
     if (err) {
       console.error('Error fetching projects:', err);
-      return res.status(500).json({ error: 'Database error' });
+      return res.status(500).json({ error: 'Database error', details: err.message });
     }
+
+    console.log(`Found ${results.length} projects`);
 
     // Format dates to ISO string format for consistent handling
     const formattedResults = results.map(project => ({
@@ -2657,7 +2665,10 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
       created_at: project.created_at ? project.created_at.toISOString() : null
     }));
 
-    res.status(200).json({ projects: formattedResults });
+    res.status(200).json({ 
+      projects: formattedResults,
+      total: results.length 
+    });
   });
 });
 
@@ -3572,6 +3583,51 @@ app.put('/admin/update_project/:id', authenticateAdmin, (req, res) => {
       message: 'Project updated successfully',
       projectId: projectId,
       affectedRows: results.affectedRows
+    });
+  });
+});
+
+// Create temporary user for project owner
+app.post('/create_temp_user', authenticateAdmin, (req, res) => {
+  const { email, organization } = req.body;
+
+  // Check if user already exists
+  const checkUserQuery = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(checkUserQuery, [email], (err, results) => {
+    if (err) {
+      console.error('Error checking existing user:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    // If user exists, return their ID
+    if (results.length > 0) {
+      return res.status(200).json({ 
+        userId: results[0].id,
+        message: 'User already exists',
+        isExisting: true 
+      });
+    }
+
+    // Create new temporary user
+    const createUserQuery = `
+      INSERT INTO users (name, email, password, organization, created_at)
+      VALUES (?, ?, 'temporary_password', ?, NOW())
+    `;
+
+    const userName = email.split('@')[0]; // Use part before @ as temporary name
+
+    connection.query(createUserQuery, [userName, email, organization], (err, result) => {
+      if (err) {
+        console.error('Error creating temporary user:', err);
+        return res.status(500).json({ error: 'Failed to create temporary user' });
+      }
+
+      res.status(201).json({ 
+        userId: result.insertId,
+        message: 'Temporary user created successfully',
+        isExisting: false
+      });
     });
   });
 });
