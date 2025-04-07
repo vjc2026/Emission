@@ -132,6 +132,7 @@ const History = () => {
     fetchUserDetails();
   }, []);
 
+  // Update the fetchUserTasks function to include projects where progress status is either "In Progress" or "Stage Complete"
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
@@ -192,6 +193,7 @@ const History = () => {
             isRunning: false,
             startTime: null,
             userCompleted: project.progress_status === 'Stage Complete',
+            progressStatus: project.progress_status,
             stage_duration: project.stage_duration || 14,
             stage_start_date: project.stage_start_date || new Date().toISOString().split('T')[0],
             stage_due_date: project.stage_due_date || '',
@@ -200,11 +202,9 @@ const History = () => {
           };
         }));
 
-        // Filter out projects that the user doesn't have access to (progress_status = 'Not Started')
+        // Filter out both "Not Started" and "Stage Complete" projects
         const filteredTasks = tasksWithMembers.filter(task => 
-          !task.assignees.some((assignee: any) =>
-            assignee.email === user?.email && assignee.progressStatus === 'Not Started'
-          )
+          task.progressStatus !== 'Not Started' && task.progressStatus !== 'Stage Complete'
         );
 
         setTasks(filteredTasks);
@@ -458,7 +458,7 @@ const History = () => {
           });
           
           setSelectedTask(null);
-        } else if (responseData.status === 'Stage-User-Completed' || responseData.status === 'Stage-Waiting') {
+        } else if (responseData.status === 'Stage-User-Completed') {
           // This user has completed their part, but not all team members have finished
           notifications.hide(notificationId);
           
@@ -511,6 +511,17 @@ const History = () => {
           if (selectedTask?.id === taskId) {
             setSelectedTask((prev: Task) => ({ ...prev, userCompleted: true }));
           }
+          
+          // If there's a new stage ID, check if it's already in our tasks list
+          if (responseData.newStageId) {
+            const existsInTaskList = tasks.some(t => t.id === responseData.newStageId);
+            if (!existsInTaskList) {
+              // If the new stage isn't in our tasks list yet, fetch updated tasks
+              if (user?.email) {
+                await fetchUserTasks(user.email);
+              }
+            }
+          }
         } else {
           // Handle other statuses
           notifications.hide(notificationId);
@@ -519,11 +530,11 @@ const History = () => {
             message: responseData.message || 'Task status updated',
             color: 'blue',
           });
-        }
-  
-        // Always refresh the task list after any operation
-        if (user?.email) {
-          await fetchUserTasks(user.email);
+          
+          // Make sure to refresh task list even for other statuses
+          if (user?.email) {
+            await fetchUserTasks(user.email);
+          }
         }
       } catch (parseError) {
         // Handle JSON parsing error (if response isn't valid JSON)

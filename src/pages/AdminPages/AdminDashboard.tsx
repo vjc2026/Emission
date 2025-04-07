@@ -226,6 +226,7 @@ const checkAndUpdateProjectStatus = async (projectId: number,
     const members = data.members || [];
 
     // Filter out project owners as they don't contribute to project completion
+    // This is the key change - make sure we're excluding project_owner role in all project status checks
     const contributingMembers = members.filter(
       (member: { role: string }) => member.role !== 'project_owner'
     );
@@ -648,7 +649,9 @@ const AdminDashboard: React.FC = () => {
         throw new Error('No token found');
       }
 
-      // First, create or get the temporary user for the owner
+      // First, create or get the temporary user for the owner email
+      // This endpoint will create a new user if they don't exist
+      // or return the existing user if they do
       const createTempUserResponse = await fetch('http://localhost:5000/create_temp_user', {
         method: 'POST',
         headers: {
@@ -662,21 +665,22 @@ const AdminDashboard: React.FC = () => {
       });
 
       if (!createTempUserResponse.ok) {
-        throw new Error('Failed to create/verify owner user');
+        const error = await createTempUserResponse.json();
+        throw new Error(error.error || 'Failed to process owner user');
       }
-
-      const tempUserData = await createTempUserResponse.json();
 
       // Now create the project with External organization
       const projectToCreate = {
         ...newProject,
         owner_email: newProject.owner,
         leader_email: newProject.project_leader,
-        members: [...newProject.members],
+        members: [...newProject.members], // Make sure we're sending all members
         session_duration: 0,
         carbon_emit: 0,
         organization: "External" // Set organization as "External" for the project
       };
+  
+      console.log("Creating project with members:", projectToCreate.members); // Add debugging
   
       const response = await fetch('http://localhost:5000/admin/create_project', {
         method: 'POST',
@@ -730,9 +734,22 @@ const AdminDashboard: React.FC = () => {
       });
       setNewProjectAssignee('');
   
+      // Show success notification
+      notifications.show({
+        title: 'Project Created',
+        message: `Project "${projectToCreate.project_name}" has been created successfully.`,
+        color: 'green',
+      });
     } catch (error) {
       console.error('Error creating project:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      
+      // Show error notification
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to create project',
+        color: 'red',
+      });
     }
   };
   
@@ -857,9 +874,10 @@ const AdminDashboard: React.FC = () => {
           return;
         }
 
-        // Check if assignee email is the same as owner email
+        // Check if assignee email is the same as owner email 
+        // Note: Owners can only be listed once per project
         if (newProjectAssignee === newProject.owner) {
-          setNewProjectAssigneeError('Owner cannot be added as an assignee');
+          setNewProjectAssigneeError('Owner is already included as the client and cannot be added as a team member');
           return;
         }
 
