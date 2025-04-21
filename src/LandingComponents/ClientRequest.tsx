@@ -85,7 +85,7 @@ const ClientRequest: React.FC = () => {
               margin: '0 auto 3rem auto'
             }}
           >
-            Join the next generation of eco-conscious developers. Let's build a greener future together.
+            Join the next generation of eco-conscious developers. Let&apos;s build a greener future together.
           </Text>
 
           <Paper 

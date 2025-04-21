@@ -85,7 +85,7 @@ function TestimonialCard({ name, title, image, testimonial }: (typeof testimonia
               fontStyle: 'italic'
             }}
           >
-            "{testimonial}"
+            "            &quot;            &quot;{testimonial}&quot;&quot;"
           </Text>
         </div>
         <div 
