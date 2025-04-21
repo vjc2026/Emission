@@ -5,28 +5,32 @@
       "src": "api/server.js",
       "use": "@vercel/node"
     }
-  ],  "routes": [
-    {
-      "src": "/uploads/(.*)",
-      "dest": "/api/uploads/$1",
-      "headers": {
-        "Cache-Control": "max-age=3600",
-        "Access-Control-Allow-Origin": "*",
-        "Cross-Origin-Resource-Policy": "cross-origin"
-      }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/server.js"
-    }
   ],
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/uploads/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "max-age=3600" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/api/uploads/$1"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/server.js"
     }
   ]
 }
