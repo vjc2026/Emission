@@ -43,7 +43,6 @@ const primaryData = [
 const secondaryData = [
   { link: '/main', label: 'Dashboard', icon: IconBell },
   { link: '/main', label: 'Statistics', icon: IconChartBar },
-  { link: '/main', label: 'Projects Session Tracker', icon: IconHistory },
   { link: '/main', label: 'Code Optimizer', icon: Icon3dCubeSphere },
   { link: '/main', label: 'Compare Devices', icon: IconAccessPoint },
 ];

@@ -2161,13 +2161,12 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
       project_members 
     WHERE 
       user_id = ?
-    UNION
-    SELECT 
+    UNION    SELECT 
       id as project_id
     FROM 
       user_history
     WHERE 
-      user_id = ? AND status NOT IN ('Complete', 'Archived')
+      user_id = ? AND status NOT IN ('Archived')
   `;
 
   connection.query(getAllProjectIdsQuery, [userId, userId], (err, projectIds) => {
@@ -2213,10 +2212,9 @@ app.get('/user_project_display_combined', authenticateToken, (req, res) => {
       JOIN 
         users u ON uh.user_id = u.id
       LEFT JOIN 
-        project_members pm ON uh.id = pm.project_id AND pm.user_id = ?
-      WHERE 
+        project_members pm ON uh.id = pm.project_id AND pm.user_id = ?      WHERE 
         uh.id IN (${idPlaceholders})
-        AND uh.status NOT IN ('Complete', 'Archived')
+        AND uh.status NOT IN ('Archived')
     `;
 
     const queryParams = [userId, ...ids];
@@ -2602,27 +2600,78 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Error fetching devices' });
     }
     
-    // ===== NEW ENDPOINT CODE (unchanged) =====
-    // Endpoint to fetch device details and calculate carbon emissions for comparison
-    // new
-    const newEmissions = results.map(row => ({
-      deviceId: row.id,
-      deviceType: row.device,
-      carbonEmissions: 0, // Replace with actual calculation if needed
-      specifications: [
-        `CPU: ${row.cpu}`,
-        `GPU: ${row.gpu}`,
-        `RAM: ${row.ram}`,
-        `PSU: ${row.psu}`
-      ]
-    }));
-    // ===== END NEW ENDPOINT CODE =====
-    
-    // ===== OLD ENDPOINT CODE (unchanged) =====
-    // Endpoint to fetch device details and calculate carbon emissions for comparison
-    // old
-    const devices = results;
-    const oldEmissions = [];
+    try {
+      // Calculate actual emissions where possible
+      const emissions = await Promise.all(results.map(async row => {
+        let carbonEmissions = 0;
+        
+        // Determine device type and calculate emissions based on wattage
+        try {
+          let cpuWattage = 0, gpuWattage = 0, ramWattage = 0;
+          
+          // Get wattage data based on device type
+          if (row.device === 'Laptop' || row.device === 'Mobile') {
+            // Query specific wattage endpoints for mobile/laptop
+            const cpuQuery = `SELECT cpu_watts FROM cpusm WHERE model = ?`;
+            const gpuQuery = `SELECT gpu_watts FROM gpusm WHERE model = ?`;
+            const ramQuery = `SELECT avg_watt_usage FROM ram WHERE ddr_generation = ?`;
+            
+            const [cpuResults] = await connection.promise().query(cpuQuery, [row.cpu]);
+            const [gpuResults] = await connection.promise().query(gpuQuery, [row.gpu]);
+            const [ramResults] = await connection.promise().query(ramQuery, [row.ram]);
+            
+            cpuWattage = cpuResults[0]?.avg_watt_usage || 0;
+            gpuWattage = gpuResults[0]?.avg_watt_usage || 0;
+            ramWattage = ramResults[0]?.avg_watt_usage || 0;
+          } else {
+            // Query specific wattage endpoints for PC
+            const cpuQuery = `SELECT avg_watt_usage FROM cpus WHERE model = ?`;
+            const gpuQuery = `SELECT avg_watt_usage FROM gpus WHERE model = ?`;
+            const ramQuery = `SELECT avg_watt_usage FROM ram WHERE ddr_generation = ?`;
+            
+            const [cpuResults] = await connection.promise().query(cpuQuery, [row.cpu]);
+            const [gpuResults] = await connection.promise().query(gpuQuery, [row.gpu]);
+            const [ramResults] = await connection.promise().query(ramQuery, [row.ram]);
+            
+            cpuWattage = cpuResults[0]?.avg_watt_usage || 0;
+            gpuWattage = gpuResults[0]?.avg_watt_usage || 0;
+            ramWattage = ramResults[0]?.avg_watt_usage || 0;
+          }
+          
+          // Calculate total wattage
+          const totalWattage = cpuWattage + gpuWattage + ramWattage;
+          
+          // Convert wattage to carbon emissions (kg CO2)
+          // Assuming 1 kWh produces about 0.5 kg CO2 - adjust this factor as needed
+          const hoursPerDay = 8; // Assuming 8 hours of use per day
+          const daysPerYear = 365;
+          const kwhPerYear = (totalWattage / 1000) * hoursPerDay * daysPerYear;
+          carbonEmissions = kwhPerYear * 0.5;
+        } catch (error) {
+          console.error(`Error calculating emissions for device ${row.id}:`, error);
+          // Use default value if calculation fails
+          carbonEmissions = 0;
+        }
+        
+        return {
+          deviceId: row.id,
+          deviceType: row.device,
+          carbonEmissions: carbonEmissions,
+          specifications: [
+            `CPU: ${row.cpu}`,
+            `GPU: ${row.gpu}`,
+            `RAM: ${row.ram}`,
+            `PSU: ${row.psu}`
+          ]
+        };
+      }));
+      
+      // Return the emissions data
+      return res.status(200).json({ emissions });
+    } catch (error) {
+      console.error('Error processing device data:', error);
+      return res.status(500).json({ error: 'Error processing device data' });
+    }
     
     for (const device of devices) {
       const { id, deviceType, cpu, gpu, ram, psu } = device;

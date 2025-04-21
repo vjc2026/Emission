@@ -669,7 +669,34 @@ const AdminDashboard: React.FC = () => {
         throw new Error(error.error || 'Failed to process owner user');
       }
 
-      // Now create the project with External organization
+      // Determine the organization for the project
+      let projectOrganization = "External"; // Default organization
+        // If there's a project leader assigned, try to get their organization
+      if (newProject.project_leader && newProject.project_leader.trim()) {
+        try {
+          // Fetch the project leader's details to get their organization
+          const leaderResponse = await fetch(`http://localhost:5000/user_organization/${newProject.project_leader}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          
+          if (leaderResponse.ok) {
+            const leaderData = await leaderResponse.json();
+            if (leaderData.organization) {
+              projectOrganization = leaderData.organization;
+              console.log(`Using project leader's organization: ${projectOrganization}`);
+            }
+          } else {
+            console.warn(`Couldn't fetch project leader's organization, using default: External`);
+          }
+        } catch (leaderError) {
+          console.error("Error fetching project leader's organization:", leaderError);
+          // Continue with default organization if there was an error
+        }
+      }
+
+      // Now create the project with the determined organization
       const projectToCreate = {
         ...newProject,
         owner_email: newProject.owner,
@@ -677,7 +704,7 @@ const AdminDashboard: React.FC = () => {
         members: [...newProject.members], // Make sure we're sending all members
         session_duration: 0,
         carbon_emit: 0,
-        organization: "External" // Set organization as "External" for the project
+        organization: projectOrganization // Use the determined organization
       };
   
       console.log("Creating project with members:", projectToCreate.members); // Add debugging
@@ -1437,21 +1464,15 @@ const AdminDashboard: React.FC = () => {
                     onChange={(event) => {
                       const startDate = event.currentTarget.value;
                       const start = new Date(startDate);
-                      const due = new Date(start);
-                      due.setDate(start.getDate() + newProject.stage_duration);
+                      const due = new Date(newProject.stage_due_date);
                       
-                      // Ensure project start date is not after stage start date
-                      const projectStart = new Date(newProject.project_start_date);
-                      if (start < projectStart) {
-                        start.setHours(0, 0, 0, 0);
+                      // Only update if stage start is before stage due
+                      if (start <= due) {
+                        setNewProject({
+                          ...newProject,
+                          stage_start_date: startDate
+                        });
                       }
-                      
-                      setNewProject({
-                        ...newProject,
-                        stage_start_date: startDate,
-                        stage_due_date: due.toISOString().split('T')[0],
-                        project_start_date: start < projectStart ? startDate : newProject.project_start_date
-                      });
                     }}
                     min={new Date().toISOString().split('T')[0]} // Cannot select past dates
                   />

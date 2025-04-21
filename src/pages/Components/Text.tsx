@@ -1040,51 +1040,6 @@ const History = () => {
             </table>
           )}
         </div>
-
-        <div className={styles.taskSection}>
-          <div className={styles.taskSectionHeader} onClick={() => setShowCompletedTasks(!showCompletedTasks)}>
-            Completed tasks ({completedTasks.length})
-          </div>
-          {showCompletedTasks && (
-            <table className={styles.taskTable}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Type</th>
-                  <th>Leader</th>
-                  <th>Assignees</th>
-                  <th>Spent Time</th>
-                  <th>Carbon Emissions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {completedTasks.map((task) => (
-                  <tr key={task.id} className={styles.completed} onClick={() => handleTaskClick(task)}>
-                    <td>{task.title}</td>
-                    <td>{task.status}</td>
-                    <td>{task.type}</td>
-                    <td>
-                      {task.leader && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <img 
-                            src={task.leader.profileImage || `https://www.gravatar.com/avatar/${task.leader.email}?d=identicon&s=24`}
-                            alt={task.leader.name}
-                            style={{ borderRadius: '50%', width: '24px', height: '24px' }}
-                          />
-                          <span>{task.leader.name || task.leader.email}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td>{renderAssignees(task.assignees)}</td>
-                    <td>{formatTime(task.spentTime)}</td>
-                    <td>{task.carbonEmit ? `${task.carbonEmit.toFixed(2)} kg CO2` : '0 kg CO2'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
       </div>
 
       {selectedTask && (
