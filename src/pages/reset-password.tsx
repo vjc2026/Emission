@@ -24,7 +24,7 @@ const ResetPassword: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/resetpassword', {
+      const response = await fetch('http://emission-811s.vercel.app/resetpassword', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

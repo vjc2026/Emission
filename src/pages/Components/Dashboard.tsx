@@ -19,7 +19,7 @@ export function DashboardComponent() {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/user_project_display_combined', {
+        const response = await fetch('http://emission-811s.vercel.app/user_project_display_combined', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });

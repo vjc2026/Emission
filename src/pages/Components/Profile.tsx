@@ -88,7 +88,7 @@ export function HELPComponent() {
   
       try {
         // Fetch device type first
-        const response = await fetch('http://localhost:5000/checkDeviceType', {
+        const response = await fetch('http://emission-811s.vercel.app/checkDeviceType', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -98,8 +98,8 @@ export function HELPComponent() {
   
         // Based on device type, choose the correct endpoint
         const endpoint = deviceType === 'Laptop'
-          ? 'http://localhost:5000/displayuserM'
-          : 'http://localhost:5000/displayuser';
+          ? 'http://emission-811s.vercel.app/displayuserM'
+          : 'http://emission-811s.vercel.app/displayuser';
   
         // Fetch user details
         const userResponse = await fetch(endpoint, {
@@ -137,7 +137,7 @@ export function HELPComponent() {
     const fetchUserProjects = async (_email: string) => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch('http://localhost:5000/profile_display_projects', {
+        const response = await fetch('http://emission-811s.vercel.app/profile_display_projects', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -162,20 +162,20 @@ export function HELPComponent() {
     const fetchOptions = async () => {
       try {
         const cpuEndpoint = newDevice === 'Laptop' ? 'cpu-options-mobile' : 'cpu-options';
-        const cpuResponse = await axios.get(`http://localhost:5000/${cpuEndpoint}`);
+        const cpuResponse = await axios.get(`http://emission-811s.vercel.app/${cpuEndpoint}`);
         setCpuOptions(cpuResponse.data.cpuOptions.map((cpu: { label: string; value: string }) => ({
           label: cpu.label,
           value: cpu.value
         })));
   
         const gpuEndpoint = newDevice === 'Laptop' ? 'gpu-options-mobile' : 'gpu-options';
-        const gpuResponse = await axios.get(`http://localhost:5000/${gpuEndpoint}`);
+        const gpuResponse = await axios.get(`http://emission-811s.vercel.app/${gpuEndpoint}`);
         setGpuOptions(gpuResponse.data.gpuOptions.map((gpu: { label: string; value: string }) => ({
           label: gpu.label,
           value: gpu.value
         })));
   
-        const ramResponse = await axios.get('http://localhost:5000/ram-options');
+        const ramResponse = await axios.get('http://emission-811s.vercel.app/ram-options');
         setRamOptions(ramResponse.data.ramOptions.map((ram: { label: string; value: string }) => ({
           label: ram.label,
           value: ram.value
@@ -194,7 +194,7 @@ export function HELPComponent() {
     const fetchDevices = async () => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch('http://localhost:5000/user_devices', {
+        const response = await fetch('http://emission-811s.vercel.app/user_devices', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -234,7 +234,7 @@ export function HELPComponent() {
         psu,
       };
 
-      const response = await axios.post('http://localhost:5000/addDevice', formData, {
+      const response = await axios.post('http://emission-811s.vercel.app/addDevice', formData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -255,7 +255,7 @@ export function HELPComponent() {
   const handleDeviceSwitch = async (deviceId: number) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/setCurrentDevice', {
+      const response = await fetch('http://emission-811s.vercel.app/setCurrentDevice', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ export function HELPComponent() {
         setSelectedDevice(selectedDevice);
   
         // Fetch the updated user details based on the selected device type
-        const deviceTypeResponse = await fetch('http://localhost:5000/checkDeviceType', {
+        const deviceTypeResponse = await fetch('http://emission-811s.vercel.app/checkDeviceType', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -279,8 +279,8 @@ export function HELPComponent() {
         setDeviceType(deviceType);
   
         const endpoint = deviceType === 'Laptop'
-          ? 'http://localhost:5000/displayuserM'
-          : 'http://localhost:5000/displayuser';
+          ? 'http://emission-811s.vercel.app/displayuserM'
+          : 'http://emission-811s.vercel.app/displayuser';
   
         const userResponse = await fetch(endpoint, {
           method: 'GET',
@@ -544,7 +544,7 @@ export function HELPComponent() {
               onClick={async () => {
                 const token = localStorage.getItem('token');
                 try {
-                  const response = await fetch(`http://localhost:5000/archive_project/${selectedProject.id}`, {
+                  const response = await fetch(`http://emission-811s.vercel.app/archive_project/${selectedProject.id}`, {
                     method: 'PUT',
                     headers: { Authorization: `Bearer ${token}` },
                   });

@@ -75,7 +75,7 @@ export function StatisticsComponent() {
       }
 
       try {
-        const userResponse = await fetch('http://localhost:5000/user', {
+        const userResponse = await fetch('http://emission-811s.vercel.app/user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -83,7 +83,7 @@ export function StatisticsComponent() {
         if (userResponse.ok) {          const userData = await userResponse.json();
           setOrganization(userData.user.organization);
 
-          const projectsResponse = await fetch('http://localhost:5000/user_project_display_combined', {
+          const projectsResponse = await fetch('http://emission-811s.vercel.app/user_project_display_combined', {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` },
           });          if (projectsResponse.ok) {
