@@ -796,7 +796,7 @@ useEffect(() => {
         <Text style={{ lineHeight: 1.6, fontSize: '16px' }}>
           This system allows you to manage your projects and track carbon emissions during development.
           <br /><br />
-          1. Create a project by clicking the &quot;Create Project&quot; button which allows you to set a name and a description for your project. It is recommended to start your Project stage in Design.
+          1. Create a project by clicking the "Create Project" button which allows you to set a name and a description for your project. It is recommended to start your Project stage in Design.
           <br /><br />
           2. Start a session to track time and emissions.
           <br /><br />
