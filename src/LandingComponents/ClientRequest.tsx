@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   TextInput,
   Textarea,
@@ -21,7 +21,6 @@ const ClientRequest: React.FC = () => {
   const [projectTitle, setProjectTitle] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const formRef = useRef(null);
-  const formWrapperRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(formRef, { once: true });
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -42,19 +41,9 @@ const ClientRequest: React.FC = () => {
     setProjectDescription('');
   };
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (formWrapperRef.current) {
-      const rect = formWrapperRef.current.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
-      formWrapperRef.current.style.setProperty('--mouse-x', `${x}%`);
-      formWrapperRef.current.style.setProperty('--mouse-y', `${y}%`);
-    }
-  }, []);
-
   return (
     <Box className={classes.wrapper}>
-      <Container size="xl" className={classes.container}>
+      <Container size="xl" py={100} className={classes.container}>
         <motion.div
           ref={formRef}
           initial={{ opacity: 0, y: 20 }}
@@ -63,14 +52,13 @@ const ClientRequest: React.FC = () => {
         >
           <Title 
             ta="center" 
-            mb="sm"
+            mb="xl"
             style={{
               fontSize: 'clamp(2rem, 4vw, 3rem)',
               fontWeight: 800,
               background: 'linear-gradient(135deg, #fff 0%, #9fffe7 100%)',
               WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              marginBottom: '1rem'
+              WebkitTextFillColor: 'transparent'
             }}
           >
             Begin Your Sustainable Journey
@@ -82,19 +70,16 @@ const ClientRequest: React.FC = () => {
               color: '#b4ffe9',
               fontSize: 'clamp(1rem, 1.5vw, 1.2rem)',
               maxWidth: '600px',
-              margin: '0 auto 3rem auto'
+              margin: '0 auto'
             }}
           >
             Join the next generation of eco-conscious developers. Let's build a greener future together.
           </Text>
 
           <Paper 
-            ref={formWrapperRef}
-            onMouseMove={handleMouseMove}
             className={classes.formWrapper}
             p="xl"
           >
-            <div className={classes.formOverlay}></div>
             <form onSubmit={handleSubmit} className={classes.form}>
               <div className={classes.formGrid}>
                 <TextInput

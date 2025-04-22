@@ -40,20 +40,19 @@ function TestimonialCard({ name, title, image, testimonial }: (typeof testimonia
         padding="xl" 
         radius="md" 
         style={{
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,255,200,0.05) 100%)',
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,255,200,0.03) 100%)',
           backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: '1px solid rgba(255,255,255,0.05)',
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
           position: 'relative',
           overflow: 'hidden',
-          transition: 'transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+          transition: 'transform 0.3s ease, border-color 0.3s ease',
           '&:hover': {
             transform: 'translateY(-5px)',
             borderColor: 'rgba(0,255,200,0.2)',
-            boxShadow: '0 10px 30px rgba(0,255,200,0.1)'
           }
         }}
       >
@@ -92,7 +91,7 @@ function TestimonialCard({ name, title, image, testimonial }: (typeof testimonia
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(circle at 50% 50%, rgba(0,255,200,0.07) 0%, transparent 70%)',
+            background: 'radial-gradient(circle at 50% 50%, rgba(0,255,200,0.05) 0%, transparent 70%)',
             opacity: 0,
             transition: 'opacity 0.3s ease',
           }}
@@ -108,12 +107,13 @@ export function Testimonials() {
   const isInView = useInView(ref, { once: true });
 
   return (
-    <div 
+    <Container 
+      size="xl" 
+      py={100}
       style={{
+        background: 'linear-gradient(180deg, rgba(0,31,63,0.95) 0%, rgba(0,70,67,0.97) 100%)',
         position: 'relative',
-        overflow: 'hidden',
-        width: '100%',
-        background: 'linear-gradient(180deg, rgba(0,70,67,0.97) 0%, rgba(0,31,63,0.95) 100%)'
+        overflow: 'hidden'
       }}
     >
       <div 
@@ -126,75 +126,49 @@ export function Testimonials() {
         }}
       />
       
-      <Container 
-        size="xl"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '6rem 0',
-          margin: '0 auto',
-          zIndex: 1
-        }}
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, y: 20 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+        transition={{ duration: 0.6, ease: [0.215, 0.61, 0.355, 1] }}
+        style={{ position: 'relative', zIndex: 1 }}
       >
-        <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-          transition={{ duration: 0.6, ease: [0.215, 0.61, 0.355, 1] }}
-          style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 2rem' }}
+        <Title 
+          ta="center" 
+          mb={50}
+          style={{
+            fontSize: 'clamp(2rem, 4vw, 3rem)',
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #fff 0%, #9fffe7 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}
         >
-          <Title 
-            ta="center" 
-            mb="sm"
-            style={{
-              fontSize: 'clamp(2rem, 4vw, 3rem)',
-              fontWeight: 800,
-              background: 'linear-gradient(135deg, #fff 0%, #9fffe7 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              marginBottom: '1rem'
-            }}
-          >
-            Trusted by Developers Worldwide
-          </Title>
-          
-          <Text 
-            ta="center" 
-            mb={40}
-            style={{ 
-              color: '#b4ffe9',
-              fontSize: 'clamp(1rem, 1.5vw, 1.2rem)',
-              maxWidth: '700px',
-              margin: '0 auto 3rem auto'
-            }}
-          >
-            See how EmissionSense is making an impact in the developer community
-          </Text>
-        </motion.div>
+          Trusted by Developers Worldwide
+        </Title>
+      </motion.div>
 
-        <SimpleGrid 
-          cols={{ base: 1, sm: 2, md: 3 }} 
-          spacing="xl"
-          style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 2rem' }}
-        >
-          {testimonials.map((testimonial) => (
-            <TestimonialCard 
-              key={testimonial.name} 
-              {...testimonial} 
-            />
-          ))}
-        </SimpleGrid>
+      <SimpleGrid 
+        cols={{ base: 1, sm: 2, md: 3 }} 
+        spacing="xl"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        {testimonials.map((testimonial) => (
+          <TestimonialCard 
+            key={testimonial.name} 
+            {...testimonial} 
+          />
+        ))}
+      </SimpleGrid>
 
-        <style jsx global>{`
-          .card-glow {
-            opacity: 0;
-          }
-          .mantine-Card-root:hover .card-glow {
-            opacity: 1;
-          }
-        `}</style>
-      </Container>
-    </div>
+      <style jsx global>{`
+        .card-glow {
+          opacity: 0;
+        }
+        .mantine-Card-root:hover .card-glow {
+          opacity: 1;
+        }
+      `}</style>
+    </Container>
   );
 }
