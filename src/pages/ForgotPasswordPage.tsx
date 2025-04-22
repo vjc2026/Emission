@@ -9,7 +9,7 @@ const ForgotPasswordWithEmail: React.FC = () => {
 
   const handleSendResetEmail = async () => {
     try {
-      const response = await fetch('http://emission-811s.vercel.app/send-reset-email', {
+      const response = await fetch('https://node-iota-livid.vercel.app/send-reset-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

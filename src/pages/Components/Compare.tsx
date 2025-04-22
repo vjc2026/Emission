@@ -18,7 +18,7 @@ const Compare = () => {
 
   const fetchEmissions = async () => {
     try {
-      const response = await axios.get('http://emission-811s.vercel.app/compare_devices', {
+      const response = await axios.get('https://node-iota-livid.vercel.app/compare_devices', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
