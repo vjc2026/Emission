@@ -75,7 +75,7 @@ export function StatisticsComponent() {
       }
 
       try {
-        const userResponse = await fetch('http://emission-mah2.onrender.com/user', {
+        const userResponse = await fetch('https://emission-mah2.onrender.com/user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -83,7 +83,7 @@ export function StatisticsComponent() {
         if (userResponse.ok) {          const userData = await userResponse.json();
           setOrganization(userData.user.organization);
 
-          const projectsResponse = await fetch('http://emission-mah2.onrender.com/user_project_display_combined', {
+          const projectsResponse = await fetch('https://emission-mah2.onrender.com/user_project_display_combined', {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` },
           });          if (projectsResponse.ok) {
