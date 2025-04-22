@@ -105,7 +105,7 @@ const AdminEmissionView: React.FC = () => {
           throw new Error('No token found');
         }
 
-        const response = await fetch(`http://emission-mah2.onrender.com/emission_data?viewBy=${viewBy}`, {
+        const response = await fetch(`https://emission-mah2.onrender.com/emission_data?viewBy=${viewBy}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
