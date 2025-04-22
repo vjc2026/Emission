@@ -18,7 +18,7 @@ const Compare = () => {
 
   const fetchEmissions = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/compare_devices', {
+      const response = await axios.get('http://emission-mah2.onrender.com/compare_devices', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

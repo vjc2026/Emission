@@ -131,7 +131,7 @@ const fetchProjectMembers = async (projectId: number) => {
       throw new Error('No token found');
     }
 
-    const response = await fetch(`http://localhost:5000/project_members/${projectId}`, {
+    const response = await fetch(`http://emission-mah2.onrender.com/project_members/${projectId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -212,7 +212,7 @@ const checkAndUpdateProjectStatus = async (projectId: number,
     }
 
     // First, fetch all project members
-    const response = await fetch(`http://localhost:5000/project_members/${projectId}`, {
+    const response = await fetch(`http://emission-mah2.onrender.com/project_members/${projectId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -250,7 +250,7 @@ const checkAndUpdateProjectStatus = async (projectId: number,
       }
 
       // Update project status to "Complete"
-      const updateResponse = await fetch(`http://localhost:5000/admin/update_project/${projectId}`, {
+      const updateResponse = await fetch(`http://emission-mah2.onrender.com/admin/update_project/${projectId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -368,7 +368,7 @@ const AdminDashboard: React.FC = () => {
           throw new Error('No token found');
         }
 
-        const response = await fetch('http://localhost:5000/all_user_projects_admin', {
+        const response = await fetch('http://emission-mah2.onrender.com/all_user_projects_admin', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -482,7 +482,7 @@ const AdminDashboard: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`http://localhost:5000/admin/delete_project/${selectedProject.id}`, {
+      const response = await fetch(`http://emission-mah2.onrender.com/admin/delete_project/${selectedProject.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -557,7 +557,7 @@ const AdminDashboard: React.FC = () => {
           throw new Error('Project description is required');
         }
 
-        const response = await fetch(`http://localhost:5000/admin/update_project/${selectedProject.id}`, {
+        const response = await fetch(`http://emission-mah2.onrender.com/admin/update_project/${selectedProject.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -652,7 +652,7 @@ const AdminDashboard: React.FC = () => {
       // First, create or get the temporary user for the owner email
       // This endpoint will create a new user if they don't exist
       // or return the existing user if they do
-      const createTempUserResponse = await fetch('http://localhost:5000/create_temp_user', {
+      const createTempUserResponse = await fetch('http://emission-mah2.onrender.com/create_temp_user', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -675,7 +675,7 @@ const AdminDashboard: React.FC = () => {
       if (newProject.project_leader && newProject.project_leader.trim()) {
         try {
           // Fetch the project leader's details to get their organization
-          const leaderResponse = await fetch(`http://localhost:5000/user_organization/${newProject.project_leader}`, {
+          const leaderResponse = await fetch(`http://emission-mah2.onrender.com/user_organization/${newProject.project_leader}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -709,7 +709,7 @@ const AdminDashboard: React.FC = () => {
   
       console.log("Creating project with members:", projectToCreate.members); // Add debugging
   
-      const response = await fetch('http://localhost:5000/admin/create_project', {
+      const response = await fetch('http://emission-mah2.onrender.com/admin/create_project', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -788,7 +788,7 @@ const AdminDashboard: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`http://localhost:5000/validate_user_email/${email}`, {
+      const response = await fetch(`http://emission-mah2.onrender.com/validate_user_email/${email}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -847,7 +847,7 @@ const AdminDashboard: React.FC = () => {
         // If we get here, the email is valid, so clear any error
         setAssigneeError('');
 
-        const response = await fetch('http://localhost:5000/add_project_member', {
+        const response = await fetch('http://emission-mah2.onrender.com/add_project_member', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

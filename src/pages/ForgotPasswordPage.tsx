@@ -9,7 +9,7 @@ const ForgotPasswordWithEmail: React.FC = () => {
 
   const handleSendResetEmail = async () => {
     try {
-      const response = await fetch('http://localhost:5000/send-reset-email', {
+      const response = await fetch('http://emission-mah2.onrender.com/send-reset-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
