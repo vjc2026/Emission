@@ -48,7 +48,7 @@ const RegisterPage: React.FC = () => {
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
     try {
-      const response = await fetch('https://node-iota-livid.vercel.app/check-email', {
+      const response = await fetch('https://localhost:5000/check-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

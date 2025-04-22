@@ -81,7 +81,7 @@ const MainContent: React.FC = () => {
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('https://node-iota-livid.vercel.app/user', {
+        const response = await fetch('https://localhost:5000/user', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -105,7 +105,7 @@ const MainContent: React.FC = () => {
     const fetchNotifications = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('https://node-iota-livid.vercel.app/notifications', {
+        const response = await fetch('https://localhost:5000/notifications', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -164,7 +164,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`https://node-iota-livid.vercel.app/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://localhost:5000/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`https://node-iota-livid.vercel.app/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://localhost:5000/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`https://node-iota-livid.vercel.app/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://localhost:5000/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

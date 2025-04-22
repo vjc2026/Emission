@@ -105,7 +105,7 @@ const AdminEmissionView: React.FC = () => {
           throw new Error('No token found');
         }
 
-        const response = await fetch(`https://node-iota-livid.vercel.app/emission_data?viewBy=${viewBy}`, {
+        const response = await fetch(`https://localhost:5000/emission_data?viewBy=${viewBy}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
