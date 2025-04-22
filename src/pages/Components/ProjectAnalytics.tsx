@@ -64,7 +64,7 @@ export function ProjectAnalytics() {
       }
 
       try {
-        const response = await fetch('http://emission-811s.vercel.app/user_project_display_combined', {
+        const response = await fetch('http://localhost:5000/user_project_display_combined', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
@@ -76,7 +76,7 @@ export function ProjectAnalytics() {
         
         // Enhance projects with member data
         const enhancedProjects = await Promise.all(data.projects.map(async (project: Project) => {
-          const membersResponse = await fetch(`http://emission-811s.vercel.app/project/${project.id}/members`, {
+          const membersResponse = await fetch(`http://localhost:5000/project/${project.id}/members`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           

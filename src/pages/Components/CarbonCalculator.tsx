@@ -68,7 +68,7 @@ export function HistoryComponent() {
       }
 
       try {
-        const response = await fetch('https://localhost:5000/user', {
+        const response = await fetch('http://localhost:5000/user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -96,7 +96,7 @@ export function HistoryComponent() {
   const fetchUserProjects = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`https://localhost:5000/user_project_display_combined`, {
+      const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -150,7 +150,7 @@ export function HistoryComponent() {
     const fetchCurrentDevice = async () => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch('https://localhost:5000/checkDeviceType', {
+        const response = await fetch('http://localhost:5000/checkDeviceType', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -182,7 +182,7 @@ export function HistoryComponent() {
     console.log("Starting session with:", projectName, projectDescription);
  
     try {
-       const response = await fetch(`https://localhost:5000/find_project`, {
+       const response = await fetch(`http://localhost:5000/find_project`, {
           method: 'POST',
           headers: {
              'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ export function HistoryComponent() {
     };
 
     try {
-      const deviceTypeResponse = await fetch('https://localhost:5000/checkDeviceType', {
+      const deviceTypeResponse = await fetch('http://localhost:5000/checkDeviceType', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -252,8 +252,8 @@ export function HistoryComponent() {
       const { deviceType } = await deviceTypeResponse.json();
 
       const emissionsEndpoint = deviceType === 'Laptop' 
-        ? 'https://localhost:5000/calculate_emissionsM'
-        : 'https://localhost:5000/calculate_emissions';
+        ? 'http://localhost:5000/calculate_emissionsM'
+        : 'http://localhost:5000/calculate_emissions';
 
       const emissionsResponse = await fetch(emissionsEndpoint, {
         method: 'POST',
@@ -271,7 +271,7 @@ export function HistoryComponent() {
       const { carbonEmissions } = await emissionsResponse.json();
       console.log(`Calculated Carbon Emissions: ${carbonEmissions} kg CO2`);
 
-        const updateResponse = await fetch('https://localhost:5000/user_Update', {
+        const updateResponse = await fetch('http://localhost:5000/user_Update', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -342,7 +342,7 @@ useEffect(() => {
     const updatedProject = { projectName, projectDescription, projectStage };
 
     try {
-      const response = await fetch(`https://localhost:5000/update_project/${editableProject.id}`, {
+      const response = await fetch(`http://localhost:5000/update_project/${editableProject.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -394,7 +394,7 @@ useEffect(() => {
     };
     try {
       // Check if a project with the same name exists
-      const checkResponse = await fetch('https://localhost:5000/check_existing_projectname', {
+      const checkResponse = await fetch('http://localhost:5000/check_existing_projectname', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -412,7 +412,7 @@ useEffect(() => {
       }
   
       // No existing project, create the new one
-      const response = await fetch('https://localhost:5000/user_history', {
+      const response = await fetch('http://localhost:5000/user_history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -468,7 +468,7 @@ useEffect(() => {
     const isLastStage = currentStageIndex === projectStages.length - 1;
 
     try {
-      const response = await fetch(`https://localhost:5000/complete_project/${projectId}`, {
+      const response = await fetch(`http://localhost:5000/complete_project/${projectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -511,7 +511,7 @@ useEffect(() => {
   const handleInviteUser = async (recipientEmail: string, projectId: number, message: string): Promise<void> => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('https://localhost:5000/send-invitation', {
+      const response = await fetch('http://localhost:5000/send-invitation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
