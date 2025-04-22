@@ -63,7 +63,7 @@ const AdminUsers: React.FC = () => {
           throw new Error('No token found');
         }
 
-        const response = await fetch('http://localhost:5000/all_users', {
+        const response = await fetch('https://node-iota-livid.vercel.app/all_users', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -102,9 +102,9 @@ const AdminUsers: React.FC = () => {
         const gpuEndpoint = device === 'Laptop' ? 'gpu-options-mobile' : 'gpu-options';
 
         const [cpuResponse, gpuResponse, ramResponse] = await Promise.all([
-          axios.get(`http://localhost:5000/${cpuEndpoint}`),
-          axios.get(`http://localhost:5000/${gpuEndpoint}`),
-          axios.get('http://localhost:5000/ram-options'),
+          axios.get(`https://node-iota-livid.vercel.app/${cpuEndpoint}`),
+          axios.get(`https://node-iota-livid.vercel.app/${gpuEndpoint}`),
+          axios.get('https://node-iota-livid.vercel.app/ram-options'),
         ]);
 
         setCpuOptions(cpuResponse.data.cpuOptions);
@@ -155,7 +155,7 @@ const AdminUsers: React.FC = () => {
         formData.append('profilePicture', values.profilePicture);
       }
 
-      const response = await fetch('http://localhost:5000/register', {
+      const response = await fetch('https://node-iota-livid.vercel.app/register', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -185,7 +185,7 @@ const AdminUsers: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`http://localhost:5000/delete_user/${userId}`, {
+      const response = await fetch(`https://node-iota-livid.vercel.app/delete_user/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

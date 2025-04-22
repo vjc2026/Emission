@@ -42,7 +42,7 @@ const DeviceForm: React.FC = () => {
         const cpuEndpoint = device === 'Laptop' ? 'cpu-options-mobile' : 'cpu-options';
         console.log(`Fetching CPU options from: ${cpuEndpoint}`);
   
-        const cpuResponse = await axios.get(`http://localhost:5000/${cpuEndpoint}`);
+        const cpuResponse = await axios.get(`https://node-iota-livid.vercel.app/${cpuEndpoint}`);
         setCpuOptions(
           cpuResponse.data.cpuOptions.map((cpu: { label: string; value: string }) => ({
             label: cpu.label,
@@ -52,7 +52,7 @@ const DeviceForm: React.FC = () => {
   
         // Fetch GPU options
         const gpuEndpoint = device === 'Laptop' ? 'gpu-options-mobile' : 'gpu-options';
-        const gpuResponse = await axios.get(`http://localhost:5000/${gpuEndpoint}`);
+        const gpuResponse = await axios.get(`https://node-iota-livid.vercel.app/${gpuEndpoint}`);
         setGpuOptions(
           gpuResponse.data.gpuOptions.map((gpu: { label: string; value: string }) => ({
             label: gpu.label,
@@ -61,7 +61,7 @@ const DeviceForm: React.FC = () => {
         );
   
         // Fetch RAM options
-        const ramResponse = await axios.get('http://localhost:5000/ram-options');
+        const ramResponse = await axios.get('https://node-iota-livid.vercel.app/ram-options');
         setRamOptions(
           ramResponse.data.ramOptions.map((ram: { label: string; value: string }) => ({
             label: ram.label,
@@ -97,7 +97,7 @@ const DeviceForm: React.FC = () => {
       formData.append('psu', psu);
       if (profilePicture) formData.append('profilePicture', profilePicture);
 
-      const response = await axios.post('http://localhost:5000/register', formData, {
+      const response = await axios.post('https://node-iota-livid.vercel.app/register', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

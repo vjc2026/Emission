@@ -92,7 +92,7 @@ const History = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/user', {
+        const response = await fetch('https://node-iota-livid.vercel.app/user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -113,7 +113,7 @@ const History = () => {
 
       // Fetch device type
       try {
-        const deviceResponse = await fetch('http://localhost:5000/checkDeviceType', {
+        const deviceResponse = await fetch('https://node-iota-livid.vercel.app/checkDeviceType', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -136,7 +136,7 @@ const History = () => {
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
+      const response = await fetch(`https://node-iota-livid.vercel.app/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -144,7 +144,7 @@ const History = () => {
       if (response.ok) {
         const data = await response.json();
         const tasksWithMembers = await Promise.all(data.projects.map(async (project: any) => {
-          const membersResponse = await fetch(`http://localhost:5000/project/${project.id}/members`, {
+          const membersResponse = await fetch(`https://node-iota-livid.vercel.app/project/${project.id}/members`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           
@@ -261,8 +261,8 @@ const History = () => {
       try {
         // Calculate emissions
         const emissionsEndpoint = currentDevice === 'Laptop' 
-          ? 'http://localhost:5000/calculate_emissionsM'
-          : 'http://localhost:5000/calculate_emissions';
+          ? 'https://node-iota-livid.vercel.app/calculate_emissionsM'
+          : 'https://node-iota-livid.vercel.app/calculate_emissions';
 
         const emissionsResponse = await fetch(emissionsEndpoint, {
           method: 'POST',
@@ -284,7 +284,7 @@ const History = () => {
         }
 
         // Fetch project members after stopping
-        const membersResponse = await fetch(`http://localhost:5000/project/${taskId}/members`, {
+        const membersResponse = await fetch(`https://node-iota-livid.vercel.app/project/${taskId}/members`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
@@ -300,7 +300,7 @@ const History = () => {
         }
 
         // Update task with new values and send to server
-        const updateResponse = await fetch('http://localhost:5000/user_Update', {
+        const updateResponse = await fetch('https://node-iota-livid.vercel.app/user_Update', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -400,7 +400,7 @@ const History = () => {
       });
   
       // Send both the current and next stage to the server
-      const completeResponse = await fetch(`http://localhost:5000/complete_project/${taskId}`, {
+      const completeResponse = await fetch(`https://node-iota-livid.vercel.app/complete_project/${taskId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -565,7 +565,7 @@ const History = () => {
     
     try {
       // First check if project with same name exists
-      const checkResponse = await fetch('http://localhost:5000/check_existing_projectname', {
+      const checkResponse = await fetch('https://node-iota-livid.vercel.app/check_existing_projectname', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -584,7 +584,7 @@ const History = () => {
       }
 
       // If no duplicate, create the project
-      const response = await fetch('http://localhost:5000/user_history', {
+      const response = await fetch('https://node-iota-livid.vercel.app/user_history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -670,7 +670,7 @@ const History = () => {
     try {
       if (selectedTask) {
         // Adding assignee to existing task
-        const response = await fetch('http://localhost:5000/send-invitation', {
+        const response = await fetch('https://node-iota-livid.vercel.app/send-invitation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -727,7 +727,7 @@ const History = () => {
       };
 
       // Update project details
-      const updateResponse = await fetch(`http://localhost:5000/update_project/${selectedTask.id}`, {
+      const updateResponse = await fetch(`https://node-iota-livid.vercel.app/update_project/${selectedTask.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
