@@ -97,7 +97,7 @@ const transporter = nodemailer.createTransport({
 
 // Set up global CORS headers
 app.use(cors({
-  origin: 'https://emission-two.vercel.app/',
+  origin: 'https://emission-one.vercel.app/',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -114,7 +114,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://emission-two.vercel.app/');
+  res.header('Access-Control-Allow-Origin', 'https://emission-one.vercel.app/');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
   next();
@@ -228,7 +228,7 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const profileImageUrl = profilePicture ? `http://emission-mah2.onrender.com/uploads/${profilePicture}` : null;
+      const profileImageUrl = profilePicture ? `https://emission-mah2.onrender.com/uploads/${profilePicture}` : null;
       res.status(200).json({ message: 'User registered successfully', profileImageUrl });
     });
   });
@@ -361,7 +361,7 @@ app.get('/user', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -817,9 +817,9 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage
-        const cpuResponse = await fetch(`http://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`http://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
-        const ramResponse = await fetch(`http://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
+        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
@@ -936,9 +936,9 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage from mobile tables
-        const cpuResponse = await fetch(`http://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`http://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
-        const ramResponse = await fetch(`http://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
+        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const cpuData = await cpuResponse.json();
@@ -1135,7 +1135,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1217,7 +1217,7 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1871,7 +1871,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `https://emission-two.vercel.app//reset-password?token=${resetToken}`;
+      const resetLink = `https://emission-one.vercel.app//reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
@@ -2140,7 +2140,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null
     }));
 
@@ -2679,9 +2679,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
     
       try {
         if (deviceType === 'Laptop') {
-          const cpuResponse = await fetch(`http://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
+          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2691,9 +2691,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
             throw new Error('Error fetching wattage data for laptop');
           }
         } else {
-          const cpuResponse = await fetch(`http://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
+          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2880,7 +2880,7 @@ app.get('/project_members/:projectId', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null
     }));
 
@@ -3280,7 +3280,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null,
       roleTitle: member.role === 'project_owner' ? 'Project Owner (Client)'
                : member.role === 'project_leader' ? 'Project Leader (Team Manager)'
