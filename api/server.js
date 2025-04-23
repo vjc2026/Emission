@@ -222,14 +222,34 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
+    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, deviceResults) => {
       if (err) {
         console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const profileImageUrl = profilePicture ? `https://emission-mah2.onrender.com/uploads/${profilePicture}` : null;
-      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
+      // Update the user's current_device_id with the newly created device ID
+      const deviceId = deviceResults.insertId;
+      const updateUserQuery = `
+        UPDATE users 
+        SET current_device_id = ? 
+        WHERE id = ?
+      `;
+
+      connection.query(updateUserQuery, [deviceId, userId], (err, updateResults) => {
+        if (err) {
+          console.error('Error updating user with current device ID:', err);
+          // Even if this fails, we'll still return success since the user and device were created
+        }
+
+        const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
+        res.status(200).json({ 
+          message: 'User registered successfully', 
+          profileImageUrl,
+          userId: userId,
+          deviceId: deviceId
+        });
+      });
     });
   });
 });
