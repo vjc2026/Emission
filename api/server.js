@@ -97,7 +97,7 @@ const transporter = nodemailer.createTransport({
 
 // Set up global CORS headers
 app.use(cors({
-  origin: 'https://emission-vert.vercel.app',
+  origin: 'https://emission-1.onrender.com',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -114,7 +114,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
+  res.header('Access-Control-Allow-Origin', 'https://emission-1.onrender.com');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
   next();
@@ -1871,7 +1871,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `https://emission-vert.vercel.app/reset-password?token=${resetToken}`;
+      const resetLink = `https://emission-1.onrender.com/reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
