@@ -106,24 +106,33 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory path to be relative to the project root
-const uploadsDir = path.join(process.cwd(), 'uploads');
+// Update the uploads directory to use the mounted persistent storage
+const uploadsDir = process.env.NODE_ENV === 'production' 
+  ? '/data/uploads' 
+  : path.join(process.cwd(), 'uploads');
+
+// Ensure the uploads directory exists
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+
+console.log(`Using uploads directory: ${uploadsDir}`);
 
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
+  console.log(`Image request: ${req.url}, serving from: ${uploadsDir}`);
   next();
 }, express.static(uploadsDir, {
   fallthrough: false // Return 404 if file doesn't exist
 }), (err, req, res, next) => {
   if (err.status === 404) {
+    console.error(`Image not found: ${req.url}`);
     res.status(404).json({ error: 'Image not found' });
   } else {
+    console.error(`Error serving image: ${req.url}`, err);
     res.status(500).json({ error: 'Error serving image' });
   }
 });
