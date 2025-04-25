@@ -184,6 +184,7 @@ app.post('/upload', upload.single('profileImage'), (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
+
   res.status(200).send({ fileName: req.file.filename });
 });
 
