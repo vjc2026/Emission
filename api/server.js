@@ -82,9 +82,13 @@ pool.query('SELECT 1', (err, results) => {
 
 // Add a health check ping every 30 seconds to keep connections alive
 setInterval(() => {
-  pool.query('SELECT 1')
-    .then(() => console.log('Database connection ping successful'))
-    .catch(err => console.error('Database ping failed:', err));
+  pool.query('SELECT 1', (err, results) => {
+    if (err) {
+      console.error('Database ping failed:', err);
+    } else {
+      console.log('Database connection ping successful');
+    }
+  });
 }, 30000);
 
 // Utility function to check and update project completion status
