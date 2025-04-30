@@ -17,22 +17,75 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environme
 
 let totpSecrets = {};
 
-// Create MySQL connection
-const connection = mysql.createConnection({
+// Create MySQL connection pool instead of a single connection
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,     // Adjust based on your needs and database plan
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 30000, // 30 seconds
 });
 
-connection.connect((err) => {
+// This makes the pool compatible with your existing code that uses connection.query
+const connection = {
+  query: function(sql, args, callback) {
+    return pool.query(sql, args, callback);
+  },
+  beginTransaction: function(callback) {
+    return pool.getConnection((err, conn) => {
+      if (err) return callback(err);
+      
+      conn.beginTransaction((err) => {
+        if (err) {
+          conn.release();
+          return callback(err);
+        }
+        
+        // Extend the connection object with transaction methods
+        const txnConnection = {
+          query: function(sql, args, cb) {
+            return conn.query(sql, args, cb);
+          },
+          commit: function(cb) {
+            conn.commit((err) => {
+              conn.release();
+              cb(err);
+            });
+          },
+          rollback: function(cb) {
+            conn.rollback(() => {
+              conn.release();
+              cb();
+            });
+          }
+        };
+        
+        callback(null, txnConnection);
+      });
+    });
+  }
+};
+
+// Test the connection
+pool.query('SELECT 1', (err, results) => {
   if (err) {
     console.error('Error connecting to MySQL:', err);
     return;
   }
-  console.log('Connected to MySQL database');
+  console.log('Connected to MySQL database pool');
 });
+
+// Add a health check ping every 30 seconds to keep connections alive
+setInterval(() => {
+  pool.query('SELECT 1')
+    .then(() => console.log('Database connection ping successful'))
+    .catch(err => console.error('Database ping failed:', err));
+}, 30000);
 
 // Utility function to check and update project completion status
 const checkAndUpdateProjectCompletion = (projectId, callback) => {
