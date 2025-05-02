@@ -25,7 +25,7 @@ import {
   
     const handleLogin = async () => {
       try {
-        const response = await fetch('https://emission-mah2.onrender.com/login', {
+        const response = await fetch('http://localhost:5000/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ import {
   
     const handleAdminLogin = async () => {
       try {
-        const response = await fetch('https://emission-mah2.onrender.com/admin_login', {
+        const response = await fetch('http://localhost:5000/admin_login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -95,7 +95,7 @@ import {
         const token = localStorage.getItem('token');
         if (!token) return;
   
-        const response = await fetch('https://emission-mah2.onrender.com/refresh-token', {
+        const response = await fetch('http://localhost:5000/refresh-token', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,

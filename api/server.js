@@ -17,79 +17,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environme
 
 let totpSecrets = {};
 
-// Create MySQL connection pool instead of a single connection
-const pool = mysql.createPool({
+// Create MySQL connection
+const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
-  waitForConnections: true,
-  connectionLimit: 10,     // Adjust based on your needs and database plan
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 30000, // 30 seconds
 });
 
-// This makes the pool compatible with your existing code that uses connection.query
-const connection = {
-  query: function(sql, args, callback) {
-    return pool.query(sql, args, callback);
-  },
-  beginTransaction: function(callback) {
-    return pool.getConnection((err, conn) => {
-      if (err) return callback(err);
-      
-      conn.beginTransaction((err) => {
-        if (err) {
-          conn.release();
-          return callback(err);
-        }
-        
-        // Extend the connection object with transaction methods
-        const txnConnection = {
-          query: function(sql, args, cb) {
-            return conn.query(sql, args, cb);
-          },
-          commit: function(cb) {
-            conn.commit((err) => {
-              conn.release();
-              cb(err);
-            });
-          },
-          rollback: function(cb) {
-            conn.rollback(() => {
-              conn.release();
-              cb();
-            });
-          }
-        };
-        
-        callback(null, txnConnection);
-      });
-    });
-  }
-};
-
-// Test the connection
-pool.query('SELECT 1', (err, results) => {
+connection.connect((err) => {
   if (err) {
     console.error('Error connecting to MySQL:', err);
     return;
   }
-  console.log('Connected to MySQL database pool');
+  console.log('Connected to MySQL database');
 });
-
-// Add a health check ping every 30 seconds to keep connections alive
-setInterval(() => {
-  pool.query('SELECT 1', (err, results) => {
-    if (err) {
-      console.error('Database ping failed:', err);
-    } else {
-      console.log('Database connection ping successful');
-    }
-  });
-}, 30000);
 
 // Utility function to check and update project completion status
 const checkAndUpdateProjectCompletion = (projectId, callback) => {
@@ -154,7 +97,7 @@ const transporter = nodemailer.createTransport({
 
 // Set up global CORS headers
 app.use(cors({
-  origin: 'https://emission-vert.vercel.app',
+  origin: 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -163,33 +106,24 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory to use the mounted persistent storage
-const uploadsDir = process.env.NODE_ENV === 'production' 
-  ? '/data/uploads' 
-  : path.join(process.cwd(), 'uploads');
-
-// Ensure the uploads directory exists
+// Update the uploads directory path to be relative to the project root
+const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-console.log(`Using uploads directory: ${uploadsDir}`);
-
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
-  console.log(`Image request: ${req.url}, serving from: ${uploadsDir}`);
   next();
 }, express.static(uploadsDir, {
   fallthrough: false // Return 404 if file doesn't exist
 }), (err, req, res, next) => {
   if (err.status === 404) {
-    console.error(`Image not found: ${req.url}`);
     res.status(404).json({ error: 'Image not found' });
   } else {
-    console.error(`Error serving image: ${req.url}`, err);
     res.status(500).json({ error: 'Error serving image' });
   }
 });
@@ -288,34 +222,14 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, deviceResults) => {
+    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
       if (err) {
         console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      // Update the user's current_device_id with the newly created device ID
-      const deviceId = deviceResults.insertId;
-      const updateUserQuery = `
-        UPDATE users 
-        SET current_device_id = ? 
-        WHERE id = ?
-      `;
-
-      connection.query(updateUserQuery, [deviceId, userId], (err, updateResults) => {
-        if (err) {
-          console.error('Error updating user with current device ID:', err);
-          // Even if this fails, we'll still return success since the user and device were created
-        }
-
-        const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
-        res.status(200).json({ 
-          message: 'User registered successfully', 
-          profileImageUrl,
-          userId: userId,
-          deviceId: deviceId
-        });
-      });
+      const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
+      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
     });
   });
 });
@@ -447,7 +361,7 @@ app.get('/user', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -903,9 +817,9 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage
-        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
-        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
+        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
@@ -1022,9 +936,9 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage from mobile tables
-        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
-        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
+        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const cpuData = await cpuResponse.json();
@@ -1221,7 +1135,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1303,7 +1217,7 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1957,7 +1871,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `https://emission-vert.vercel.app/reset-password?token=${resetToken}`;
+      const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
@@ -2226,7 +2140,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `http://localhost:5000/uploads/${member.profile_image}`
         : null
     }));
 
@@ -2765,9 +2679,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
     
       try {
         if (deviceType === 'Laptop') {
-          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
-          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
+          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2777,9 +2691,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
             throw new Error('Error fetching wattage data for laptop');
           }
         } else {
-          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
-          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
+          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2966,7 +2880,7 @@ app.get('/project_members/:projectId', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `http://localhost:5000/uploads/${member.profile_image}`
         : null
     }));
 
@@ -3366,7 +3280,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
+        ? `http://localhost:5000/uploads/${member.profile_image}`
         : null,
       roleTitle: member.role === 'project_owner' ? 'Project Owner (Client)'
                : member.role === 'project_leader' ? 'Project Leader (Team Manager)'
@@ -3493,5 +3407,274 @@ app.post('/create_temp_user', authenticateAdmin, (req, res) => {
         isExisting: false
       });
     });
+  });
+});
+
+// Project Request Endpoints
+
+// Submit new project request (for users)
+app.post('/project-requests', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const {
+    title,
+    description,
+    project_stage,
+    organization,
+    stage_duration,
+    stage_start_date,
+    stage_due_date,
+    project_start_date,
+    project_due_date
+  } = req.body;
+
+  // Validate required fields
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Title and description are required' });
+  }
+
+  const query = `
+    INSERT INTO project_requests (
+      user_id, title, description, project_stage, organization,
+      stage_duration, stage_start_date, stage_due_date,
+      project_start_date, project_due_date, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+  `;
+
+  connection.query(
+    query,
+    [
+      userId, title, description, project_stage, organization,
+      stage_duration, stage_start_date, stage_due_date,
+      project_start_date, project_due_date
+    ],
+    (err, results) => {
+      if (err) {
+        console.error('Error creating project request:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.status(201).json({
+        message: 'Project request submitted successfully',
+        requestId: results.insertId
+      });
+    }
+  );
+});
+
+// Get all project requests (for admins)
+app.get('/admin/project-requests', authenticateAdmin, (req, res) => {
+  const query = `
+    SELECT pr.*, u.name as user_name, u.email as user_email
+    FROM project_requests pr
+    JOIN users u ON pr.user_id = u.id
+    ORDER BY pr.created_at DESC
+  `;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching project requests:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ requests: results });
+  });
+});
+
+// Get user's own project requests
+app.get('/user/project-requests', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const query = `
+    SELECT *
+    FROM project_requests
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+  `;
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user project requests:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ requests: results });
+  });
+});
+
+// Approve project request (admin only)
+app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => {
+  const requestId = req.params.id;
+  const reviewerId = req.user.id;
+  const { review_notes } = req.body;
+
+  // Start a transaction
+  connection.beginTransaction(err => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction error' });
+    }
+
+    // First, update the request status
+    const updateQuery = `
+      UPDATE project_requests
+      SET status = 'approved', reviewer_id = ?, review_notes = ?
+      WHERE id = ?
+    `;
+
+    connection.query(updateQuery, [reviewerId, review_notes, requestId], (err, results) => {
+      if (err) {
+        return connection.rollback(() => {
+          console.error('Error updating request:', err);
+          res.status(500).json({ error: 'Database error' });
+        });
+      }
+
+      if (results.affectedRows === 0) {
+        return connection.rollback(() => {
+          res.status(404).json({ error: 'Request not found' });
+        });
+      }
+
+      // Get the request details to create the project
+      const getRequestQuery = `
+        SELECT * FROM project_requests WHERE id = ?
+      `;
+
+      connection.query(getRequestQuery, [requestId], (err, requests) => {
+        if (err) {
+          return connection.rollback(() => {
+            console.error('Error fetching request:', err);
+            res.status(500).json({ error: 'Database error' });
+          });
+        }
+
+        if (requests.length === 0) {
+          return connection.rollback(() => {
+            res.status(404).json({ error: 'Request not found' });
+          });
+        }
+
+        const request = requests[0];
+
+        // Create the project based on the request with explicit 0 values for session_duration and carbon_emit
+        const createProjectQuery = `
+          INSERT INTO user_history (
+            user_id, project_name, project_description, stage,
+            organization, stage_duration, stage_start_date, stage_due_date,
+            project_start_date, project_due_date, status, session_duration, carbon_emit
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'In Progress', 0, 0)
+        `;
+
+        const projectValues = [
+          request.user_id,
+          request.title,
+          request.description,
+          request.project_stage,
+          request.organization,
+          request.stage_duration,
+          request.stage_start_date,
+          request.stage_due_date,
+          request.project_start_date,
+          request.project_due_date
+        ];
+
+        connection.query(createProjectQuery, projectValues, (err, projectResult) => {
+          if (err) {
+            return connection.rollback(() => {
+              console.error('Error creating project:', err);
+              res.status(500).json({ error: 'Database error' });
+            });
+          }
+
+          const projectId = projectResult.insertId;
+          
+          // Update the project_id field to be the same as the project's ID
+          const updateProjectIdQuery = `
+            UPDATE user_history 
+            SET project_id = ? 
+            WHERE id = ?
+          `;
+            connection.query(updateProjectIdQuery, [projectId, projectId], (err) => {
+            if (err) {
+              return connection.rollback(() => {
+                console.error('Error updating project ID:', err);
+                res.status(500).json({ error: 'Failed to update project ID' });
+              });
+            }
+            
+            // Add the user as both project_owner and project_leader in the project_members table
+            const addOwnerQuery = `
+              INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
+              VALUES (?, ?, 'project_owner', ?, 'In Progress')
+            `;
+            
+            connection.query(addOwnerQuery, [projectId, request.user_id, request.project_stage], (err) => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error adding project owner:', err);
+                  res.status(500).json({ error: 'Failed to add project owner' });
+                });
+              }
+              
+              // Add the same user as project_leader
+              const addLeaderQuery = `
+                INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
+                VALUES (?, ?, 'project_leader', ?, 'In Progress')
+              `;
+              
+              connection.query(addLeaderQuery, [projectId, request.user_id, request.project_stage], (err) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    console.error('Error adding project leader:', err);
+                    res.status(500).json({ error: 'Failed to add project leader' });
+                  });
+                }
+                
+                // If everything was successful, commit the transaction
+                connection.commit(err => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      console.error('Error committing transaction:', err);
+                      res.status(500).json({ error: 'Transaction error' });
+                    });
+                  }
+                  
+                  res.status(200).json({
+                    message: 'Project request approved and project created successfully',
+                    projectId: projectId
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+// Reject project request (admin only)
+app.put('/admin/project-requests/:id/reject', authenticateAdmin, (req, res) => {
+  const requestId = req.params.id;
+  const reviewerId = req.user.id;
+  const { review_notes } = req.body;
+
+  const query = `
+    UPDATE project_requests
+    SET status = 'rejected', reviewer_id = ?, review_notes = ?
+    WHERE id = ?
+  `;
+
+  connection.query(query, [reviewerId, review_notes, requestId], (err, results) => {
+    if (err) {
+      console.error('Error rejecting project request:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    res.status(200).json({ message: 'Project request rejected successfully' });
   });
 });
