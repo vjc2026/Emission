@@ -2529,46 +2529,46 @@ app.delete('/admin/delete_project/:id', authenticateAdmin, (req, res) => {
   const projectId = req.params.id;
 
   // Begin transaction to ensure atomic operations
-  connection.beginTransaction(err => {
+  connection.beginTransaction((err, txn) => {
     if (err) return res.status(500).json({ error: 'Transaction error' });
 
     // 1. Delete related notifications
-    connection.query(
+    txn.query(
       `DELETE FROM notifications WHERE project_id = ?`,
       [projectId],
       (err, notifResults) => {
         if (err) {
-          return connection.rollback(() => {
+          return txn.rollback(() => {
             res.status(500).json({ error: 'Error deleting notifications' });
           });
         }
 
         // 2. Delete related project members
-        connection.query(
+        txn.query(
           `DELETE FROM project_members WHERE project_id = ?`,
           [projectId],
           (err, memberResults) => {
             if (err) {
-              return connection.rollback(() => {
+              return txn.rollback(() => {
                 res.status(500).json({ error: 'Error deleting project members' });
               });
             }
 
             // 3. Finally delete the project
-            connection.query(
+            txn.query(
               `DELETE FROM user_history WHERE id = ?`,
               [projectId],
               (err, projectResults) => {
                 if (err) {
-                  return connection.rollback(() => {
+                  return txn.rollback(() => {
                     res.status(500).json({ error: 'Error deleting project' });
                   });
                 }
 
                 // Commit the transaction
-                connection.commit(err => {
+                txn.commit(err => {
                   if (err) {
-                    return connection.rollback(() => {
+                    return txn.rollback(() => {
                       res.status(500).json({ error: 'Commit error' });
                     });
                   }
@@ -3594,7 +3594,7 @@ app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => 
   const { review_notes } = req.body;
 
   // Start a transaction
-  connection.beginTransaction(err => {
+  connection.beginTransaction((err, txn) => {
     if (err) {
       console.error('Error starting transaction:', err);
       return res.status(500).json({ error: 'Transaction error' });
@@ -3605,18 +3605,16 @@ app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => 
       UPDATE project_requests
       SET status = 'approved', reviewer_id = ?, review_notes = ?
       WHERE id = ?
-    `;
-
-    connection.query(updateQuery, [reviewerId, review_notes, requestId], (err, results) => {
+    `;    txn.query(updateQuery, [reviewerId, review_notes, requestId], (err, results) => {
       if (err) {
-        return connection.rollback(() => {
+        return txn.rollback(() => {
           console.error('Error updating request:', err);
           res.status(500).json({ error: 'Database error' });
         });
       }
 
       if (results.affectedRows === 0) {
-        return connection.rollback(() => {
+        return txn.rollback(() => {
           res.status(404).json({ error: 'Request not found' });
         });
       }
@@ -3624,18 +3622,16 @@ app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => 
       // Get the request details to create the project
       const getRequestQuery = `
         SELECT * FROM project_requests WHERE id = ?
-      `;
-
-      connection.query(getRequestQuery, [requestId], (err, requests) => {
+      `;      txn.query(getRequestQuery, [requestId], (err, requests) => {
         if (err) {
-          return connection.rollback(() => {
+          return txn.rollback(() => {
             console.error('Error fetching request:', err);
             res.status(500).json({ error: 'Database error' });
           });
         }
 
         if (requests.length === 0) {
-          return connection.rollback(() => {
+          return txn.rollback(() => {
             res.status(404).json({ error: 'Request not found' });
           });
         }
@@ -3662,11 +3658,9 @@ app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => 
           request.stage_due_date,
           request.project_start_date,
           request.project_due_date
-        ];
-
-        connection.query(createProjectQuery, projectValues, (err, projectResult) => {
+        ];        txn.query(createProjectQuery, projectValues, (err, projectResult) => {
           if (err) {
-            return connection.rollback(() => {
+            return txn.rollback(() => {
               console.error('Error creating project:', err);
               res.status(500).json({ error: 'Database error' });
             });
@@ -3680,46 +3674,44 @@ app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => 
             SET project_id = ? 
             WHERE id = ?
           `;
-            connection.query(updateProjectIdQuery, [projectId, projectId], (err) => {
+            txn.query(updateProjectIdQuery, [projectId, projectId], (err) => {
             if (err) {
-              return connection.rollback(() => {
+              return txn.rollback(() => {
                 console.error('Error updating project ID:', err);
                 res.status(500).json({ error: 'Failed to update project ID' });
               });
             }
-            
-            // Add the user as both project_owner and project_leader in the project_members table
+              // Add the user as both project_owner and project_leader in the project_members table
             const addOwnerQuery = `
               INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
               VALUES (?, ?, 'project_owner', ?, 'In Progress')
             `;
             
-            connection.query(addOwnerQuery, [projectId, request.user_id, request.project_stage], (err) => {
+            txn.query(addOwnerQuery, [projectId, request.user_id, request.project_stage], (err) => {
               if (err) {
-                return connection.rollback(() => {
+                return txn.rollback(() => {
                   console.error('Error adding project owner:', err);
                   res.status(500).json({ error: 'Failed to add project owner' });
                 });
               }
-              
-              // Add the same user as project_leader
+                // Add the same user as project_leader
               const addLeaderQuery = `
                 INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
                 VALUES (?, ?, 'project_leader', ?, 'In Progress')
               `;
               
-              connection.query(addLeaderQuery, [projectId, request.user_id, request.project_stage], (err) => {
+              txn.query(addLeaderQuery, [projectId, request.user_id, request.project_stage], (err) => {
                 if (err) {
-                  return connection.rollback(() => {
+                  return txn.rollback(() => {
                     console.error('Error adding project leader:', err);
                     res.status(500).json({ error: 'Failed to add project leader' });
                   });
                 }
                 
                 // If everything was successful, commit the transaction
-                connection.commit(err => {
+                txn.commit(err => {
                   if (err) {
-                    return connection.rollback(() => {
+                    return txn.rollback(() => {
                       console.error('Error committing transaction:', err);
                       res.status(500).json({ error: 'Transaction error' });
                     });
