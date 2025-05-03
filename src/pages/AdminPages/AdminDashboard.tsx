@@ -43,23 +43,6 @@ interface Project {
   carbonEmit?: number;
 }
 
-interface ProjectRequest {
-  id: number;
-  project_name: string;
-  owner: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  review_notes?: string;
-  user_name?: string; // Add user_name property
-  organization?: string; // Optionally add organization if used elsewhere
-  description?: string; // Optionally add description if used elsewhere
-  project_stage?: string; // Optionally add project_stage if used elsewhere
-  stage_duration?: number; // Optionally add stage_duration if used elsewhere
-  stage_start_date?: string; // Optionally add stage_start_date if used elsewhere
-  project_due_date?: string; // Optionally add project_due_date if used elsewhere
-}
-
 interface ThProps {
   children: React.ReactNode;
   reversed: boolean;
@@ -328,14 +311,6 @@ const AdminDashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  
-  // Add new states for project requests
-  const [projectRequests, setProjectRequests] = useState<ProjectRequest[]>([]);
-  const [unreadRequests, setUnreadRequests] = useState<number>(0);
-  const [selectedRequest, setSelectedRequest] = useState<ProjectRequest | null>(null);
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [reviewNotes, setReviewNotes] = useState('');
-  
   const [sortedData, setSortedData] = useState<Project[]>([]);
   const [sortBy, setSortBy] = useState<keyof Project | null>(null);
   const [reverseSortDirection, setReverseSortDirection] = useState(false);
@@ -409,8 +384,8 @@ const AdminDashboard: React.FC = () => {
         }
 
         const data = await response.json();
-        console.log('Fetched projects:', data);
-        
+        console.log('Fetched projects:', data); // Debug log
+
         // Process all projects with error handling
         const projectsWithMembers = await Promise.all(
           (data.projects || []).map(async (project: Project) => {
@@ -424,7 +399,7 @@ const AdminDashboard: React.FC = () => {
           })
         );
 
-        console.log('Total projects fetched:', projectsWithMembers.length);
+        console.log('Total projects fetched:', projectsWithMembers.length); // Debug log
         setProjects(projectsWithMembers);
         setSortedData(projectsWithMembers);
       } catch (error) {
@@ -437,39 +412,9 @@ const AdminDashboard: React.FC = () => {
       }
     };
 
-    const fetchProjectRequests = async () => {
-      try {
-        const response = await fetch('https://emission-mah2.onrender.com/admin/project-requests', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch project requests');
-        }
-
-        const data = await response.json();
-        setProjectRequests(data.requests);
-        const unread = data.requests.filter((req: ProjectRequest) => req.status === 'pending').length;
-        setUnreadRequests(unread);
-      } catch (error) {
-        console.error('Error fetching project requests:', error);
-      }
-    };
-
-    // Initial fetch
     fetchProjects();
-    fetchProjectRequests();
-
-    // Set up polling for project requests
-    const interval = setInterval(() => {
-      fetchProjectRequests();
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(interval);
   }, [router]);
-  
+
   // Add an effect to check project completion status periodically
   useEffect(() => {
     // Don't run if there are no projects
@@ -844,8 +789,7 @@ const AdminDashboard: React.FC = () => {
       }
 
       const response = await fetch(`https://emission-mah2.onrender.com/validate_user_email/${email}`, {
-        headers:
-         {
+        headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
@@ -1110,103 +1054,6 @@ const AdminDashboard: React.FC = () => {
     </React.Fragment>
   ));
 
-  const handleApproveRequest = async (request: ProjectRequest) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/project-requests/${request.id}/approve`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ review_notes: reviewNotes }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to approve project request');
-      }
-
-      notifications.show({
-        title: 'Success',
-        message: 'Project request approved successfully',
-        color: 'green',
-      });
-
-      // Update local state
-      setProjectRequests(prev => 
-        prev.map(req => 
-          req.id === request.id 
-            ? { ...req, status: 'approved' } 
-            : req
-        )
-      );
-      setUnreadRequests(prev => Math.max(0, prev - 1));
-      setIsRequestModalOpen(false);
-      setReviewNotes('');
-
-    } catch (error) {
-      console.error('Error approving request:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to approve project request',
-        color: 'red',
-      });
-    }
-  };
-
-  const handleRejectRequest = async (request: ProjectRequest) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/project-requests/${request.id}/reject`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ review_notes: reviewNotes }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to reject project request');
-      }
-
-      notifications.show({
-        title: 'Success',
-        message: 'Project request rejected',
-        color: 'orange',
-      });
-
-      // Update local state
-      setProjectRequests(prev => 
-        prev.map(req => 
-          req.id === request.id 
-            ? { ...req, status: 'rejected' } 
-            : req
-        )
-      );
-      setUnreadRequests(prev => Math.max(0, prev - 1));
-      setIsRequestModalOpen(false);
-      setReviewNotes('');
-
-    } catch (error) {
-      console.error('Error rejecting request:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to reject project request',
-        color: 'red',
-      });
-    }
-  };
-
-  const handleRequestClick = (request: ProjectRequest) => {
-    setSelectedRequest(request);
-    setIsRequestModalOpen(true);
-  };
-  
   return (
     <AdminLayout>
       <div className={classes.container}>
@@ -1916,92 +1763,6 @@ const AdminDashboard: React.FC = () => {
               </Button>
             </Group>
           </div>
-        </Modal>
-
-        {/* Request Review Modal */}
-        <Modal
-          opened={isRequestModalOpen}
-          onClose={() => {
-            setIsRequestModalOpen(false);
-            setSelectedRequest(null);
-            setReviewNotes('');
-          }}
-          title={
-            <Text size="lg" fw={600}>
-              Project Request Details
-            </Text>
-          }
-          size="lg"
-        >
-          {selectedRequest && (
-            <Stack>
-              <Text fw={500} size="md">Project Title: {selectedRequest.project_name}</Text>
-              <Text c="dimmed" size="sm">Submitted by: {selectedRequest.user_name}</Text>
-              <Text c="dimmed" size="sm">Organization: {selectedRequest.organization}</Text>
-              
-              <Paper withBorder p="md" radius="md">
-                <Text fw={500} mb="xs">Description:</Text>
-                <Text>{selectedRequest.description}</Text>
-              </Paper>
-
-              <Group grow>
-                <Paper withBorder p="md" radius="md">
-                  <Text fw={500} mb="xs">Project Stage:</Text>
-                  <Text>{selectedRequest.project_stage}</Text>
-                </Paper>
-                <Paper withBorder p="md" radius="md">
-                  <Text fw={500} mb="xs">Stage Duration:</Text>
-                  <Text>{selectedRequest.stage_duration} days</Text>
-                </Paper>
-              </Group>
-
-              <Group grow>
-                <Paper withBorder p="md" radius="md">
-                  <Text fw={500} mb="xs">Start Date:</Text>
-                  <Text>{formatDate(selectedRequest.stage_start_date)}</Text>
-                </Paper>
-                <Paper withBorder p="md" radius="md">
-                  <Text fw={500} mb="xs">Due Date:</Text>
-                  <Text>{formatDate(selectedRequest.project_due_date)}</Text>
-                </Paper>
-              </Group>
-
-              {selectedRequest.status === 'pending' && (
-                <Textarea
-                  label="Review Notes"
-                  placeholder="Add your review notes here..."
-                  minRows={3}
-                  value={reviewNotes}
-                  onChange={(event) => setReviewNotes(event.currentTarget.value)}
-                />
-              )}
-
-              {selectedRequest.review_notes && (
-                <Paper withBorder p="md" radius="md">
-                  <Text fw={500} mb="xs">Review Notes:</Text>
-                  <Text>{selectedRequest.review_notes}</Text>
-                </Paper>
-              )}
-
-              {selectedRequest.status === 'pending' && (
-                <Group justify="flex-end" mt="md">
-                  <Button
-                    variant="outline"
-                    color="red"
-                    onClick={() => handleRejectRequest(selectedRequest)}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    color="green"
-                    onClick={() => handleApproveRequest(selectedRequest)}
-                  >
-                    Approve
-                  </Button>
-                </Group>
-              )}
-            </Stack>
-          )}
         </Modal>
       </div>
     </AdminLayout>

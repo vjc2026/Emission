@@ -5,7 +5,10 @@ import {
   IconBellRinging,
   IconReceipt2,
   IconFingerprint,
-  IconClipboardText,
+  IconKey,
+  IconDatabaseImport,
+  Icon2fa,
+  IconSettings,
   IconLogout,
   IconChevronLeft,
   IconChevronRight,
@@ -15,7 +18,6 @@ import styles from './AdminNavbar.module.css';
 const data = [
   { link: '/AdminPages/AdminDashboard', label: 'Dashboard', icon: IconBellRinging },
   { link: '/AdminPages/AdminUsers', label: 'Users', icon: IconReceipt2 },
-  { link: '/AdminPages/AdminProjectRequests', label: 'Project Requests', icon: IconClipboardText },
   { link: '/AdminPages/AdminEmissionView', label: 'Admin Emission View', icon: IconFingerprint },
 ];
 

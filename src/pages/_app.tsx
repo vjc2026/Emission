@@ -1,8 +1,6 @@
 import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
 import type { AppProps } from 'next/app';
 import { createTheme, MantineProvider } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
 import { BrowserRouter, StaticRouter } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
@@ -19,7 +17,6 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <MantineProvider theme={theme}>
-      <Notifications position="top-right" zIndex={1000} />
       {isClient ? (
         <BrowserRouter>
           <Component {...pageProps} />
