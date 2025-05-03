@@ -106,8 +106,12 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory path to be relative to the project root
-const uploadsDir = path.join(process.cwd(), 'uploads');
+// Update the uploads directory to use the mounted persistent storage
+const uploadsDir = process.env.NODE_ENV === 'production' 
+  ? '/data/uploads' 
+  : path.join(process.cwd(), 'uploads');
+
+// Ensure the uploads directory exists
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
