@@ -11,7 +11,24 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const path = require('path');
+
 const app = express();
+// Place CORS middleware at the very top, before any other middleware or routes
+app.use(cors({
+  origin: 'https://emission-vert.vercel.app',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Handle preflight requests for all routes
+app.options('*', cors({
+  origin: 'https://emission-vert.vercel.app',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environment variable for secret key
 
