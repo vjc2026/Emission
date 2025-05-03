@@ -71,6 +71,7 @@ const connection = {
   }
 };
 
+
 // Test the connection
 pool.query('SELECT 1', (err, results) => {
   if (err) {
