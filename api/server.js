@@ -1,3 +1,330 @@
+
+// Endpoint to create a project (admin only)
+app.post('/admin/create_project', authenticateAdmin, (req, res) => {
+  try {
+    const { 
+      project_name, 
+      project_description, 
+      status, 
+      stage, 
+      carbon_emit,
+      session_duration,
+      owner_email, 
+      leader_email,
+      members,
+      organization,
+      stage_duration,
+      stage_start_date,
+      stage_due_date,
+      project_start_date,
+      project_due_date
+    } = req.body;
+
+    // First, get the owner's user ID
+    const getUserIdQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(getUserIdQuery, [owner_email], (err, ownerResults) => {
+      if (err) {
+        console.error('Error getting user ID:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      if (ownerResults.length === 0) {
+        return res.status(400).json({ error: 'Owner email not found' });
+      }
+      
+      const ownerId = ownerResults[0].id;
+      
+      // Insert the project
+      const createProjectQuery = `
+        INSERT INTO user_history (
+          user_id, 
+          project_name, 
+          project_description, 
+          status, 
+          stage, 
+          carbon_emit,
+          session_duration,
+          organization,
+          stage_duration,
+          stage_start_date,
+          stage_due_date,
+          project_start_date,
+          project_due_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      connection.query(createProjectQuery, [
+        ownerId,
+        project_name,
+        project_description,
+        status || 'In Progress',
+        stage || 'Design: Creating the software architecture',
+        carbon_emit || 0,
+        session_duration || 0,
+        organization || 'External',
+        stage_duration || 14,
+        stage_start_date,
+        stage_due_date,
+        project_start_date,
+        project_due_date
+      ], (err, result) => {
+        if (err) {
+          console.error('Error creating project:', err);
+          return res.status(500).json({ error: 'Failed to create project' });
+        }
+        
+        const projectId = result.insertId;
+        
+        // Add owner as a member
+        const addOwnerQuery = `
+          INSERT INTO project_members (project_id, user_id, role)
+          VALUES (?, ?, 'owner')
+        `;
+        
+        connection.query(addOwnerQuery, [projectId, ownerId], (err) => {
+          if (err) {
+            console.error('Error adding owner as member:', err);
+          }
+          
+          // Add project leader if specified
+          const projectLeaderPromise = new Promise((resolve) => {
+            if (leader_email) {
+              connection.query(getUserIdQuery, [leader_email], (err, leaderResults) => {
+                if (!err && leaderResults.length > 0) {
+                  const leaderId = leaderResults[0].id;
+                  connection.query(
+                    'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, "leader")',
+                    [projectId, leaderId],
+                    (err) => {
+                      if (err) console.error('Error adding leader as member:', err);
+                      resolve();
+                    }
+                  );
+                } else {
+                  resolve();
+                }
+              });
+            } else {
+              resolve();
+            }
+          });
+          
+          // Add other members if specified
+          const memberPromises = (members || []).map(memberEmail => {
+            return new Promise((resolve) => {
+              if (memberEmail) {
+                connection.query(getUserIdQuery, [memberEmail], (err, memberResults) => {
+                  if (!err && memberResults.length > 0) {
+                    const memberId = memberResults[0].id;
+                    connection.query(
+                      'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, "member")',
+                      [projectId, memberId],
+                      (err) => {
+                        if (err) console.error(`Error adding member ${memberEmail}:`, err);
+                        resolve();
+                      }
+                    );
+                  } else {
+                    resolve();
+                  }
+                });
+              } else {
+                resolve();
+              }
+            });
+          });
+          
+          // Wait for all member additions to complete
+          Promise.all([projectLeaderPromise, ...memberPromises])
+            .then(() => {
+              // Return the created project
+              const getProjectQuery = `
+                SELECT 
+                  uh.*, 
+                  u.email as owner, 
+                  u.name as owner_name
+                FROM user_history uh
+                JOIN users u ON uh.user_id = u.id
+                WHERE uh.id = ?
+              `;
+              
+              connection.query(getProjectQuery, [projectId], (err, projectResults) => {
+                if (err) {
+                  console.error('Error retrieving created project:', err);
+                  return res.status(200).json({ 
+                    id: projectId,
+                    project_name,
+                    project_description,
+                    status: status || 'In Progress',
+                    stage: stage || 'Design: Creating the software architecture',
+                    carbon_emit: carbon_emit || 0,
+                    session_duration: session_duration || 0,
+                    owner: owner_email,
+                    organization: organization || 'External'
+                  });
+                }
+                
+                // Get all members of the project
+                const getMembersQuery = `
+                  SELECT u.email
+                  FROM project_members pm
+                  JOIN users u ON pm.user_id = u.id
+                  WHERE pm.project_id = ?
+                `;
+                
+                connection.query(getMembersQuery, [projectId], (err, memberResults) => {
+                  const members = err ? [] : memberResults.map(m => m.email);
+                  
+                  const project = projectResults[0];
+                  project.members = members;
+                  
+                  res.status(201).json(project);
+                });
+              });
+            })
+            .catch(error => {
+              console.error('Error in member promises:', error);
+              res.status(500).json({ error: 'An error occurred while adding members' });
+            });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    res.status(500).json({ error: 'An unexpected error occurred' });
+  }
+});
+
+// Endpoint to validate user email (check if user exists)
+app.get('/validate_user_email/:email', authenticateToken, (req, res) => {
+  const { email } = req.params;
+  
+  const query = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error validating email:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    res.json({ exists: results.length > 0 });
+  });
+});
+
+// Endpoint to create a temporary user if they don't exist
+app.post('/create_temp_user', authenticateToken, (req, res) => {
+  const { email, organization } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  
+  // Check if user already exists
+  const checkUserQuery = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(checkUserQuery, [email], (err, results) => {
+    if (err) {
+      console.error('Error checking user:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length > 0) {
+      // User already exists, return their ID
+      return res.json({ id: results[0].id, email, exists: true });
+    }
+    
+    // Create a temporary user
+    const createUserQuery = `
+      INSERT INTO users (email, name, organization, password, created_at)
+      VALUES (?, ?, ?, 'temporary', NOW())
+    `;
+    
+    const username = email.split('@')[0];
+    
+    connection.query(createUserQuery, [email, username, organization || 'External'], (err, result) => {
+      if (err) {
+        console.error('Error creating temp user:', err);
+        return res.status(500).json({ error: 'Failed to create temporary user' });
+      }
+      
+      res.status(201).json({ id: result.insertId, email, exists: false });
+    });
+  });
+});
+
+// Endpoint to add project member
+app.post('/add_project_member', authenticateToken, (req, res) => {
+  const { projectId, userEmail, role } = req.body;
+  
+  if (!projectId || !userEmail) {
+    return res.status(400).json({ error: 'Project ID and user email are required' });
+  }
+  
+  // First, get the user's ID
+  const getUserQuery = 'SELECT id FROM users WHERE email = ?';
+  
+  connection.query(getUserQuery, [userEmail], (err, userResults) => {
+    if (err) {
+      console.error('Error getting user:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (userResults.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userId = userResults[0].id;
+    
+    // Check if user is already a member
+    const checkMemberQuery = 'SELECT * FROM project_members WHERE project_id = ? AND user_id = ?';
+    
+    connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
+      if (err) {
+        console.error('Error checking membership:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      if (memberResults.length > 0) {
+        return res.status(400).json({ error: 'User is already a member of this project' });
+      }
+      
+      // Add user as a member
+      const addMemberQuery = `
+        INSERT INTO project_members (project_id, user_id, role)
+        VALUES (?, ?, ?)
+      `;
+      
+      connection.query(addMemberQuery, [projectId, userId, role || 'member'], (err) => {
+        if (err) {
+          console.error('Error adding member:', err);
+          return res.status(500).json({ error: 'Failed to add member' });
+        }
+        
+        // Get all members of the project
+        const getAllMembersQuery = `
+          SELECT u.email
+          FROM project_members pm
+          JOIN users u ON pm.user_id = u.id
+          WHERE pm.project_id = ?
+        `;
+        
+        connection.query(getAllMembersQuery, [projectId], (err, results) => {
+          if (err) {
+            console.error('Error getting members:', err);
+            return res.status(500).json({ 
+              message: 'Member added successfully, but failed to retrieve updated members list',
+              members: [{ email: userEmail }]
+            });
+          }
+          
+          const members = results.map(result => ({ email: result.email }));
+          res.status(200).json({ message: 'Member added successfully', members });
+        });
+      });
+    });
+  });
+});
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -170,13 +497,32 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Set up global CORS headers
 app.use(cors({
   origin: 'https://emission-vert.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+// Set up global CORS headers - enable for all routes and methods
+app.use(cors({
+  origin: ['https://emission-vert.vercel.app', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Access-Control-Allow-Origin'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
+
+// Explicitly handle OPTIONS requests
+app.options('*', cors());
+
+// Middleware to ensure CORS headers are applied even for errors
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  next();
+});
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
