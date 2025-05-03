@@ -25,115 +25,71 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 10,     // Increased limit slightly, adjust based on needs
+  connectionLimit: 3,     // Adjust based on your needs and database plan
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 30000, // 30 seconds
 });
 
-// Promisify the pool for async/await usage if needed elsewhere
-const promisePool = pool.promise();
-
-// Wrapper object to maintain compatibility with existing `connection.query` usage
-// And provide transaction handling that manages connection release.
+// This makes the pool compatible with your existing code that uses connection.query
 const connection = {
   query: function(sql, args, callback) {
-    // Use pool.query for non-transactional queries
-    // pool.query handles connection acquisition and release automatically
-    return pool.query(sql, args, (err, results, fields) => {
-      if (err) {
-        console.error("Error executing query via pool:", err);
-      }
-      if (callback) {
-        // Ensure callback signature matches mysql2 (err, results, fields)
-        callback(err, results, fields);
-      } else if (err) {
-        // If no callback, at least log the error
-         console.error("Unhandled query error:", err);
-      }
-    });
+    return pool.query(sql, args, callback);
   },
-  // Updated beginTransaction to ensure connection release
   beginTransaction: function(callback) {
-    // Get a connection from the pool
-    pool.getConnection((err, conn) => {
-      if (err) {
-        console.error("Failed to get connection for transaction:", err);
-        return callback(err); // Pass error to the callback
-      }
-
-      // Begin the transaction on the acquired connection
-      conn.beginTransaction((txErr) => {
-        if (txErr) {
-          console.error("Failed to begin transaction:", txErr);
-          conn.release(); // Release connection if beginTransaction fails
-          return callback(txErr); // Pass error to the callback
+    return pool.getConnection((err, conn) => {
+      if (err) return callback(err);
+      
+      conn.beginTransaction((err) => {
+        if (err) {
+          conn.release();
+          return callback(err);
         }
-
-        // Create a wrapper for this specific connection during the transaction
+        
+        // Extend the connection object with transaction methods
         const txnConnection = {
           query: function(sql, args, cb) {
-            // Execute query using the specific connection
             return conn.query(sql, args, cb);
           },
           commit: function(cb) {
-            // Commit the transaction
-            conn.commit((commitErr) => {
-              conn.release(); // Release the connection back to the pool
-              if (cb) cb(commitErr); // Pass potential commit error
+            conn.commit((err) => {
+              conn.release();
+              cb(err);
             });
           },
           rollback: function(cb) {
-            // Rollback the transaction
             conn.rollback(() => {
-              conn.release(); // Release the connection back to the pool
-              if (cb) cb(); // Rollback doesn't typically pass error
+              conn.release();
+              cb();
             });
-          },
-           // Expose the raw connection if needed, though not recommended for direct use
-          _getConnection: function() { return conn; }
+          }
         };
-
-        // Pass the transaction-aware connection object to the callback
+        
         callback(null, txnConnection);
       });
     });
-  },
-  // Expose promise-based query for async/await if needed
-  promiseQuery: function(sql, args) {
-    return promisePool.query(sql, args);
-  },
-   // Expose pool directly if needed for advanced use cases
-  getPool: function() {
-    return pool;
   }
 };
 
-// Test the connection pool
+// Test the connection
 pool.query('SELECT 1', (err, results) => {
   if (err) {
-    console.error('Error connecting to MySQL pool:', err);
-    // Consider exiting or implementing retry logic if initial connection fails
+    console.error('Error connecting to MySQL:', err);
     return;
   }
-  console.log('Connected to MySQL database pool successfully.');
+  console.log('Connected to MySQL database pool');
 });
 
-// Keep-alive ping using the pool's query method.
-// This is generally safe and lets the pool manage connection acquisition/release.
-// It should not interfere with user sessions. If logouts persist, the issue
-// is likely elsewhere in session handling or application logic.
+// Add a health check ping every 30 seconds to keep connections alive
 setInterval(() => {
-  pool.query('SELECT 1', (err) => { // Simple ping query
+  pool.query('SELECT 1', (err, results) => {
     if (err) {
-      console.error('Database pool keep-alive ping failed:', err);
-      // Consider adding monitoring or alerts for persistent ping failures
+      console.error('Database ping failed:', err);
+    } else {
+      console.log('Database connection ping successful');
     }
-    // else {
-    //   console.log('Database pool keep-alive ping successful.'); // Optional: Keep commented out to reduce noise
-    // }
   });
-}, 30000); // Ping every 30 seconds
+}, 30000);
 
 // Utility function to check and update project completion status
 const checkAndUpdateProjectCompletion = (projectId, callback) => {
@@ -3789,22 +3745,44 @@ app.put('/admin/project-requests/:id/reject', authenticateAdmin, (req, res) => {
   const reviewerId = req.user.id;
   const { review_notes } = req.body;
 
-  const query = `
-    UPDATE project_requests
-    SET status = 'rejected', reviewer_id = ?, review_notes = ?
-    WHERE id = ?
-  `;
-
-  connection.query(query, [reviewerId, review_notes, requestId], (err, results) => {
+  // Use a transaction for data consistency
+  connection.beginTransaction((err, txn) => {
     if (err) {
-      console.error('Error rejecting project request:', err);
-      return res.status(500).json({ error: 'Database error' });
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction error' });
     }
 
-    if (results.affectedRows === 0) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
+    const query = `
+      UPDATE project_requests
+      SET status = 'rejected', reviewer_id = ?, review_notes = ?
+      WHERE id = ?
+    `;
 
-    res.status(200).json({ message: 'Project request rejected successfully' });
+    txn.query(query, [reviewerId, review_notes, requestId], (err, results) => {
+      if (err) {
+        return txn.rollback(() => {
+          console.error('Error rejecting project request:', err);
+          res.status(500).json({ error: 'Database error' });
+        });
+      }
+
+      if (results.affectedRows === 0) {
+        return txn.rollback(() => {
+          res.status(404).json({ error: 'Request not found' });
+        });
+      }
+
+      // Commit the transaction
+      txn.commit(err => {
+        if (err) {
+          return txn.rollback(() => {
+            console.error('Error committing transaction:', err);
+            res.status(500).json({ error: 'Transaction error' });
+          });
+        }
+        
+        res.status(200).json({ message: 'Project request rejected successfully' });
+      });
+    });
   });
 });
