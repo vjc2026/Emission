@@ -152,9 +152,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Set up global CORS headers
+// Set up global CORS headers - more permissive to solve cross-origin issues
 app.use(cors({
-  origin: 'https://emission-vert.vercel.app',
+  origin: '*', // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -162,6 +162,14 @@ app.use(cors({
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Special handling for CORS preflight requests
+app.options('*', cors({
+  origin: '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Update the uploads directory to use the mounted persistent storage
 const uploadsDir = process.env.NODE_ENV === 'production' 
@@ -177,7 +185,7 @@ console.log(`Using uploads directory: ${uploadsDir}`);
 
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
+  res.header('Access-Control-Allow-Origin', '*'); // Allow all origins
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
   console.log(`Image request: ${req.url}, serving from: ${uploadsDir}`);
