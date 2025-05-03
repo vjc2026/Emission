@@ -3413,3 +3413,272 @@ app.post('/create_temp_user', authenticateAdmin, (req, res) => {
     });
   });
 });
+
+// Project Request Endpoints
+
+// Submit new project request (for users)
+app.post('/project-requests', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const {
+    title,
+    description,
+    project_stage,
+    organization,
+    stage_duration,
+    stage_start_date,
+    stage_due_date,
+    project_start_date,
+    project_due_date
+  } = req.body;
+
+  // Validate required fields
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Title and description are required' });
+  }
+
+  const query = `
+    INSERT INTO project_requests (
+      user_id, title, description, project_stage, organization,
+      stage_duration, stage_start_date, stage_due_date,
+      project_start_date, project_due_date, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+  `;
+
+  connection.query(
+    query,
+    [
+      userId, title, description, project_stage, organization,
+      stage_duration, stage_start_date, stage_due_date,
+      project_start_date, project_due_date
+    ],
+    (err, results) => {
+      if (err) {
+        console.error('Error creating project request:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.status(201).json({
+        message: 'Project request submitted successfully',
+        requestId: results.insertId
+      });
+    }
+  );
+});
+
+// Get all project requests (for admins)
+app.get('/admin/project-requests', authenticateAdmin, (req, res) => {
+  const query = `
+    SELECT pr.*, u.name as user_name, u.email as user_email
+    FROM project_requests pr
+    JOIN users u ON pr.user_id = u.id
+    ORDER BY pr.created_at DESC
+  `;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching project requests:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ requests: results });
+  });
+});
+
+// Get user's own project requests
+app.get('/user/project-requests', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const query = `
+    SELECT *
+    FROM project_requests
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+  `;
+
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching user project requests:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ requests: results });
+  });
+});
+
+// Approve project request (admin only)
+app.put('/admin/project-requests/:id/approve', authenticateAdmin, (req, res) => {
+  const requestId = req.params.id;
+  const reviewerId = req.user.id;
+  const { review_notes } = req.body;
+
+  // Start a transaction
+  connection.beginTransaction(err => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction error' });
+    }
+
+    // First, update the request status
+    const updateQuery = `
+      UPDATE project_requests
+      SET status = 'approved', reviewer_id = ?, review_notes = ?
+      WHERE id = ?
+    `;
+
+    connection.query(updateQuery, [reviewerId, review_notes, requestId], (err, results) => {
+      if (err) {
+        return connection.rollback(() => {
+          console.error('Error updating request:', err);
+          res.status(500).json({ error: 'Database error' });
+        });
+      }
+
+      if (results.affectedRows === 0) {
+        return connection.rollback(() => {
+          res.status(404).json({ error: 'Request not found' });
+        });
+      }
+
+      // Get the request details to create the project
+      const getRequestQuery = `
+        SELECT * FROM project_requests WHERE id = ?
+      `;
+
+      connection.query(getRequestQuery, [requestId], (err, requests) => {
+        if (err) {
+          return connection.rollback(() => {
+            console.error('Error fetching request:', err);
+            res.status(500).json({ error: 'Database error' });
+          });
+        }
+
+        if (requests.length === 0) {
+          return connection.rollback(() => {
+            res.status(404).json({ error: 'Request not found' });
+          });
+        }
+
+        const request = requests[0];
+
+        // Create the project based on the request with explicit 0 values for session_duration and carbon_emit
+        const createProjectQuery = `
+          INSERT INTO user_history (
+            user_id, project_name, project_description, stage,
+            organization, stage_duration, stage_start_date, stage_due_date,
+            project_start_date, project_due_date, status, session_duration, carbon_emit
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'In Progress', 0, 0)
+        `;
+
+        const projectValues = [
+          request.user_id,
+          request.title,
+          request.description,
+          request.project_stage,
+          request.organization,
+          request.stage_duration,
+          request.stage_start_date,
+          request.stage_due_date,
+          request.project_start_date,
+          request.project_due_date
+        ];
+
+        connection.query(createProjectQuery, projectValues, (err, projectResult) => {
+          if (err) {
+            return connection.rollback(() => {
+              console.error('Error creating project:', err);
+              res.status(500).json({ error: 'Database error' });
+            });
+          }
+
+          const projectId = projectResult.insertId;
+          
+          // Update the project_id field to be the same as the project's ID
+          const updateProjectIdQuery = `
+            UPDATE user_history 
+            SET project_id = ? 
+            WHERE id = ?
+          `;
+            connection.query(updateProjectIdQuery, [projectId, projectId], (err) => {
+            if (err) {
+              return connection.rollback(() => {
+                console.error('Error updating project ID:', err);
+                res.status(500).json({ error: 'Failed to update project ID' });
+              });
+            }
+            
+            // Add the user as both project_owner and project_leader in the project_members table
+            const addOwnerQuery = `
+              INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
+              VALUES (?, ?, 'project_owner', ?, 'In Progress')
+            `;
+            
+            connection.query(addOwnerQuery, [projectId, request.user_id, request.project_stage], (err) => {
+              if (err) {
+                return connection.rollback(() => {
+                  console.error('Error adding project owner:', err);
+                  res.status(500).json({ error: 'Failed to add project owner' });
+                });
+              }
+              
+              // Add the same user as project_leader
+              const addLeaderQuery = `
+                INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
+                VALUES (?, ?, 'project_leader', ?, 'In Progress')
+              `;
+              
+              connection.query(addLeaderQuery, [projectId, request.user_id, request.project_stage], (err) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    console.error('Error adding project leader:', err);
+                    res.status(500).json({ error: 'Failed to add project leader' });
+                  });
+                }
+                
+                // If everything was successful, commit the transaction
+                connection.commit(err => {
+                  if (err) {
+                    return connection.rollback(() => {
+                      console.error('Error committing transaction:', err);
+                      res.status(500).json({ error: 'Transaction error' });
+                    });
+                  }
+                  
+                  res.status(200).json({
+                    message: 'Project request approved and project created successfully',
+                    projectId: projectId
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+// Reject project request (admin only)
+app.put('/admin/project-requests/:id/reject', authenticateAdmin, (req, res) => {
+  const requestId = req.params.id;
+  const reviewerId = req.user.id;
+  const { review_notes } = req.body;
+
+  const query = `
+    UPDATE project_requests
+    SET status = 'rejected', reviewer_id = ?, review_notes = ?
+    WHERE id = ?
+  `;
+
+  connection.query(query, [reviewerId, review_notes, requestId], (err, results) => {
+    if (err) {
+      console.error('Error rejecting project request:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    res.status(200).json({ message: 'Project request rejected successfully' });
+  });
+});
