@@ -61,7 +61,7 @@ const AdminProjectRequests: React.FC = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/admin/project-requests', {
+      const response = await fetch('https://emission-mah2.onrender.com/admin/project-requests', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -102,7 +102,7 @@ const AdminProjectRequests: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
-      const response = await fetch(`http://localhost:5000/admin/project-requests/${selectedRequest.id}/approve`, {
+      const response = await fetch(`https://emission-mah2.onrender.com/admin/project-requests/${selectedRequest.id}/approve`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -143,7 +143,7 @@ const AdminProjectRequests: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
-      const response = await fetch(`http://localhost:5000/admin/project-requests/${selectedRequest.id}/reject`, {
+      const response = await fetch(`https://emission-mah2.onrender.com/admin/project-requests/${selectedRequest.id}/reject`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

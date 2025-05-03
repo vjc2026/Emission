@@ -92,7 +92,7 @@ const History = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/user', {
+        const response = await fetch('https://emission-mah2.onrender.com/user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -113,7 +113,7 @@ const History = () => {
 
       // Fetch device type
       try {
-        const deviceResponse = await fetch('http://localhost:5000/checkDeviceType', {
+        const deviceResponse = await fetch('https://emission-mah2.onrender.com/checkDeviceType', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -135,7 +135,7 @@ const History = () => {
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/user_project_display_combined`, {
+      const response = await fetch(`https://emission-mah2.onrender.com/user_project_display_combined`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -149,7 +149,7 @@ const History = () => {
         for (const project of data.projects) {
           // Only process if we haven't seen this project ID before
           if (!projectMap.has(project.id)) {
-            const membersResponse = await fetch(`http://localhost:5000/project/${project.id}/members`, {
+            const membersResponse = await fetch(`https://emission-mah2.onrender.com/project/${project.id}/members`, {
               headers: { 'Authorization': `Bearer ${token}` },
             });
             
@@ -272,8 +272,8 @@ const History = () => {
       try {
         // Calculate emissions
         const emissionsEndpoint = currentDevice === 'Laptop' 
-          ? 'http://localhost:5000/calculate_emissionsM'
-          : 'http://localhost:5000/calculate_emissions';
+          ? 'https://emission-mah2.onrender.com/calculate_emissionsM'
+          : 'https://emission-mah2.onrender.com/calculate_emissions';
 
         const emissionsResponse = await fetch(emissionsEndpoint, {
           method: 'POST',
@@ -295,7 +295,7 @@ const History = () => {
         }
 
         // Fetch project members after stopping
-        const membersResponse = await fetch(`http://localhost:5000/project/${taskId}/members`, {
+        const membersResponse = await fetch(`https://emission-mah2.onrender.com/project/${taskId}/members`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
@@ -311,7 +311,7 @@ const History = () => {
         }
 
         // Update task with new values and send to server
-        const updateResponse = await fetch('http://localhost:5000/user_Update', {
+        const updateResponse = await fetch('https://emission-mah2.onrender.com/user_Update', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -411,7 +411,7 @@ const History = () => {
       });
   
       // Send both the current and next stage to the server
-      const completeResponse = await fetch(`http://localhost:5000/complete_project/${taskId}`, {
+      const completeResponse = await fetch(`https://emission-mah2.onrender.com/complete_project/${taskId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -579,7 +579,7 @@ const History = () => {
     let loadingNotificationId: string | null = null;
     
     try {      // First check if project with same name exists
-      const checkResponse = await fetch('http://localhost:5000/check_existing_projectname', {
+      const checkResponse = await fetch('https://emission-mah2.onrender.com/check_existing_projectname', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -610,7 +610,7 @@ const History = () => {
       });
 
       // Submit project request for admin approval
-      const response = await fetch('http://localhost:5000/project-requests', {
+      const response = await fetch('https://emission-mah2.onrender.com/project-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -712,7 +712,7 @@ const History = () => {
     try {
       if (selectedTask) {
         // Adding assignee to existing task
-        const response = await fetch('http://localhost:5000/send-invitation', {
+        const response = await fetch('https://emission-mah2.onrender.com/send-invitation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -769,7 +769,7 @@ const History = () => {
       };
 
       // Update project details
-      const updateResponse = await fetch(`http://localhost:5000/update_project/${selectedTask.id}`, {
+      const updateResponse = await fetch(`https://emission-mah2.onrender.com/update_project/${selectedTask.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

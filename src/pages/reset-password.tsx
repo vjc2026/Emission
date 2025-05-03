@@ -24,7 +24,7 @@ const ResetPassword: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/resetpassword', {
+      const response = await fetch('https://emission-mah2.onrender.com/resetpassword', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

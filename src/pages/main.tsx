@@ -81,7 +81,7 @@ const MainContent: React.FC = () => {
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/user', {
+        const response = await fetch('https://emission-mah2.onrender.com/user', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -105,7 +105,7 @@ const MainContent: React.FC = () => {
     const fetchNotifications = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/notifications', {
+        const response = await fetch('https://emission-mah2.onrender.com/notifications', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -164,7 +164,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://emission-mah2.onrender.com/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://emission-mah2.onrender.com/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ const MainContent: React.FC = () => {
     if (selectedNotification) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/invitations/${selectedNotification.id}/respond`, {
+        const response = await fetch(`https://emission-mah2.onrender.com/invitations/${selectedNotification.id}/respond`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

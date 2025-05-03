@@ -17,22 +17,79 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environme
 
 let totpSecrets = {};
 
-// Create MySQL connection
-const connection = mysql.createConnection({
+// Create MySQL connection pool instead of a single connection
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,     // Adjust based on your needs and database plan
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 30000, // 30 seconds
 });
 
-connection.connect((err) => {
+// This makes the pool compatible with your existing code that uses connection.query
+const connection = {
+  query: function(sql, args, callback) {
+    return pool.query(sql, args, callback);
+  },
+  beginTransaction: function(callback) {
+    return pool.getConnection((err, conn) => {
+      if (err) return callback(err);
+      
+      conn.beginTransaction((err) => {
+        if (err) {
+          conn.release();
+          return callback(err);
+        }
+        
+        // Extend the connection object with transaction methods
+        const txnConnection = {
+          query: function(sql, args, cb) {
+            return conn.query(sql, args, cb);
+          },
+          commit: function(cb) {
+            conn.commit((err) => {
+              conn.release();
+              cb(err);
+            });
+          },
+          rollback: function(cb) {
+            conn.rollback(() => {
+              conn.release();
+              cb();
+            });
+          }
+        };
+        
+        callback(null, txnConnection);
+      });
+    });
+  }
+};
+
+// Test the connection
+pool.query('SELECT 1', (err, results) => {
   if (err) {
     console.error('Error connecting to MySQL:', err);
     return;
   }
-  console.log('Connected to MySQL database');
+  console.log('Connected to MySQL database pool');
 });
+
+// Add a health check ping every 30 seconds to keep connections alive
+setInterval(() => {
+  pool.query('SELECT 1', (err, results) => {
+    if (err) {
+      console.error('Database ping failed:', err);
+    } else {
+      console.log('Database connection ping successful');
+    }
+  });
+}, 30000);
 
 // Utility function to check and update project completion status
 const checkAndUpdateProjectCompletion = (projectId, callback) => {
@@ -97,7 +154,7 @@ const transporter = nodemailer.createTransport({
 
 // Set up global CORS headers
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'https://emission-vert.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -106,24 +163,33 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory path to be relative to the project root
-const uploadsDir = path.join(process.cwd(), 'uploads');
+// Update the uploads directory to use the mounted persistent storage
+const uploadsDir = process.env.NODE_ENV === 'production' 
+  ? '/data/uploads' 
+  : path.join(process.cwd(), 'uploads');
+
+// Ensure the uploads directory exists
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+console.log(`Using uploads directory: ${uploadsDir}`);
+
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
+  console.log(`Image request: ${req.url}, serving from: ${uploadsDir}`);
   next();
 }, express.static(uploadsDir, {
   fallthrough: false // Return 404 if file doesn't exist
 }), (err, req, res, next) => {
   if (err.status === 404) {
+    console.error(`Image not found: ${req.url}`);
     res.status(404).json({ error: 'Image not found' });
   } else {
+    console.error(`Error serving image: ${req.url}`, err);
     res.status(500).json({ error: 'Error serving image' });
   }
 });
@@ -222,14 +288,34 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
+    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, deviceResults) => {
       if (err) {
         console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
-      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
+      // Update the user's current_device_id with the newly created device ID
+      const deviceId = deviceResults.insertId;
+      const updateUserQuery = `
+        UPDATE users 
+        SET current_device_id = ? 
+        WHERE id = ?
+      `;
+
+      connection.query(updateUserQuery, [deviceId, userId], (err, updateResults) => {
+        if (err) {
+          console.error('Error updating user with current device ID:', err);
+          // Even if this fails, we'll still return success since the user and device were created
+        }
+
+        const profileImageUrl = profilePicture ? `https://emission-mah2.onrender.com/uploads/${profilePicture}` : null;
+        res.status(200).json({ 
+          message: 'User registered successfully', 
+          profileImageUrl,
+          userId: userId,
+          deviceId: deviceId
+        });
+      });
     });
   });
 });
@@ -361,7 +447,7 @@ app.get('/user', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -817,9 +903,9 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage
-        const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
-        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
+        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const { avg_watt_usage: cpuWattUsage } = await cpuResponse.json();
@@ -936,9 +1022,9 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
         const { cpu, gpu, ram, psu } = userResults[0];
 
         // Fetch CPU, GPU, and RAM wattage from mobile tables
-        const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
-        const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
-        const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
+        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
 
         if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
           const cpuData = await cpuResponse.json();
@@ -1135,7 +1221,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1217,7 +1303,7 @@ app.get('/displayuserM', authenticateToken, (req, res) => {
 
     if (userResults.length > 0) {
       const user = userResults[0];
-      const profileImageUrl = user.profile_image ? `http://localhost:5000/uploads/${user.profile_image}` : null;
+      const profileImageUrl = user.profile_image ? `https://emission-mah2.onrender.com/uploads/${user.profile_image}` : null;
       user.profile_image = profileImageUrl;
 
       const deviceQuery = `
@@ -1871,7 +1957,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+      const resetLink = `https://emission-vert.vercel.app/reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
@@ -2140,7 +2226,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://localhost:5000/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null
     }));
 
@@ -2679,9 +2765,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
     
       try {
         if (deviceType === 'Laptop') {
-          const cpuResponse = await fetch(`http://localhost:5000/cpum_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://localhost:5000/gpum_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
+          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2691,9 +2777,9 @@ app.get('/compare_devices', authenticateToken, async (req, res) => {
             throw new Error('Error fetching wattage data for laptop');
           }
         } else {
-          const cpuResponse = await fetch(`http://localhost:5000/cpu_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`http://localhost:5000/gpu_usage?model=${gpu}`);
-          const ramResponse = await fetch(`http://localhost:5000/ram_usage?model=${ram}`);
+          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
+          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
+          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
     
           if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
             cpuWattage = (await cpuResponse.json()).avg_watt_usage;
@@ -2880,7 +2966,7 @@ app.get('/project_members/:projectId', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://localhost:5000/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null
     }));
 
@@ -3280,7 +3366,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
-        ? `http://localhost:5000/uploads/${member.profile_image}`
+        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
         : null,
       roleTitle: member.role === 'project_owner' ? 'Project Owner (Client)'
                : member.role === 'project_leader' ? 'Project Leader (Team Manager)'
