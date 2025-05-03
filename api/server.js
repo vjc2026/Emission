@@ -17,79 +17,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key'; // Use environme
 
 let totpSecrets = {};
 
-// Create MySQL connection pool instead of a single connection
-const pool = mysql.createPool({
+// Create MySQL connection
+const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
-  waitForConnections: true,
-  connectionLimit: 10,     // Adjust based on your needs and database plan
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 30000, // 30 seconds
 });
 
-// This makes the pool compatible with your existing code that uses connection.query
-const connection = {
-  query: function(sql, args, callback) {
-    return pool.query(sql, args, callback);
-  },
-  beginTransaction: function(callback) {
-    return pool.getConnection((err, conn) => {
-      if (err) return callback(err);
-      
-      conn.beginTransaction((err) => {
-        if (err) {
-          conn.release();
-          return callback(err);
-        }
-        
-        // Extend the connection object with transaction methods
-        const txnConnection = {
-          query: function(sql, args, cb) {
-            return conn.query(sql, args, cb);
-          },
-          commit: function(cb) {
-            conn.commit((err) => {
-              conn.release();
-              cb(err);
-            });
-          },
-          rollback: function(cb) {
-            conn.rollback(() => {
-              conn.release();
-              cb();
-            });
-          }
-        };
-        
-        callback(null, txnConnection);
-      });
-    });
-  }
-};
-
-// Test the connection
-pool.query('SELECT 1', (err, results) => {
+connection.connect((err) => {
   if (err) {
     console.error('Error connecting to MySQL:', err);
     return;
   }
-  console.log('Connected to MySQL database pool');
+  console.log('Connected to MySQL database');
 });
-
-// Add a health check ping every 30 seconds to keep connections alive
-setInterval(() => {
-  pool.query('SELECT 1', (err, results) => {
-    if (err) {
-      console.error('Database ping failed:', err);
-    } else {
-      console.log('Database connection ping successful');
-    }
-  });
-}, 30000);
 
 // Utility function to check and update project completion status
 const checkAndUpdateProjectCompletion = (projectId, callback) => {
@@ -163,33 +106,24 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory to use the mounted persistent storage
-const uploadsDir = process.env.NODE_ENV === 'production' 
-  ? '/data/uploads' 
-  : path.join(process.cwd(), 'uploads');
-
-// Ensure the uploads directory exists
+// Update the uploads directory path to be relative to the project root
+const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-
-console.log(`Using uploads directory: ${uploadsDir}`);
 
 // Serve static files from uploads directory with proper headers and error handling
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'https://emission-vert.vercel.app');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'max-age=3600'); // Cache images for 1 hour
-  console.log(`Image request: ${req.url}, serving from: ${uploadsDir}`);
   next();
 }, express.static(uploadsDir, {
   fallthrough: false // Return 404 if file doesn't exist
 }), (err, req, res, next) => {
   if (err.status === 404) {
-    console.error(`Image not found: ${req.url}`);
     res.status(404).json({ error: 'Image not found' });
   } else {
-    console.error(`Error serving image: ${req.url}`, err);
     res.status(500).json({ error: 'Error serving image' });
   }
 });
@@ -288,34 +222,14 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, deviceResults) => {
+    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
       if (err) {
         console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      // Update the user's current_device_id with the newly created device ID
-      const deviceId = deviceResults.insertId;
-      const updateUserQuery = `
-        UPDATE users 
-        SET current_device_id = ? 
-        WHERE id = ?
-      `;
-
-      connection.query(updateUserQuery, [deviceId, userId], (err, updateResults) => {
-        if (err) {
-          console.error('Error updating user with current device ID:', err);
-          // Even if this fails, we'll still return success since the user and device were created
-        }
-
-        const profileImageUrl = profilePicture ? `http://localhost:5000/uploads/${profilePicture}` : null;
-        res.status(200).json({ 
-          message: 'User registered successfully', 
-          profileImageUrl,
-          userId: userId,
-          deviceId: deviceId
-        });
-      });
+      const profileImageUrl = profilePicture ? `https://emission-vert.vercel.app/uploads/${profilePicture}` : null;
+      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
     });
   });
 });
@@ -1957,7 +1871,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `https://emission-vert.vercel.app/reset-password?token=${resetToken}`;
+      const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
