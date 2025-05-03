@@ -131,7 +131,6 @@ const History = () => {
 
     fetchUserDetails();
   }, []);
-
   // Update the fetchUserTasks function to include projects where progress status is either "In Progress" or "Stage Complete"
   const fetchUserTasks = async (email: string) => {
     const token = localStorage.getItem('token');
@@ -143,70 +142,82 @@ const History = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const tasksWithMembers = await Promise.all(data.projects.map(async (project: any) => {
-          const membersResponse = await fetch(`https://emission-mah2.onrender.com/project/${project.id}/members`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          
-          let members = [];
-          let leader = null;
-          let owner = {
-            email: project.owner_email,
-            name: project.owner_name,
-            profileImage: null
-          };
+        // Create a Map to store unique projects by ID
+        const projectMap = new Map();
+        
+        // Process each project only once
+        for (const project of data.projects) {
+          // Only process if we haven't seen this project ID before
+          if (!projectMap.has(project.id)) {
+            const membersResponse = await fetch(`https://emission-mah2.onrender.com/project/${project.id}/members`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            
+            let members = [];
+            let leader = null;
+            let owner = {
+              email: project.owner_email,
+              name: project.owner_name,
+              profileImage: null
+            };
 
-          if (membersResponse.ok) {
-            const { members: projectMembers } = await membersResponse.json();
-            members = projectMembers.map((member: any) => {
-              if (member.role === 'project_leader') {
-                leader = {
+            if (membersResponse.ok) {
+              const { members: projectMembers } = await membersResponse.json();
+              members = projectMembers.map((member: any) => {
+                if (member.role === 'project_leader') {
+                  leader = {
+                    email: member.email,
+                    name: member.name,
+                    profileImage: member.profile_image
+                  };
+                }
+                return {
                   email: member.email,
                   name: member.name,
-                  profileImage: member.profile_image
+                  role: member.role,
+                  joinedAt: member.joined_at,
+                  profileImage: member.profile_image,
+                  progressStatus: member.progress_status || 'In Progress',
+                  currentStage: member.current_stage || project.stage
                 };
-              }
-              return {
-                email: member.email,
-                name: member.name,
-                role: member.role,
-                joinedAt: member.joined_at,
-                profileImage: member.profile_image,
-                progressStatus: member.progress_status || 'In Progress',
-                currentStage: member.current_stage || project.stage
-              };
+              });
+            }
+
+            // Add the processed project to our map
+            projectMap.set(project.id, {
+              id: project.id,
+              project_id: project.project_id || project.id.toString(),
+              title: project.project_name,
+              description: project.project_description,
+              status: project.status === 'Archived' ? 'Completed' : 'In Progress',
+              type: project.stage,
+              assignees: members,
+              leader: leader,
+              owner: owner,
+              spentTime: project.session_duration || 0,
+              carbonEmit: project.carbon_emit || 0,
+              isRunning: false,
+              startTime: null,
+              userCompleted: project.progress_status === 'Stage Complete',
+              progressStatus: project.progress_status,
+              stage_duration: project.stage_duration || 14,
+              stage_start_date: project.stage_start_date || new Date().toISOString().split('T')[0],
+              stage_due_date: project.stage_due_date || '',
+              project_start_date: project.project_start_date || new Date().toISOString().split('T')[0],
+              project_due_date: project.project_due_date || ''
             });
           }
-
-          return {
-            id: project.id,
-            project_id: project.project_id || project.id.toString(),
-            title: project.project_name,
-            description: project.project_description,
-            status: project.status === 'Archived' ? 'Completed' : 'In Progress',
-            type: project.stage,
-            assignees: members,
-            leader: leader,
-            owner: owner,
-            spentTime: project.session_duration || 0,
-            carbonEmit: project.carbon_emit || 0,
-            isRunning: false,
-            startTime: null,
-            userCompleted: project.progress_status === 'Stage Complete',
-            progressStatus: project.progress_status,
-            stage_duration: project.stage_duration || 14,
-            stage_start_date: project.stage_start_date || new Date().toISOString().split('T')[0],
-            stage_due_date: project.stage_due_date || '',
-            project_start_date: project.project_start_date || new Date().toISOString().split('T')[0],
-            project_due_date: project.project_due_date || ''
-          };
-        }));
+        }
+        
+        // Convert map values to array
+        const tasksWithMembers = Array.from(projectMap.values());
 
         // Filter out both "Not Started" and "Stage Complete" projects
         const filteredTasks = tasksWithMembers.filter(task => 
           task.progressStatus !== 'Not Started' && task.progressStatus !== 'Stage Complete'
         );
 
+        console.log(`Fetched ${data.projects.length} projects, processed ${tasksWithMembers.length} unique projects, displaying ${filteredTasks.length} filtered tasks`);
         setTasks(filteredTasks);
       }
     } catch (err) {
@@ -554,17 +565,20 @@ const History = () => {
         color: 'red',
       });
     }
-  };
-
-  const handleProjectRequest = async () => {
+  };  const handleProjectRequest = async () => {
     if (!newRequest.title || !newRequest.description || !newRequest.type) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please fill in all required fields',
+        color: 'red',
+      });
       return;
     }
 
     const token = localStorage.getItem('token');
+    let loadingNotificationId: string | null = null;
     
-    try {
-      // First check if project with same name exists
+    try {      // First check if project with same name exists
       const checkResponse = await fetch('https://emission-mah2.onrender.com/check_existing_projectname', {
         method: 'POST',
         headers: {
@@ -579,63 +593,71 @@ const History = () => {
       const checkData = await checkResponse.json();
       
       if (checkData.exists) {
-        setError('A project with this name already exists');
-        return;
-      }
+        notifications.show({
+          title: 'Error',
+          message: 'A project with this name already exists',
+          color: 'red',
+        });
+        return;      }
 
-      // If no duplicate, create the project
-      const response = await fetch('https://emission-mah2.onrender.com/user_history', {
+      // Show a processing notification
+      loadingNotificationId = notifications.show({
+        title: 'Submitting Request',
+        message: 'Please wait while we send your request to the admin...',
+        loading: true,
+        autoClose: false,
+        withCloseButton: false,
+      });
+
+      // Submit project request for admin approval
+      const response = await fetch('https://emission-mah2.onrender.com/project-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          projectName: newRequest.title,
-          projectDescription: newRequest.description,
-          projectStage: 'Design: Creating the software architecture',
-          status: 'In Progress',
-          organization: organization,
-          sessionDuration: 0,
-          carbonEmit: 0
+          title: newRequest.title,
+          description: newRequest.description,
+          project_stage: newRequest.type,
+          stage_duration: newRequest.stage_duration,
+          stage_start_date: newRequest.stage_start_date,
+          stage_due_date: newRequest.stage_due_date,
+          project_start_date: newRequest.project_start_date,
+          project_due_date: newRequest.project_due_date,
+          organization: organization
         })
+      });      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit project request');
+      }      const data = await response.json();
+
+      // Hide the loading notification
+      if (loadingNotificationId) {
+        notifications.hide(loadingNotificationId);
+      }      // Show a more detailed success notification
+      const notificationId = notifications.show({
+        title: 'Request Submitted Successfully',
+        message: 'Your project request has been sent to the admin for approval. You will be notified once it is reviewed.',
+        color: 'green',
+        autoClose: 5000,
+        withCloseButton: true,
+        icon: <span style={{ marginRight: '8px' }}>✓</span>,
+        styles: (theme) => ({
+          root: {
+            backgroundColor: '#f0f9f0',
+            borderColor: '#006400',
+            borderWidth: 1,
+            borderStyle: 'solid',
+          },
+          title: { color: '#006400', fontWeight: 'bold' },
+          description: { color: '#2e7d32' }
+        }),
       });
+      
+      console.log('Notification shown with ID:', notificationId);
 
-      if (!response.ok) {
-        throw new Error('Failed to create project');
-      }
-
-      const data = await response.json();
-
-      // Update the tasks list with the new project
-      const newProject: Task = {
-        id: data.projectId,
-        project_id: data.projectId.toString(),
-        title: newRequest.title,
-        description: newRequest.description,
-        type: 'Design: Creating the software architecture',
-        status: 'In Progress',
-        assignees: [],
-        spentTime: 0,
-        isRunning: false,
-        startTime: null,
-        carbonEmit: 0,
-        leader: null,
-        owner: user ? { 
-          email: user.email,
-          name: user.name,
-          profileImage: '' // Changed from null to empty string to match the type
-        } : null,
-        stage_duration: newRequest.stage_duration,
-        stage_start_date: newRequest.stage_start_date,
-        stage_due_date: newRequest.stage_due_date,
-        project_start_date: newRequest.project_start_date,
-        project_due_date: newRequest.project_due_date
-      };
-
-      setTasks(prevTasks => [...prevTasks, newProject]);
-
-      // Reset the form with all required fields
+      // Reset the form
       setNewRequest({
         title: '',
         description: '',
@@ -648,15 +670,35 @@ const History = () => {
         assignees: []
       });
 
-      setShowAddModal(false);
+      // Close the modal
+      setShowAddModal(false);    } catch (err) {      console.error('Error creating project:', err);
       
-      // Fetch updated tasks list
-      if (user?.email) {
-        await fetchUserTasks(user.email);
+      // Hide loading notification if it exists
+      if (loadingNotificationId) {
+        notifications.hide(loadingNotificationId);
       }
-
-    } catch (err) {
-      console.error('Error creating project:', err);
+        // Show detailed error notification
+      const errorNotificationId = notifications.show({
+        title: 'Request Failed',
+        message: 'There was a problem submitting your project request. Please try again later.',
+        color: 'red',
+        autoClose: 5000,
+        withCloseButton: true,
+        icon: <span style={{ marginRight: '8px' }}>✗</span>,
+        styles: (theme) => ({
+          root: {
+            backgroundColor: '#fff1f0',
+            borderColor: '#ff4d4f',
+            borderWidth: 1,
+            borderStyle: 'solid',
+          },
+          title: { color: '#cf1322', fontWeight: 'bold' },
+          description: { color: '#cf1322' }
+        }),
+      });
+      
+      console.log('Error notification shown with ID:', errorNotificationId);
+      
       setError('Failed to create project');
     }
   };
