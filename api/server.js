@@ -1875,7 +1875,7 @@ app.post('/send-reset-email', async (req, res) => {
       const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '5m' });
 
       // Send the password reset email
-      const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+      const resetLink = `https://emission-mah2.onrender.com/reset-password?token=${resetToken}`;
       const mailOptions = {
           from: `"EmissionSense" <${process.env.EMAIL_USER}>`,
           to: email,
