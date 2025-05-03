@@ -29,33 +29,7 @@ const History = () => {
   // Existing task management state
   const [showActiveTasks, setShowActiveTasks] = useState(true);
   const [showCompletedTasks, setShowCompletedTasks] = useState(true);
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      project_id: 'PRJ-1',
-      title: 'Create draft design for Website using Figma',
-      description: 'Design a draft for the new website using Figma.',
-      status: 'In Progress',
-      type: 'Low',
-      assignees: [
-        { email: 'user1@example.com', name: 'User 1', role: 'Member', profileImage: '' },
-        { email: 'user2@example.com', name: 'User 2', role: 'Member', profileImage: '' },
-        { email: 'user3@example.com', name: 'User 3', role: 'Member', profileImage: '' },
-        { email: 'user4@example.com', name: 'User 4', role: 'Member', profileImage: '' }
-      ],
-      spentTime: 6840, // 1:54h in seconds
-      isRunning: false,
-      startTime: null as number | null,
-      carbonEmit: 0,
-      leader: null as { email: string; name: string; profileImage: string } | null,
-      owner: { email: 'example@example.com', name: 'Example User', profileImage: '' },
-      stage_duration: 0,
-      stage_start_date: new Date().toISOString().split('T')[0],
-      stage_due_date: '',
-      project_start_date: new Date().toISOString().split('T')[0],
-      project_due_date: ''
-    }
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [now, setNow] = useState(Date.now());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRequest, setNewRequest] = useState({
@@ -484,20 +458,14 @@ const History = () => {
               <div>
                 <p>{responseData.message}</p>
                 <p>{completedMembers} out of {totalMembers} team members have completed this stage.</p>
-                <div style={{ 
-                  height: '6px', 
-                  width: '100%', 
-                  backgroundColor: '#e0e0e0', 
-                  borderRadius: '3px',
-                  marginTop: '8px' 
-                }}>
-                  <div style={{ 
-                    height: '100%', 
-                    width: `${progressPercentage}%`, 
-                    backgroundColor: progressPercentage === 100 ? '#52c41a' : '#faad14', 
-                    borderRadius: '3px',
-                    transition: 'width 0.3s ease'
-                  }}/>
+                <div className={styles.progressNotification}>
+                  <div 
+                    className={styles.progressNotificationFill} 
+                    style={{ 
+                      width: `${progressPercentage}%`, 
+                      backgroundColor: progressPercentage === 100 ? '#52c41a' : '#faad14'
+                    }}
+                  />
                 </div>
               </div>
             ),
@@ -642,7 +610,7 @@ const History = () => {
         color: 'green',
         autoClose: 5000,
         withCloseButton: true,
-        icon: <span style={{ marginRight: '8px' }}>✓</span>,
+        icon: <span className={styles.notificationIcon}>✓</span>,
         styles: (theme) => ({
           root: {
             backgroundColor: '#f0f9f0',
@@ -684,7 +652,7 @@ const History = () => {
         color: 'red',
         autoClose: 5000,
         withCloseButton: true,
-        icon: <span style={{ marginRight: '8px' }}>✗</span>,
+        icon: <span className={styles.notificationIcon}>✗</span>,
         styles: (theme) => ({
           root: {
             backgroundColor: '#fff1f0',
@@ -818,8 +786,10 @@ const History = () => {
   };
 
   const renderAssignees = (assignees: any[]) => {
-    // Filter out assignees with role "project_owner"
-    const filteredAssignees = assignees.filter(assignee => assignee.role !== 'project_owner');
+    // Filter out assignees with role "project_leader" or "project_owner"
+    const filteredAssignees = assignees.filter(assignee => 
+      assignee.role !== 'project_leader' && assignee.role !== 'project_owner'
+    );
     const displayedAssignees = filteredAssignees.slice(0, 3);
     const remainingCount = filteredAssignees.length - displayedAssignees.length;
 
@@ -828,12 +798,12 @@ const History = () => {
         {displayedAssignees.map((assignee, index) => (
           <div key={index} className={styles.assignee}>
             <img 
-              src={assignee.profileImage || '/default-avatar.png'} 
+              src={assignee.profileImage || 'https://www.gravatar.com/avatar/default?d=mp'} 
               alt={assignee.name}
               className={styles.assigneeAvatar}
               onError={(e: any) => {
                 e.target.onerror = null;
-                e.target.src = '/default-avatar.png';
+                e.target.src = 'https://www.gravatar.com/avatar/default?d=mp';
               }}
             />
             <div className={styles.assigneeInfo}>
@@ -1031,11 +1001,11 @@ const History = () => {
                       <td>{task.type}</td>
                       <td>
                         {task.owner && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className={styles.teamMemberContainer}>
                             <img 
                               src={task.owner.profileImage || `https://www.gravatar.com/avatar/${task.owner.email}?d=identicon&s=24`}
                               alt={task.owner.name}
-                              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                              className={styles.teamMemberAvatar}
                             />
                             <span>{task.owner.name || task.owner.email}</span>
                           </div>
@@ -1043,11 +1013,11 @@ const History = () => {
                       </td>
                       <td>
                         {task.leader && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className={styles.teamMemberContainer}>
                             <img 
                               src={task.leader.profileImage || `https://www.gravatar.com/avatar/${task.leader.email}?d=identicon&s=24`}
                               alt={task.leader.name}
-                              style={{ borderRadius: '50%', width: '24px', height: '24px' }}
+                              className={styles.teamMemberAvatar}
                             />
                             <span>{task.leader.name || task.leader.email}</span>
                           </div>

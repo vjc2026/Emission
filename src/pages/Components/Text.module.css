@@ -844,6 +844,36 @@
   min-height: 500px;
 }
 
+.notificationIcon {
+  margin-right: 8px;
+}
+
+.teamMemberContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teamMemberAvatar {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+}
+
+.progressNotification {
+  height: 6px;
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  margin-top: 8px;
+}
+
+.progressNotificationFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .container {
