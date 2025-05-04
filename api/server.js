@@ -226,14 +226,29 @@ app.post('/register', upload.single('profilePicture'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err) => {
+  connection.query(deviceQuery, [userId, device, cpu, gpu, ram, capacity, motherboard, psu], (err, deviceResult) => {
       if (err) {
         console.error('Error inserting data into the user_devices table:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      const profileImageUrl = profilePicture ? `https://emission-vert.vercel.app/uploads/${profilePicture}` : null;
-      res.status(200).json({ message: 'User registered successfully', profileImageUrl });
+      // Get the newly inserted device ID
+      const deviceId = deviceResult.insertId;
+      
+      // Update the user's current_device_id with the newly inserted device ID
+      const updateUserQuery = `
+        UPDATE users SET current_device_id = ? WHERE id = ?
+      `;
+      
+      connection.query(updateUserQuery, [deviceId, userId], (err) => {
+        if (err) {
+          console.error('Error updating user with current device ID:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+        
+        const profileImageUrl = profilePicture ? `https://emission-vert.vercel.app/uploads/${profilePicture}` : null;
+        res.status(200).json({ message: 'User registered successfully', profileImageUrl });
+      });
     });
   });
 });
