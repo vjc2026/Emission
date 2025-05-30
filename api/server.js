@@ -2154,8 +2154,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
       console.error('Error querying the database:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    
-    // Transform results to include full profile image URLs
+
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 
@@ -2163,8 +2162,7 @@ app.get('/project/:id/members', authenticateToken, (req, res) => {
         : null
     }));
 
-    console.log('Sending members data:', members); // Debug log
-    res.json({ members });
+    res.status(200).json({ members });
   });
 });
 
@@ -2502,7 +2500,7 @@ app.delete('/admin/delete_project/:id', authenticateAdmin, (req, res) => {
                 connection.commit(err => {
                   if (err) {
                     return connection.rollback(() => {
-                      res.status(500).json({ error: 'Commit error' });
+                      res.status(500).json({ error: 'Transaction commit error' });
                     });
                   }
 
@@ -2605,151 +2603,408 @@ app.get('/project_members/:projectId', authenticateAdmin, (req, res) => {
   });
 });
 
-// Combined endpoint to fetch device details and calculate carbon emissions for comparison
-app.get('/compare_devices', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-  const query = 
-    `SELECT id, device, cpu, gpu, ram, psu
-    FROM user_devices
-    WHERE user_id = ?`
-  ;
-  connection.query(query, [userId], async (err, results) => {
+// Device Maintenance Admin Endpoints
+
+// Desktop CPUs endpoints
+app.get('/admin/cpus', authenticateAdmin, (req, res) => {
+  const query = 'SELECT * FROM cpus ORDER BY manufacturer, series, model';
+  
+  connection.query(query, (err, results) => {
     if (err) {
-      console.error('Error fetching devices:', err);
-      return res.status(500).json({ error: 'Error fetching devices' });
+      console.error('Error fetching CPUs:', err);
+      return res.status(500).json({ error: 'Failed to fetch CPUs' });
     }
-    
-    try {
-      // Calculate actual emissions where possible
-      const emissions = await Promise.all(results.map(async row => {
-        let carbonEmissions = 0;
-        
-        // Determine device type and calculate emissions based on wattage
-        try {
-          let cpuWattage = 0, gpuWattage = 0, ramWattage = 0;
-          
-          // Get wattage data based on device type
-          if (row.device === 'Laptop' || row.device === 'Mobile') {
-            // Query specific wattage endpoints for mobile/laptop
-            const cpuQuery = `SELECT cpu_watts FROM cpusm WHERE model = ?`;
-            const gpuQuery = `SELECT gpu_watts FROM gpusm WHERE model = ?`;
-            const ramQuery = `SELECT avg_watt_usage FROM ram WHERE ddr_generation = ?`;
-            
-            const [cpuResults] = await connection.promise().query(cpuQuery, [row.cpu]);
-            const [gpuResults] = await connection.promise().query(gpuQuery, [row.gpu]);
-            const [ramResults] = await connection.promise().query(ramQuery, [row.ram]);
-            
-            cpuWattage = cpuResults[0]?.avg_watt_usage || 0;
-            gpuWattage = gpuResults[0]?.avg_watt_usage || 0;
-            ramWattage = ramResults[0]?.avg_watt_usage || 0;
-          } else {
-            // Query specific wattage endpoints for PC
-            const cpuQuery = `SELECT avg_watt_usage FROM cpus WHERE model = ?`;
-            const gpuQuery = `SELECT avg_watt_usage FROM gpus WHERE model = ?`;
-            const ramQuery = `SELECT avg_watt_usage FROM ram WHERE ddr_generation = ?`;
-            
-            const [cpuResults] = await connection.promise().query(cpuQuery, [row.cpu]);
-            const [gpuResults] = await connection.promise().query(gpuQuery, [row.gpu]);
-            const [ramResults] = await connection.promise().query(ramQuery, [row.ram]);
-            
-            cpuWattage = cpuResults[0]?.avg_watt_usage || 0;
-            gpuWattage = gpuResults[0]?.avg_watt_usage || 0;
-            ramWattage = ramResults[0]?.avg_watt_usage || 0;
-          }
-          
-          // Calculate total wattage
-          const totalWattage = cpuWattage + gpuWattage + ramWattage;
-          
-          // Convert wattage to carbon emissions (kg CO2)
-          // Assuming 1 kWh produces about 0.5 kg CO2 - adjust this factor as needed
-          const hoursPerDay = 8; // Assuming 8 hours of use per day
-          const daysPerYear = 365;
-          const kwhPerYear = (totalWattage / 1000) * hoursPerDay * daysPerYear;
-          carbonEmissions = kwhPerYear * 0.5;
-        } catch (error) {
-          console.error(`Error calculating emissions for device ${row.id}:`, error);
-          // Use default value if calculation fails
-          carbonEmissions = 0;
-        }
-        
-        return {
-          deviceId: row.id,
-          deviceType: row.device,
-          carbonEmissions: carbonEmissions,
-          specifications: [
-            `CPU: ${row.cpu}`,
-            `GPU: ${row.gpu}`,
-            `RAM: ${row.ram}`,
-            `PSU: ${row.psu}`
-          ]
-        };
-      }));
-      
-      // Return the emissions data
-      return res.status(200).json({ emissions });
-    } catch (error) {
-      console.error('Error processing device data:', error);
-      return res.status(500).json({ error: 'Error processing device data' });
+    res.json(results);
+  });
+});
+
+app.post('/admin/cpus', authenticateAdmin, (req, res) => {
+  const { manufacturer, series, model, generation, avg_watt_usage } = req.body;
+  
+  const query = `
+    INSERT INTO cpus (manufacturer, series, model, generation, avg_watt_usage)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  
+  connection.query(query, [manufacturer, series, model, generation, avg_watt_usage], (err, results) => {
+    if (err) {
+      console.error('Error adding CPU:', err);
+      return res.status(500).json({ error: 'Failed to add CPU' });
     }
-    
-    for (const device of devices) {
-      const { id, deviceType, cpu, gpu, ram, psu } = device;
-      let cpuWattage, gpuWattage, ramWattage;
-    
-      try {
-        if (deviceType === 'Laptop') {
-          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
-          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
-    
-          if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-            cpuWattage = (await cpuResponse.json()).avg_watt_usage;
-            gpuWattage = (await gpuResponse.json()).avg_watt_usage;
-            ramWattage = (await ramResponse.json()).avg_watt_usage;
-          } else {
-            throw new Error('Error fetching wattage data for laptop');
-          }
-        } else {
-          const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpu_usage?model=${cpu}`);
-          const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpu_usage?model=${gpu}`);
-          const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
-    
-          if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
-            cpuWattage = (await cpuResponse.json()).avg_watt_usage;
-            gpuWattage = (await gpuResponse.json()).avg_watt_usage;
-            ramWattage = (await ramResponse.json()).avg_watt_usage;
-          } else {
-            throw new Error('Error fetching wattage data for PC');
-          }
-        }
-    
-        const psuWattage = Number(psu);
-        const totalWattage = Number(cpuWattage) + Number(gpuWattage) + Number(ramWattage) + psuWattage;
-        const sessionDurationSeconds = 5;
-        const totalEnergyUsed = (totalWattage / 3600) * sessionDurationSeconds;
-        const carbonEmissions = totalEnergyUsed * 0.475;
-    
-        oldEmissions.push({ deviceId: id, deviceType, carbonEmissions });
-      } catch (error) {
-        console.error('Error calculating carbon emissions:', error);
-        return res.status(500).json({ error: 'Error calculating carbon emissions' });
-      }
+    res.json({ message: 'CPU added successfully', id: results.insertId });
+  });
+});
+
+app.put('/admin/cpus/:id', authenticateAdmin, (req, res) => {
+  const cpuId = req.params.id;
+  const { manufacturer, series, model, generation, avg_watt_usage } = req.body;
+  
+  const query = `
+    UPDATE cpus 
+    SET manufacturer = ?, series = ?, model = ?, generation = ?, avg_watt_usage = ?
+    WHERE id = ?
+  `;
+  
+  connection.query(query, [manufacturer, series, model, generation, avg_watt_usage, cpuId], (err, results) => {
+    if (err) {
+      console.error('Error updating CPU:', err);
+      return res.status(500).json({ error: 'Failed to update CPU' });
     }
-    // ===== END OLD ENDPOINT CODE =====
-    
-    // ===== COMBINE THE RESULTS =====
-    // For each device, merge the specification info (from newEmissions) with the calculated carbon emissions (from oldEmissions)
-    const combinedEmissions = newEmissions.map(newEmission => {
-      const correspondingOld = oldEmissions.find(oldEmission => oldEmission.deviceId === newEmission.deviceId);
-      return { 
-        deviceId: newEmission.deviceId, 
-        deviceType: newEmission.deviceType,
-        carbonEmissions: correspondingOld ? correspondingOld.carbonEmissions : newEmission.carbonEmissions,
-        specifications: newEmission.specifications
-      };
-    });
-    
-    res.status(200).json({ emissions: combinedEmissions });
+    res.json({ message: 'CPU updated successfully' });
+  });
+});
+
+app.delete('/admin/cpus/:id', authenticateAdmin, (req, res) => {
+  const cpuId = req.params.id;
+  
+  const query = 'DELETE FROM cpus WHERE id = ?';
+  
+  connection.query(query, [cpuId], (err, results) => {
+    if (err) {
+      console.error('Error deleting CPU:', err);
+      return res.status(500).json({ error: 'Failed to delete CPU' });
+    }
+    res.json({ message: 'CPU deleted successfully' });
+  });
+});
+
+// Mobile CPUs endpoints
+app.get('/admin/cpus-mobile', authenticateAdmin, (req, res) => {
+  const query = 'SELECT * FROM cpusm ORDER BY generation, model';
+  
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching mobile CPUs:', err);
+      return res.status(500).json({ error: 'Failed to fetch mobile CPUs' });
+    }
+    res.json(results);
+  });
+});
+
+app.post('/admin/cpus-mobile', authenticateAdmin, (req, res) => {
+  const { generation, model, cpu_watts } = req.body;
+  
+  const query = `
+    INSERT INTO cpusm (generation, model, cpu_watts)
+    VALUES (?, ?, ?)
+  `;
+  
+  connection.query(query, [generation, model, cpu_watts], (err, results) => {
+    if (err) {
+      console.error('Error adding mobile CPU:', err);
+      return res.status(500).json({ error: 'Failed to add mobile CPU' });
+    }
+    res.json({ message: 'Mobile CPU added successfully', id: results.insertId });
+  });
+});
+
+app.put('/admin/cpus-mobile/:id', authenticateAdmin, (req, res) => {
+  const cpuId = req.params.id;
+  const { generation, model, cpu_watts } = req.body;
+  
+  const query = `
+    UPDATE cpusm 
+    SET generation = ?, model = ?, cpu_watts = ?
+    WHERE id = ?
+  `;
+  
+  connection.query(query, [generation, model, cpu_watts, cpuId], (err, results) => {
+    if (err) {
+      console.error('Error updating mobile CPU:', err);
+      return res.status(500).json({ error: 'Failed to update mobile CPU' });
+    }
+    res.json({ message: 'Mobile CPU updated successfully' });
+  });
+});
+
+app.delete('/admin/cpus-mobile/:id', authenticateAdmin, (req, res) => {
+  const cpuId = req.params.id;
+  
+  const query = 'DELETE FROM cpusm WHERE id = ?';
+  
+  connection.query(query, [cpuId], (err, results) => {
+    if (err) {
+      console.error('Error deleting mobile CPU:', err);
+      return res.status(500).json({ error: 'Failed to delete mobile CPU' });
+    }
+    res.json({ message: 'Mobile CPU deleted successfully' });
+  });
+});
+
+// Desktop GPUs endpoints
+app.get('/admin/gpus', authenticateAdmin, (req, res) => {
+  const query = 'SELECT * FROM gpus ORDER BY manufacturer, series, model';
+  
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching GPUs:', err);
+      return res.status(500).json({ error: 'Failed to fetch GPUs' });
+    }
+    res.json(results);
+  });
+});
+
+app.post('/admin/gpus', authenticateAdmin, (req, res) => {
+  const { manufacturer, series, model, generation, avg_watt_usage } = req.body;
+  
+  const query = `
+    INSERT INTO gpus (manufacturer, series, model, generation, avg_watt_usage)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  
+  connection.query(query, [manufacturer, series, model, generation, avg_watt_usage], (err, results) => {
+    if (err) {
+      console.error('Error adding GPU:', err);
+      return res.status(500).json({ error: 'Failed to add GPU' });
+    }
+    res.json({ message: 'GPU added successfully', id: results.insertId });
+  });
+});
+
+app.put('/admin/gpus/:id', authenticateAdmin, (req, res) => {
+  const gpuId = req.params.id;
+  const { manufacturer, series, model, generation, avg_watt_usage } = req.body;
+  
+  const query = `
+    UPDATE gpus 
+    SET manufacturer = ?, series = ?, model = ?, generation = ?, avg_watt_usage = ?
+    WHERE id = ?
+  `;
+  
+  connection.query(query, [manufacturer, series, model, generation, avg_watt_usage, gpuId], (err, results) => {
+    if (err) {
+      console.error('Error updating GPU:', err);
+      return res.status(500).json({ error: 'Failed to update GPU' });
+    }
+    res.json({ message: 'GPU updated successfully' });
+  });
+});
+
+app.delete('/admin/gpus/:id', authenticateAdmin, (req, res) => {
+  const gpuId = req.params.id;
+  
+  const query = 'DELETE FROM gpus WHERE id = ?';
+  
+  connection.query(query, [gpuId], (err, results) => {
+    if (err) {
+      console.error('Error deleting GPU:', err);
+      return res.status(500).json({ error: 'Failed to delete GPU' });
+    }
+    res.json({ message: 'GPU deleted successfully' });
+  });
+});
+
+// Mobile GPUs endpoints
+app.get('/admin/gpus-mobile', authenticateAdmin, (req, res) => {
+  const query = 'SELECT * FROM gpusm ORDER BY manufacturer, model';
+  
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching mobile GPUs:', err);
+      return res.status(500).json({ error: 'Failed to fetch mobile GPUs' });
+    }
+    res.json(results);
+  });
+});
+
+app.post('/admin/gpus-mobile', authenticateAdmin, (req, res) => {
+  const { manufacturer, model, gpu_watts } = req.body;
+  
+  const query = `
+    INSERT INTO gpusm (manufacturer, model, gpu_watts)
+    VALUES (?, ?, ?)
+  `;
+  
+  connection.query(query, [manufacturer, model, gpu_watts], (err, results) => {
+    if (err) {
+      console.error('Error adding mobile GPU:', err);
+      return res.status(500).json({ error: 'Failed to add mobile GPU' });
+    }
+    res.json({ message: 'Mobile GPU added successfully', id: results.insertId });
+  });
+});
+
+app.put('/admin/gpus-mobile/:id', authenticateAdmin, (req, res) => {
+  const gpuId = req.params.id;
+  const { manufacturer, model, gpu_watts } = req.body;
+  
+  const query = `
+    UPDATE gpusm 
+    SET manufacturer = ?, model = ?, gpu_watts = ?
+    WHERE id = ?
+  `;
+  
+  connection.query(query, [manufacturer, model, gpu_watts, gpuId], (err, results) => {
+    if (err) {
+      console.error('Error updating mobile GPU:', err);
+      return res.status(500).json({ error: 'Failed to update mobile GPU' });
+    }
+    res.json({ message: 'Mobile GPU updated successfully' });
+  });
+});
+
+app.delete('/admin/gpus-mobile/:id', authenticateAdmin, (req, res) => {
+  const gpuId = req.params.id;
+  
+  const query = 'DELETE FROM gpusm WHERE id = ?';
+  
+  connection.query(query, [gpuId], (err, results) => {
+    if (err) {
+      console.error('Error deleting mobile GPU:', err);
+      return res.status(500).json({ error: 'Failed to delete mobile GPU' });
+    }
+    res.json({ message: 'Mobile GPU deleted successfully' });
+  });
+});
+
+// RAM endpoints
+app.get('/admin/rams', authenticateAdmin, (req, res) => {
+  const query = 'SELECT * FROM ram ORDER BY ddr_generation';
+  
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching RAMs:', err);
+      return res.status(500).json({ error: 'Failed to fetch RAMs' });
+    }
+    res.json(results);
+  });
+});
+
+app.post('/admin/rams', authenticateAdmin, (req, res) => {
+  const { ddr_generation, voltage, avg_watt_usage } = req.body;
+  
+  const query = `
+    INSERT INTO ram (ddr_generation, voltage, avg_watt_usage)
+    VALUES (?, ?, ?)
+  `;
+  
+  connection.query(query, [ddr_generation, voltage, avg_watt_usage], (err, results) => {
+    if (err) {
+      console.error('Error adding RAM:', err);
+      return res.status(500).json({ error: 'Failed to add RAM' });
+    }
+    res.json({ message: 'RAM added successfully', id: results.insertId });
+  });
+});
+
+app.put('/admin/rams/:id', authenticateAdmin, (req, res) => {
+  const ramId = req.params.id;
+  const { ddr_generation, voltage, avg_watt_usage } = req.body;
+  
+  const query = `
+    UPDATE ram 
+    SET ddr_generation = ?, voltage = ?, avg_watt_usage = ?
+    WHERE id = ?
+  `;
+  
+  connection.query(query, [ddr_generation, voltage, avg_watt_usage, ramId], (err, results) => {
+    if (err) {
+      console.error('Error updating RAM:', err);
+      return res.status(500).json({ error: 'Failed to update RAM' });
+    }
+    res.json({ message: 'RAM updated successfully' });
+  });
+});
+
+app.delete('/admin/rams/:id', authenticateAdmin, (req, res) => {
+  const ramId = req.params.id;
+  
+  const query = 'DELETE FROM ram WHERE id = ?';
+  
+  connection.query(query, [ramId], (err, results) => {
+    if (err) {
+      console.error('Error deleting RAM:', err);
+      return res.status(500).json({ error: 'Failed to delete RAM' });
+    }
+    res.json({ message: 'RAM deleted successfully' });
+  });
+});
+
+// Endpoints to fetch device maintenance data
+app.get('/admin/device-maintenance', authenticateAdmin, (req, res) => {
+  const query = `
+    SELECT 
+      ud.id, ud.device, ud.cpu, ud.gpu, ud.ram, ud.capacity, ud.motherboard, ud.psu,
+      u.name as user_name, u.email as user_email, u.organization
+    FROM user_devices ud
+    JOIN users u ON ud.user_id = u.id
+    ORDER BY u.organization, u.name
+  `;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching device maintenance data:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ devices: results });
+  });
+});
+
+// Endpoint to get device details by ID
+app.get('/admin/device-maintenance/:id', authenticateAdmin, (req, res) => {
+  const deviceId = req.params.id;
+
+  const query = `
+    SELECT 
+      ud.id, ud.device, ud.cpu, ud.gpu, ud.ram, ud.capacity, ud.motherboard, ud.psu,
+      u.name as user_name, u.email as user_email, u.organization
+    FROM user_devices ud
+    JOIN users u ON ud.user_id = u.id
+    WHERE ud.id = ?
+  `;
+
+  connection.query(query, [deviceId], (err, results) => {
+    if (err) {
+      console.error('Error fetching device details:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    res.status(200).json({ device: results[0] });
+  });
+});
+
+// Endpoint to update device details
+app.put('/admin/device-maintenance/:id', authenticateAdmin, (req, res) => {
+  const deviceId = req.params.id;
+  const { device, cpu, gpu, ram, capacity, motherboard, psu } = req.body;
+
+  const query = `
+    UPDATE user_devices
+    SET device = ?, cpu = ?, gpu = ?, ram = ?, capacity = ?, motherboard = ?, psu = ?
+    WHERE id = ?
+  `;
+
+  connection.query(query, [device, cpu, gpu, ram, capacity, motherboard, psu, deviceId], (err, results) => {
+    if (err) {
+      console.error('Error updating device details:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Device details updated successfully' });
+  });
+});
+
+// Endpoint to delete a device
+app.delete('/admin/device-maintenance/:id', authenticateAdmin, (req, res) => {
+  const deviceId = req.params.id;
+
+  const query = `
+    DELETE FROM user_devices
+    WHERE id = ?
+  `;
+
+  connection.query(query, [deviceId], (err, results) => {
+    if (err) {
+      console.error('Error deleting device:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.status(200).json({ message: 'Device deleted successfully' });
   });
 });
 
@@ -2896,406 +3151,6 @@ app.get('/project_members/:projectId', authenticateToken, (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
 
-    const members = results.map(member => ({
-      ...member,
-      profile_image: member.profile_image 
-        ? `https://emission-mah2.onrender.com/uploads/${member.profile_image}`
-        : null
-    }));
-
-    res.status(200).json({ members });
-  });
-});
-
-// Endpoint to add project member by email (admin only)
-app.post('/add_project_member', authenticateAdmin, (req, res) => {
-  const { projectId, userEmail, role } = req.body;
-
-  // First find the user ID from email
-  const findUserQuery = 'SELECT id FROM users WHERE email = ?';
-  
-  connection.query(findUserQuery, [userEmail], (err, userResults) => {
-    if (err) {
-      console.error('Error finding user:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-
-    if (userResults.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = userResults[0].id;
-    
-    // Check if member already exists
-    const checkMemberQuery = `
-      SELECT * FROM project_members 
-      WHERE project_id = ? AND user_id = ?
-    `;
-
-    connection.query(checkMemberQuery, [projectId, userId], (err, memberResults) => {
-      if (err) {
-        console.error('Error checking membership:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-
-      if (memberResults.length > 0) {
-        return res.status(409).json({ error: 'User is already a project member' });
-      }
-
-      // Insert new member
-      const insertQuery = `
-        INSERT INTO project_members (project_id, user_id, role)
-        VALUES (?, ?, ?)
-      `;
-
-      connection.query(insertQuery, [projectId, userId, role], (err, results) => {
-        if (err) {
-          console.error('Error adding project member:', err);
-          return res.status(500).json({ error: 'Database error' });
-        }
-
-        res.status(200).json({ 
-          message: 'Project member added successfully',
-          memberId: results.insertId
-        });
-      });
-    });
-  });
-});
-
-// Endpoint to get user's organization by email
-app.get('/user_organization/:email', authenticateAdmin, (req, res) => {
-  const { email } = req.params;
-  
-  const query = 'SELECT organization FROM users WHERE email = ?';
-  
-  connection.query(query, [email], (err, results) => {
-    if (err) {
-      console.error('Error querying the database:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    res.status(200).json({ organization: results[0].organization });
-  });
-});
-
-// Endpoint to create a new project with members
-app.post('/admin/create_project', authenticateAdmin, (req, res) => {
-  const { 
-    project_name, 
-    project_description, 
-    status, 
-    stage, 
-    owner_email,       // Changed from owner to owner_email for clarity
-    leader_email,      // Added new field for project leader
-    members, 
-    organization,
-    stage_duration = 14,
-    stage_start_date = new Date().toISOString().split('T')[0],
-    stage_due_date,
-    project_start_date = stage_start_date,
-    project_due_date 
-  } = req.body;
-
-  // Calculate default due dates
-  const defaultStageDueDate = new Date(stage_start_date);
-  defaultStageDueDate.setDate(defaultStageDueDate.getDate() + stage_duration);
-  const finalStageDueDate = stage_due_date || defaultStageDueDate.toISOString().split('T')[0];
-
-  const defaultProjectDueDate = new Date(project_start_date);
-  defaultProjectDueDate.setDate(defaultProjectDueDate.getDate() + 42);
-  const finalProjectDueDate = project_due_date || defaultProjectDueDate.toISOString().split('T')[0];
-
-  connection.beginTransaction(err => {
-    if (err) {
-      console.error('Error starting transaction:', err);
-      return res.status(500).json({ error: 'Transaction start failed' });
-    }
-
-    // Find the owner's user ID
-    const findOwnerQuery = 'SELECT id FROM users WHERE email = ?';
-    
-    connection.query(findOwnerQuery, [owner_email], (err, ownerResults) => {
-      if (err || ownerResults.length === 0) {
-        return connection.rollback(() => {
-          res.status(404).json({ error: 'Owner user not found' });
-        });
-      }
-
-      const ownerId = ownerResults[0].id;
-
-      // Find the leader's user ID
-      const findLeaderQuery = 'SELECT id FROM users WHERE email = ?';
-
-      connection.query(findLeaderQuery, [leader_email], (err, leaderResults) => {
-        if (err || (leader_email && leaderResults.length === 0)) {
-          return connection.rollback(() => {
-            res.status(404).json({ error: 'Leader user not found' });
-          });
-        }
-
-        const leaderId = leader_email ? leaderResults[0].id : null;
-
-        // Create the project
-        const createProjectQuery = `
-          INSERT INTO user_history (
-            user_id, organization, project_name, project_description, 
-            status, stage, stage_duration, stage_start_date, stage_due_date,
-            project_start_date, project_due_date, session_duration, carbon_emit
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-        `;
-
-        connection.query(createProjectQuery, 
-          [ownerId, organization, project_name, project_description, 
-           status, stage, stage_duration, stage_start_date, finalStageDueDate,
-           project_start_date, finalProjectDueDate],
-          (err, projectResult) => {
-            if (err) {
-              return connection.rollback(() => {
-                res.status(500).json({ error: 'Failed to create project' });
-              });
-            }
-
-            const projectId = projectResult.insertId;
-            
-            // Update the project_id field to be the same as the project's ID
-            const updateProjectIdQuery = `
-              UPDATE user_history 
-              SET project_id = ? 
-              WHERE id = ?
-            `;
-            
-            connection.query(updateProjectIdQuery, [projectId, projectId], (err) => {
-              if (err) {
-                return connection.rollback(() => {
-                  res.status(500).json({ error: 'Failed to update project ID' });
-                });
-              }
-              
-              // Add project owner role
-              const addOwnerQuery = `
-                INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
-                VALUES (?, ?, 'project_owner', ?, NULL, NOW())
-              `;
-
-              connection.query(addOwnerQuery, [projectId, ownerId, stage], (err) => {
-                if (err) {
-                  return connection.rollback(() => {
-                    res.status(500).json({ error: 'Failed to add project owner' });
-                  });
-                }
-
-                // Add project leader role
-                const addLeaderQuery = `
-                  INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
-                  VALUES (?, ?, 'project_leader', ?, 'In Progress', NOW())
-                `;
-
-                // Only add leader if one was specified
-                if (leaderId) {
-                  connection.query(addLeaderQuery, [projectId, leaderId, stage], (err) => {
-                    if (err) {
-                      return connection.rollback(() => {
-                        res.status(500).json({ error: 'Failed to add project leader' });
-                      });
-                    }
-                    
-                    // Process additional members if present
-                    if (members && members.length > 0) {
-                      // Find user IDs for all members
-                      const placeholders = members.map(() => '?').join(',');
-                      const findMembersQuery = `SELECT email, id FROM users WHERE email IN (${placeholders})`;
-                      
-                      connection.query(findMembersQuery, members, (err, memberResults) => {
-                        if (err) {
-                          return connection.rollback(() => {
-                            res.status(500).json({ error: 'Failed to find project members' });
-                          });
-                        }
-                        
-                        // Create array of values for batch insert
-                        const memberValues = memberResults.map(member => [
-                          projectId,
-                          member.id,
-                          'member',
-                          stage,  // Set the current_stage to the project's initial stage
-                          'In Progress'
-                        ]);
-                        
-                        if (memberValues.length === 0) {
-                          // No valid members to add, commit transaction
-                          return connection.commit(err => {
-                            if (err) {
-                              return connection.rollback(() => {
-                                res.status(500).json({ error: 'Failed to commit transaction' });
-                              });
-                            }
-                            
-                            res.status(200).json({
-                              id: projectId,
-                              project_id: projectId, // Include project_id in the response
-                              project_name,
-                              project_description,
-                              status,
-                              stage,
-                              carbon_emit: 0,
-                              session_duration: 0,
-                              owner: owner_email,
-                              leader: leader_email,
-                              organization,
-                              members,
-                              stage_duration,
-                              stage_start_date,
-                              stage_due_date: finalStageDueDate,
-                              project_start_date,
-                              project_due_date: finalProjectDueDate,
-                              created_at: new Date().toISOString()
-                            });
-                          });
-                        }
-                        
-                        // Add all members at once
-                        const addMembersQuery = `
-                          INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
-                          VALUES ?
-                        `;
-
-                        connection.query(addMembersQuery, [memberValues], (err) => {
-                          if (err) {
-                            return connection.rollback(() => {
-                              res.status(500).json({ error: 'Failed to add project members' });
-                            });
-                          }
-
-                          connection.commit(err => {
-                            if (err) {
-                              return connection.rollback(() => {
-                                res.status(500).json({ error: 'Failed to commit transaction' });
-                              });
-                            }
-
-                            res.status(200).json({
-                              id: projectId,
-                              project_id: projectId, // Include project_id in the response
-                              project_name,
-                              project_description,
-                              status,
-                              stage,
-                              carbon_emit: 0,
-                              session_duration: 0,
-                              owner: owner_email,
-                              leader: leader_email,
-                              organization,
-                              members,
-                              stage_duration,
-                              stage_start_date,
-                              stage_due_date: finalStageDueDate,
-                              project_start_date,
-                              project_due_date: finalProjectDueDate,
-                              created_at: new Date().toISOString()
-                            });
-                          });
-                        });
-                      });
-                    } else {
-                      // No additional members, commit transaction
-                      connection.commit(err => {
-                        if (err) {
-                          return connection.rollback(() => {
-                            res.status(500).json({ error: 'Failed to commit transaction' });
-                          });
-                        }
-
-                        res.status(200).json({
-                          id: projectId,
-                          project_id: projectId, // Include project_id in the response
-                          project_name,
-                          project_description,
-                          status,
-                          stage,
-                          carbon_emit: 0,
-                          session_duration: 0,
-                          owner: owner_email,
-                          leader: leader_email,
-                          organization,
-                          members: [],
-                          stage_duration,
-                          stage_start_date,
-                          stage_due_date: finalStageDueDate,
-                          project_start_date,
-                          project_due_date: finalProjectDueDate,
-                          created_at: new Date().toISOString()
-                        });
-                      });
-                    }
-                  });
-                } else {
-                  // No leader specified, commit transaction
-                  connection.commit(err => {
-                    if (err) {
-                      return connection.rollback(() => {
-                        res.status(500).json({ error: 'Failed to commit transaction' });
-                      });
-                    }
-
-                    res.status(200).json({
-                      id: projectId,
-                      project_id: projectId, // Include project_id in the response
-                      project_name,
-                      project_description,
-                      status,
-                      stage,
-                      carbon_emit: 0,
-                      session_duration: 0,
-                      owner: owner_email,
-                      leader: null,
-                      organization,
-                      members: [],
-                      stage_duration,
-                      stage_start_date,
-                      stage_due_date: finalStageDueDate,
-                      project_start_date,
-                      project_due_date: finalProjectDueDate,
-                      created_at: new Date().toISOString()
-                    });
-                  });
-                }
-              });
-            });
-          }
-        );
-      });
-    });
-  });
-});
-
-// Modified endpoint to get project members with separated roles
-app.get('/project/:id/members', authenticateToken, (req, res) => {
-  const projectId = req.params.id;
-
-  const query = `
-    SELECT u.name, u.email, pm.role, pm.joined_at
-    FROM project_members pm
-    JOIN users u ON pm.user_id = u.id
-    WHERE pm.project_id = ?
-    ORDER BY 
-      CASE pm.role 
-        WHEN 'project_owner' THEN 1
-        WHEN 'project_leader' THEN 2
-        ELSE 3
-      END
-  `;
-
-  connection.query(query, [projectId], (err, results) => {
-    if (err) {
-      console.error('Error querying the database:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
     const members = results.map(member => ({
       ...member,
       profile_image: member.profile_image 

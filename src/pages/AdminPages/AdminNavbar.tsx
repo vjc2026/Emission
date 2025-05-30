@@ -9,6 +9,7 @@ import {
   IconLogout,
   IconChevronLeft,
   IconChevronRight,
+  IconDeviceDesktop,
 } from '@tabler/icons-react';
 import styles from './AdminNavbar.module.css';
 
@@ -17,6 +18,7 @@ const data = [
   { link: '/AdminPages/AdminUsers', label: 'Users', icon: IconReceipt2 },
   { link: '/AdminPages/AdminProjectRequests', label: 'Project Requests', icon: IconClipboardText },
   { link: '/AdminPages/AdminEmissionView', label: 'Admin Emission View', icon: IconFingerprint },
+  { link: '/AdminPages/DeviceMaintenance', label: 'Device Maintenance', icon: IconDeviceDesktop },
 ];
 
 interface AdminNavbarProps {
