@@ -149,11 +149,20 @@ const DeviceMaintenance: React.FC = () => {
       avg_watt_usage: 0,
     },
   });
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    };
+  };
 
   // Fetch data functions
   const fetchCpus = async () => {
     try {
-      const response = await axios.get('https://emission-mah2.onrender.com/admin/cpus');
+      const response = await axios.get('https://emission-mah2.onrender.com/admin/cpus', getAuthHeaders());
       setCpus(response.data);
     } catch (error) {
       console.error('Error fetching CPUs:', error);
@@ -162,7 +171,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const fetchCpusMobile = async () => {
     try {
-      const response = await axios.get('https://emission-mah2.onrender.com/admin/cpus-mobile');
+      const response = await axios.get('https://emission-mah2.onrender.com/admin/cpus-mobile', getAuthHeaders());
       setCpusMobile(response.data);
     } catch (error) {
       console.error('Error fetching mobile CPUs:', error);
@@ -171,7 +180,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const fetchGpus = async () => {
     try {
-      const response = await axios.get('https://emission-mah2.onrender.com/admin/gpus');
+      const response = await axios.get('https://emission-mah2.onrender.com/admin/gpus', getAuthHeaders());
       setGpus(response.data);
     } catch (error) {
       console.error('Error fetching GPUs:', error);
@@ -180,7 +189,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const fetchGpusMobile = async () => {
     try {
-      const response = await axios.get('https://emission-mah2.onrender.com/admin/gpus-mobile');
+      const response = await axios.get('https://emission-mah2.onrender.com/admin/gpus-mobile', getAuthHeaders());
       setGpusMobile(response.data);
     } catch (error) {
       console.error('Error fetching mobile GPUs:', error);
@@ -189,28 +198,32 @@ const DeviceMaintenance: React.FC = () => {
 
   const fetchRams = async () => {
     try {
-      const response = await axios.get('https://emission-mah2.onrender.com/admin/rams');
+      const response = await axios.get('https://emission-mah2.onrender.com/admin/rams', getAuthHeaders());
       setRams(response.data);
     } catch (error) {
       console.error('Error fetching RAMs:', error);
     }
   };
-
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/');
+      return;
+    }
+
     fetchCpus();
     fetchCpusMobile();
     fetchGpus();
     fetchGpusMobile();
     fetchRams();
   }, []);
-
   // Submit functions
   const handleCpuSubmit = async (values: typeof cpuForm.values) => {
     try {
       if (editingCpu) {
-        await axios.put(`https://emission-mah2.onrender.com/admin/cpus/${editingCpu.id}`, values);
+        await axios.put(`https://emission-mah2.onrender.com/admin/cpus/${editingCpu.id}`, values, getAuthHeaders());
       } else {
-        await axios.post('https://emission-mah2.onrender.com/admin/cpus', values);
+        await axios.post('https://emission-mah2.onrender.com/admin/cpus', values, getAuthHeaders());
       }
       fetchCpus();
       setCpuModalOpened(false);
@@ -224,9 +237,9 @@ const DeviceMaintenance: React.FC = () => {
   const handleCpuMobileSubmit = async (values: typeof cpuMobileForm.values) => {
     try {
       if (editingCpuMobile) {
-        await axios.put(`https://emission-mah2.onrender.com/admin/cpus-mobile/${editingCpuMobile.id}`, values);
+        await axios.put(`https://emission-mah2.onrender.com/admin/cpus-mobile/${editingCpuMobile.id}`, values, getAuthHeaders());
       } else {
-        await axios.post('https://emission-mah2.onrender.com/admin/cpus-mobile', values);
+        await axios.post('https://emission-mah2.onrender.com/admin/cpus-mobile', values, getAuthHeaders());
       }
       fetchCpusMobile();
       setCpuMobileModalOpened(false);
@@ -240,9 +253,9 @@ const DeviceMaintenance: React.FC = () => {
   const handleGpuSubmit = async (values: typeof gpuForm.values) => {
     try {
       if (editingGpu) {
-        await axios.put(`https://emission-mah2.onrender.com/admin/gpus/${editingGpu.id}`, values);
+        await axios.put(`https://emission-mah2.onrender.com/admin/gpus/${editingGpu.id}`, values, getAuthHeaders());
       } else {
-        await axios.post('https://emission-mah2.onrender.com/admin/gpus', values);
+        await axios.post('https://emission-mah2.onrender.com/admin/gpus', values, getAuthHeaders());
       }
       fetchGpus();
       setGpuModalOpened(false);
@@ -256,9 +269,9 @@ const DeviceMaintenance: React.FC = () => {
   const handleGpuMobileSubmit = async (values: typeof gpuMobileForm.values) => {
     try {
       if (editingGpuMobile) {
-        await axios.put(`https://emission-mah2.onrender.com/admin/gpus-mobile/${editingGpuMobile.id}`, values);
+        await axios.put(`https://emission-mah2.onrender.com/admin/gpus-mobile/${editingGpuMobile.id}`, values, getAuthHeaders());
       } else {
-        await axios.post('https://emission-mah2.onrender.com/admin/gpus-mobile', values);
+        await axios.post('https://emission-mah2.onrender.com/admin/gpus-mobile', values, getAuthHeaders());
       }
       fetchGpusMobile();
       setGpuMobileModalOpened(false);
@@ -272,9 +285,9 @@ const DeviceMaintenance: React.FC = () => {
   const handleRamSubmit = async (values: typeof ramForm.values) => {
     try {
       if (editingRam) {
-        await axios.put(`https://emission-mah2.onrender.com/admin/rams/${editingRam.id}`, values);
+        await axios.put(`https://emission-mah2.onrender.com/admin/rams/${editingRam.id}`, values, getAuthHeaders());
       } else {
-        await axios.post('https://emission-mah2.onrender.com/admin/rams', values);
+        await axios.post('https://emission-mah2.onrender.com/admin/rams', values, getAuthHeaders());
       }
       fetchRams();
       setRamModalOpened(false);
@@ -284,11 +297,10 @@ const DeviceMaintenance: React.FC = () => {
       console.error('Error saving RAM:', error);
     }
   };
-
   // Delete functions
   const handleDeleteCpu = async (id: number) => {
     try {
-      await axios.delete(`https://emission-mah2.onrender.com/admin/cpus/${id}`);
+      await axios.delete(`https://emission-mah2.onrender.com/admin/cpus/${id}`, getAuthHeaders());
       fetchCpus();
     } catch (error) {
       console.error('Error deleting CPU:', error);
@@ -297,7 +309,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const handleDeleteCpuMobile = async (id: number) => {
     try {
-      await axios.delete(`https://emission-mah2.onrender.com/admin/cpus-mobile/${id}`);
+      await axios.delete(`https://emission-mah2.onrender.com/admin/cpus-mobile/${id}`, getAuthHeaders());
       fetchCpusMobile();
     } catch (error) {
       console.error('Error deleting mobile CPU:', error);
@@ -306,7 +318,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const handleDeleteGpu = async (id: number) => {
     try {
-      await axios.delete(`https://emission-mah2.onrender.com/admin/gpus/${id}`);
+      await axios.delete(`https://emission-mah2.onrender.com/admin/gpus/${id}`, getAuthHeaders());
       fetchGpus();
     } catch (error) {
       console.error('Error deleting GPU:', error);
@@ -315,7 +327,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const handleDeleteGpuMobile = async (id: number) => {
     try {
-      await axios.delete(`https://emission-mah2.onrender.com/admin/gpus-mobile/${id}`);
+      await axios.delete(`https://emission-mah2.onrender.com/admin/gpus-mobile/${id}`, getAuthHeaders());
       fetchGpusMobile();
     } catch (error) {
       console.error('Error deleting mobile GPU:', error);
@@ -324,7 +336,7 @@ const DeviceMaintenance: React.FC = () => {
 
   const handleDeleteRam = async (id: number) => {
     try {
-      await axios.delete(`https://emission-mah2.onrender.com/admin/rams/${id}`);
+      await axios.delete(`https://emission-mah2.onrender.com/admin/rams/${id}`, getAuthHeaders());
       fetchRams();
     } catch (error) {
       console.error('Error deleting RAM:', error);
