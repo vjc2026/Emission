@@ -921,18 +921,9 @@ app.get('/gpu_usage', (req, res) => {
 });
 
 // Endpoint to calculate carbon emissions for mobile or laptop
-app.post('/calculate_emissionsM', authenticateToken, (req, res) => {
+app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
   const { sessionDuration, projectId } = req.body;
   const userId = req.user.id;
-
-  // Validate required fields
-  if (!sessionDuration || !projectId) {
-    return res.status(400).json({ error: 'Missing required fields: sessionDuration and projectId' });
-  }
-
-  if (typeof sessionDuration !== 'number' || sessionDuration <= 0) {
-    return res.status(400).json({ error: 'sessionDuration must be a positive number' });
-  }
 
   try {
     // Fetch user's current device ID
@@ -945,11 +936,13 @@ app.post('/calculate_emissionsM', authenticateToken, (req, res) => {
 
       if (deviceIdResults.length === 0 || !deviceIdResults[0].current_device_id) {
         return res.status(404).json({ error: 'Current device not set' });
-      }      const currentDeviceId = deviceIdResults[0].current_device_id;
+      }
+
+      const currentDeviceId = deviceIdResults[0].current_device_id;
 
       // Fetch current device details
       const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE id = ?`;
-      connection.query(userQuery, [currentDeviceId], (err, userResults) => {
+      connection.query(userQuery, [currentDeviceId], async (err, userResults) => {
         if (err) {
           console.error('Error fetching user details:', err);
           return res.status(500).json({ error: 'Database error' });
@@ -961,81 +954,46 @@ app.post('/calculate_emissionsM', authenticateToken, (req, res) => {
 
         const { cpu, gpu, ram, psu } = userResults[0];
 
-        // Fetch CPU wattage from cpusm table
-        const cpuQuery = 'SELECT cpu_watts AS avg_watt_usage FROM cpusm WHERE model = ?';
-        connection.query(cpuQuery, [cpu], (err, cpuResults) => {
-          if (err) {
-            console.error('Error querying CPU database:', err);
-            return res.status(500).json({ error: 'Database error fetching CPU data' });
-          }
+        // Fetch CPU, GPU, and RAM wattage from mobile tables
+        const cpuResponse = await fetch(`https://emission-mah2.onrender.com/cpum_usage?model=${cpu}`);
+        const gpuResponse = await fetch(`https://emission-mah2.onrender.com/gpum_usage?model=${gpu}`);
+        const ramResponse = await fetch(`https://emission-mah2.onrender.com/ram_usage?model=${ram}`);
 
-          if (cpuResults.length === 0) {
-            return res.status(404).json({ error: 'CPU model not found in database' });
-          }
+        if (cpuResponse.ok && gpuResponse.ok && ramResponse.ok) {
+          const cpuData = await cpuResponse.json();
+          const gpuData = await gpuResponse.json();
+          const ramData = await ramResponse.json();
 
-          const cpuWattage = cpuResults[0].avg_watt_usage;
+          const cpuWattage = cpuData.avg_watt_usage;
+          const gpuWattage = gpuData.avg_watt_usage;
+          const ramWattage = ramData.avg_watt_usage;
 
-          // Fetch GPU wattage from gpusm table
-          const gpuQuery = 'SELECT gpu_watts AS avg_watt_usage FROM gpusm WHERE model = ?';
-          connection.query(gpuQuery, [gpu], (err, gpuResults) => {
+          /// Calculate total wattage
+          const totalWattage = cpuWattage + gpuWattage + ramWattage;
+
+          // Calculate carbon emissions
+          const carbonEmissions = ((totalWattage * sessionDuration) / 3600) * 0.475; // Assuming 0.475 kg CO2 per kWh
+
+          // Update the project with the new carbon emissions and session duration
+          const updateQuery = `
+            UPDATE user_history
+            SET session_duration = session_duration + ?, carbon_emit = carbon_emit + ?
+            WHERE id = ? AND user_id = ?
+          `;
+
+          connection.query(updateQuery, [sessionDuration, carbonEmissions, projectId, userId], (err, updateResults) => {
             if (err) {
-              console.error('Error querying GPU database:', err);
-              return res.status(500).json({ error: 'Database error fetching GPU data' });
+              console.error('Error updating project data:', err);
+              return res.status(500).json({ error: 'Database error' });
             }
 
-            if (gpuResults.length === 0) {
-              return res.status(404).json({ error: 'GPU model not found in database' });
-            }
-
-            const gpuWattage = gpuResults[0].avg_watt_usage;
-
-            // Fetch RAM wattage from ram table
-            const ramQuery = 'SELECT avg_watt_usage FROM ram WHERE ddr_generation = ?';
-            connection.query(ramQuery, [ram], (err, ramResults) => {
-              if (err) {
-                console.error('Error querying RAM database:', err);
-                return res.status(500).json({ error: 'Database error fetching RAM data' });
-              }
-
-              if (ramResults.length === 0) {
-                return res.status(404).json({ error: 'RAM model not found in database' });
-              }
-
-              const ramWattage = ramResults[0].avg_watt_usage;
-
-              // Calculate total wattage
-              const totalWattage = cpuWattage + gpuWattage + ramWattage;
-
-              // Calculate carbon emissions
-              const carbonEmissions = ((totalWattage * sessionDuration) / 3600) * 0.475; // Assuming 0.475 kg CO2 per kWh
-
-              // Update the project with the new carbon emissions and session duration
-              const updateQuery = `
-                UPDATE user_history
-                SET session_duration = session_duration + ?, carbon_emit = carbon_emit + ?
-                WHERE id = ? AND user_id = ?
-              `;
-
-              connection.query(updateQuery, [sessionDuration, carbonEmissions, projectId, userId], (err, updateResults) => {
-                if (err) {
-                  console.error('Error updating project data:', err);
-                  return res.status(500).json({ error: 'Database error updating project' });
-                }
-
-                if (updateResults.affectedRows === 0) {
-                  return res.status(404).json({ error: 'Project not found or no permission to update' });
-                }
-
-                res.status(200).json({ 
-                  message: 'Carbon emissions calculated successfully', 
-                  carbonEmissions,
-                  totalWattage,
-                  sessionDuration
-                });
-              });
-            });
+            res.status(200).json({ message: 'Carbon emissions calculated successfully', carbonEmissions });
           });
-        });
+
+        } else {
+          console.error('Error fetching wattage data from server');
+          res.status(500).json({ error: 'Error fetching wattage data from server' });
+        }
       });
     });
   } catch (error) {
