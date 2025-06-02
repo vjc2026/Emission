@@ -21,7 +21,7 @@ const DeviceForm: React.FC = () => {
   const [gpuOptions, setGpuOptions] = useState<{ label: string; value: string }[]>([]);
   const [ramOptions, setRamOptions] = useState<{ label: string; value: string }[]>([]);
   
-  const { name, email, password, organization, profilePicturePreview } = query;
+  const { name, email, password, organization, region, profilePicturePreview } = query;
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
 
   useEffect(() => {
@@ -88,6 +88,7 @@ const DeviceForm: React.FC = () => {
       if (email) formData.append('email', email as string);
       if (password) formData.append('password', password as string);
       if (organization) formData.append('organization', organization as string);
+      if (region) formData.append('region', region as string);
       formData.append('device', device || '');
       formData.append('cpu', cpu);
       formData.append('gpu', gpu);

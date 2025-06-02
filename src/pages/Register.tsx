@@ -14,6 +14,7 @@ import {
   Avatar,
   Tooltip,
   Modal,
+  Select,
 } from '@mantine/core';
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -33,6 +34,9 @@ const RegisterPage: React.FC = () => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [organization, setOrganization] = useState(query.organization || '');
+  const [region, setRegion] = useState(
+    typeof query.region === 'string' ? query.region : ''
+  );
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(
     typeof query.profilePicturePreview === 'string' ? query.profilePicturePreview : null
@@ -201,7 +205,7 @@ const RegisterPage: React.FC = () => {
   };
 
   const handleProceed = () => {
-    if (!name || !email || !organization || (password && password !== confirmPassword)) {
+    if (!name || !email || !organization || !region || (password && password !== confirmPassword)) {
       alert('Please fill all fields and ensure the passwords match.');
       return;
     }
@@ -217,6 +221,7 @@ const RegisterPage: React.FC = () => {
         email,
         password,
         organization,
+        region,
         profilePicture: profilePicture ? profilePicture.name : null,
         profilePicturePreview,
       },
@@ -304,6 +309,19 @@ const RegisterPage: React.FC = () => {
             placeholder="Enter your organization"
             value={organization}
             onChange={(e) => setOrganization(e.currentTarget.value)}
+            required
+            style={{ color: 'white' }}
+          />
+          <Select
+            label="Region"
+            className={classes.text}
+            placeholder="Select your region"
+            value={region}
+            onChange={(value) => setRegion(value || '')}
+            data={[
+              { value: 'Singapore', label: 'Singapore' },
+              { value: 'Philippines', label: 'Philippines' }
+            ]}
             required
             style={{ color: 'white' }}
           />

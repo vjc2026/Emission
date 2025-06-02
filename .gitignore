@@ -40,3 +40,5 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+database_update.sql
+REGION_IMPLEMENTATION.md

@@ -83,8 +83,17 @@ const checkAndUpdateProjectCompletion = (projectId, callback) => {
       });
     } else {
       callback(null, false);
-    }
-  });
+    }  });
+};
+
+// Function to get carbon factor based on region
+const getCarbonFactor = (region) => {
+  const carbonFactors = {
+    'Singapore': 0.475,
+    'Philippines': 0.5246
+  };
+  
+  return carbonFactors[region] || 0.475; // Default to Singapore's factor if region not found
 };
 
 const transporter = nodemailer.createTransport({
@@ -206,15 +215,15 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Endpoint to insert user data into the MySQL database
 app.post('/register', upload.single('profilePicture'), (req, res) => {
-  const { name, email, password, organization, device, cpu, gpu, ram, capacity, motherboard, psu } = req.body;
+  const { name, email, password, organization, region, device, cpu, gpu, ram, capacity, motherboard, psu } = req.body;
   const profilePicture = req.file ? req.file.filename : null;
 
   const userQuery = `
-    INSERT INTO users (name, email, password, organization, profile_image, current_device_id)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (name, email, password, organization, region, profile_image, current_device_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  connection.query(userQuery, [name, email, password, organization, profilePicture, null], (err, results) => {
+  connection.query(userQuery, [name, email, password, organization, region, profilePicture, null], (err, results) => {
     if (err) {
       console.error('Error inserting data into the users table:', err);
       return res.status(500).json({ error: 'Database error' });
@@ -365,9 +374,8 @@ const authenticateAdmin = (req, res, next) => {
 // Endpoint to fetch user's name and email after login
 app.get('/user', authenticateToken, (req, res) => {
   const userId = req.user.id;
-
   const userQuery = `
-    SELECT id, name, email, organization, profile_image
+    SELECT id, name, email, organization, region, profile_image
     FROM users 
     WHERE id = ?
   `;
@@ -807,8 +815,8 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Fetch user's current device ID
-    const deviceIdQuery = `SELECT current_device_id FROM users WHERE id = ?`;
+    // Fetch user's current device ID and region
+    const deviceIdQuery = `SELECT current_device_id, region FROM users WHERE id = ?`;
     connection.query(deviceIdQuery, [userId], (err, deviceIdResults) => {
       if (err) {
         console.error('Error fetching current device ID:', err);
@@ -820,6 +828,7 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
       }
 
       const currentDeviceId = deviceIdResults[0].current_device_id;
+      const userRegion = deviceIdResults[0].region;
 
       // Fetch current device details
       const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE id = ?`;
@@ -854,7 +863,9 @@ app.post('/calculate_emissions', authenticateToken, async (req, res) => {
           const sessionDurationSeconds = Number(sessionDuration);
           const totalEnergyUsed = (totalWattUsage / 3600) * sessionDurationSeconds;
 
-          const carbonEmissions = totalEnergyUsed * 0.475; // Assuming 0.475 kg CO2 per kWh
+          // Get carbon factor based on user's region
+          const carbonFactor = getCarbonFactor(userRegion);
+          const carbonEmissions = totalEnergyUsed * carbonFactor;
 
           // Update the project with the calculated emissions
           const updateProjectQuery = `
@@ -926,8 +937,8 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Fetch user's current device ID
-    const deviceIdQuery = `SELECT current_device_id FROM users WHERE id = ?`;
+    // Fetch user's current device ID and region
+    const deviceIdQuery = `SELECT current_device_id, region FROM users WHERE id = ?`;
     connection.query(deviceIdQuery, [userId], (err, deviceIdResults) => {
       if (err) {
         console.error('Error fetching current device ID:', err);
@@ -939,6 +950,7 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
       }
 
       const currentDeviceId = deviceIdResults[0].current_device_id;
+      const userRegion = deviceIdResults[0].region;
 
       // Fetch current device details
       const userQuery = `SELECT cpu, gpu, ram, psu FROM user_devices WHERE id = ?`;
@@ -971,8 +983,10 @@ app.post('/calculate_emissionsM', authenticateToken, async (req, res) => {
           /// Calculate total wattage
           const totalWattage = cpuWattage + gpuWattage + ramWattage;
 
+          // Get carbon factor based on user's region
+          const carbonFactor = getCarbonFactor(userRegion);
           // Calculate carbon emissions
-          const carbonEmissions = ((totalWattage * sessionDuration) / 3600) * 0.475; // Assuming 0.475 kg CO2 per kWh
+          const carbonEmissions = ((totalWattage * sessionDuration) / 3600) * carbonFactor;
 
           // Update the project with the new carbon emissions and session duration
           const updateQuery = `
@@ -1141,7 +1155,7 @@ app.get('/displayuser', authenticateToken, (req, res) => {
   const { email } = req.user;
 
   const userQuery = `
-    SELECT id, name, email, organization, profile_image, current_device_id
+    SELECT id, name, email, organization, region, profile_image, current_device_id
     FROM users 
     WHERE email = ?
   `;
