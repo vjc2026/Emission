@@ -89,11 +89,11 @@ const checkAndUpdateProjectCompletion = (projectId, callback) => {
 // Function to get carbon factor based on region
 const getCarbonFactor = (region) => {
   const carbonFactors = {
-    'Singapore': 0.475,
+    'Singapore': 0.412,
     'Philippines': 0.5246
   };
   
-  return carbonFactors[region] || 0.475; // Default to Singapore's factor if region not found
+  return carbonFactors[region] || 0.412; // Default to Singapore's factor if region not found
 };
 
 const transporter = nodemailer.createTransport({
