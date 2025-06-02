@@ -2430,6 +2430,316 @@ app.get('/all_user_projects_admin', authenticateAdmin, (req, res) => {
   });
 });
 
+// Endpoint to get user's organization by email
+app.get('/user_organization/:email', authenticateAdmin, (req, res) => {
+  const { email } = req.params;
+  
+  const query = 'SELECT organization FROM users WHERE email = ?';
+  
+  connection.query(query, [email], (err, results) => {
+    if (err) {
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.status(200).json({ organization: results[0].organization });
+  });
+});
+
+// Endpoint to create a new project with members
+app.post('/admin/create_project', authenticateAdmin, (req, res) => {
+  const { 
+    project_name, 
+    project_description, 
+    status, 
+    stage, 
+    owner_email,       // Changed from owner to owner_email for clarity
+    leader_email,      // Added new field for project leader
+    members, 
+    organization,
+    stage_duration = 14,
+    stage_start_date = new Date().toISOString().split('T')[0],
+    stage_due_date,
+    project_start_date = stage_start_date,
+    project_due_date 
+  } = req.body;
+
+  // Calculate default due dates
+  const defaultStageDueDate = new Date(stage_start_date);
+  defaultStageDueDate.setDate(defaultStageDueDate.getDate() + stage_duration);
+  const finalStageDueDate = stage_due_date || defaultStageDueDate.toISOString().split('T')[0];
+
+  const defaultProjectDueDate = new Date(project_start_date);
+  defaultProjectDueDate.setDate(defaultProjectDueDate.getDate() + 42);
+  const finalProjectDueDate = project_due_date || defaultProjectDueDate.toISOString().split('T')[0];
+
+  connection.beginTransaction(err => {
+    if (err) {
+      console.error('Error starting transaction:', err);
+      return res.status(500).json({ error: 'Transaction start failed' });
+    }
+
+    // Find the owner's user ID
+    const findOwnerQuery = 'SELECT id FROM users WHERE email = ?';
+    
+    connection.query(findOwnerQuery, [owner_email], (err, ownerResults) => {
+      if (err || ownerResults.length === 0) {
+        return connection.rollback(() => {
+          res.status(404).json({ error: 'Owner user not found' });
+        });
+      }
+
+      const ownerId = ownerResults[0].id;
+
+      // Find the leader's user ID
+      const findLeaderQuery = 'SELECT id FROM users WHERE email = ?';
+
+      connection.query(findLeaderQuery, [leader_email], (err, leaderResults) => {
+        if (err || (leader_email && leaderResults.length === 0)) {
+          return connection.rollback(() => {
+            res.status(404).json({ error: 'Leader user not found' });
+          });
+        }
+
+        const leaderId = leader_email ? leaderResults[0].id : null;
+
+        // Create the project
+        const createProjectQuery = `
+          INSERT INTO user_history (
+            user_id, organization, project_name, project_description, 
+            status, stage, stage_duration, stage_start_date, stage_due_date,
+            project_start_date, project_due_date, session_duration, carbon_emit
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+        `;
+
+        connection.query(createProjectQuery, 
+          [ownerId, organization, project_name, project_description, 
+           status, stage, stage_duration, stage_start_date, finalStageDueDate,
+           project_start_date, finalProjectDueDate],
+          (err, projectResult) => {
+            if (err) {
+              return connection.rollback(() => {
+                res.status(500).json({ error: 'Failed to create project' });
+              });
+            }
+
+            const projectId = projectResult.insertId;
+            
+            // Update the project_id field to be the same as the project's ID
+            const updateProjectIdQuery = `
+              UPDATE user_history 
+              SET project_id = ? 
+              WHERE id = ?
+            `;
+            
+            connection.query(updateProjectIdQuery, [projectId, projectId], (err) => {
+              if (err) {
+                return connection.rollback(() => {
+                  res.status(500).json({ error: 'Failed to update project ID' });
+                });
+              }
+              
+              // Add project owner role
+              const addOwnerQuery = `
+                INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                VALUES (?, ?, 'project_owner', ?, NULL, NOW())
+              `;
+
+              connection.query(addOwnerQuery, [projectId, ownerId, stage], (err) => {
+                if (err) {
+                  return connection.rollback(() => {
+                    res.status(500).json({ error: 'Failed to add project owner' });
+                  });
+                }
+
+                // Add project leader role
+                const addLeaderQuery = `
+                  INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status, joined_at)
+                  VALUES (?, ?, 'project_leader', ?, 'In Progress', NOW())
+                `;
+
+                // Only add leader if one was specified
+                if (leaderId) {
+                  connection.query(addLeaderQuery, [projectId, leaderId, stage], (err) => {
+                    if (err) {
+                      return connection.rollback(() => {
+                        res.status(500).json({ error: 'Failed to add project leader' });
+                      });
+                    }
+                    
+                    // Process additional members if present
+                    if (members && members.length > 0) {
+                      // Find user IDs for all members
+                      const placeholders = members.map(() => '?').join(',');
+                      const findMembersQuery = `SELECT email, id FROM users WHERE email IN (${placeholders})`;
+                      
+                      connection.query(findMembersQuery, members, (err, memberResults) => {
+                        if (err) {
+                          return connection.rollback(() => {
+                            res.status(500).json({ error: 'Failed to find project members' });
+                          });
+                        }
+                        
+                        // Create array of values for batch insert
+                        const memberValues = memberResults.map(member => [
+                          projectId,
+                          member.id,
+                          'member',
+                          stage,  // Set the current_stage to the project's initial stage
+                          'In Progress'
+                        ]);
+                        
+                        if (memberValues.length === 0) {
+                          // No valid members to add, commit transaction
+                          return connection.commit(err => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                res.status(500).json({ error: 'Failed to commit transaction' });
+                              });
+                            }
+                            
+                            res.status(200).json({
+                              id: projectId,
+                              project_id: projectId, // Include project_id in the response
+                              project_name,
+                              project_description,
+                              status,
+                              stage,
+                              carbon_emit: 0,
+                              session_duration: 0,
+                              owner: owner_email,
+                              leader: leader_email,
+                              organization,
+                              members,
+                              stage_duration,
+                              stage_start_date,
+                              stage_due_date: finalStageDueDate,
+                              project_start_date,
+                              project_due_date: finalProjectDueDate,
+                              created_at: new Date().toISOString()
+                            });
+                          });
+                        }
+                        
+                        // Add all members at once
+                        const addMembersQuery = `
+                          INSERT INTO project_members (project_id, user_id, role, current_stage, progress_status)
+                          VALUES ?
+                        `;
+
+                        connection.query(addMembersQuery, [memberValues], (err) => {
+                          if (err) {
+                            return connection.rollback(() => {
+                              res.status(500).json({ error: 'Failed to add project members' });
+                            });
+                          }
+
+                          connection.commit(err => {
+                            if (err) {
+                              return connection.rollback(() => {
+                                res.status(500).json({ error: 'Failed to commit transaction' });
+                              });
+                            }
+
+                            res.status(200).json({
+                              id: projectId,
+                              project_id: projectId, // Include project_id in the response
+                              project_name,
+                              project_description,
+                              status,
+                              stage,
+                              carbon_emit: 0,
+                              session_duration: 0,
+                              owner: owner_email,
+                              leader: leader_email,
+                              organization,
+                              members,
+                              stage_duration,
+                              stage_start_date,
+                              stage_due_date: finalStageDueDate,
+                              project_start_date,
+                              project_due_date: finalProjectDueDate,
+                              created_at: new Date().toISOString()
+                            });
+                          });
+                        });
+                      });
+                    } else {
+                      // No additional members, commit transaction
+                      connection.commit(err => {
+                        if (err) {
+                          return connection.rollback(() => {
+                            res.status(500).json({ error: 'Failed to commit transaction' });
+                          });
+                        }
+
+                        res.status(200).json({
+                          id: projectId,
+                          project_id: projectId, // Include project_id in the response
+                          project_name,
+                          project_description,
+                          status,
+                          stage,
+                          carbon_emit: 0,
+                          session_duration: 0,
+                          owner: owner_email,
+                          leader: leader_email,
+                          organization,
+                          members: [],
+                          stage_duration,
+                          stage_start_date,
+                          stage_due_date: finalStageDueDate,
+                          project_start_date,
+                          project_due_date: finalProjectDueDate,
+                          created_at: new Date().toISOString()
+                        });
+                      });
+                    }
+                  });
+                } else {
+                  // No leader specified, commit transaction
+                  connection.commit(err => {
+                    if (err) {
+                      return connection.rollback(() => {
+                        res.status(500).json({ error: 'Failed to commit transaction' });
+                      });
+                    }
+
+                    res.status(200).json({
+                      id: projectId,
+                      project_id: projectId, // Include project_id in the response
+                      project_name,
+                      project_description,
+                      status,
+                      stage,
+                      carbon_emit: 0,
+                      session_duration: 0,
+                      owner: owner_email,
+                      leader: null,
+                      organization,
+                      members: [],
+                      stage_duration,
+                      stage_start_date,
+                      stage_due_date: finalStageDueDate,
+                      project_start_date,
+                      project_due_date: finalProjectDueDate,
+                      created_at: new Date().toISOString()
+                    });
+                  });
+                }
+              });
+            });
+          }
+        );
+      });
+    });
+  });
+});
+
 // Endpoint to get all users Admin only
 app.get('/all_users', authenticateAdmin, (req, res) => {
   const query = 'SELECT id, name, email, organization FROM users';
