@@ -115,10 +115,10 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Update the uploads directory to use the mounted persistent storage
+// Update the uploads directory to use the folder path relative to this server.js file
 const uploadsDir = process.env.NODE_ENV === 'production' 
   ? '/data/uploads' 
-  : path.join(process.cwd(), 'uploads');
+  : path.join(__dirname, 'uploads');
 
 // Ensure the uploads directory exists
 if (!fs.existsSync(uploadsDir)) {
