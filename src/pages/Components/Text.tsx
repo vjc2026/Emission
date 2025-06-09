@@ -1171,12 +1171,12 @@ const History = () => {
                 <strong>Project Leader:</strong>
                 <div className={styles.assignee}>
                   <img 
-                    src={selectedTask.leader.profileImage || '/default-avatar.png'} 
+                    src={selectedTask.leader.profileImage || `https://www.gravatar.com/avatar/${selectedTask.leader.email}?d=identicon&s=40`} 
                     alt={selectedTask.leader.name}
                     className={styles.assigneeAvatar}
                     onError={(e: any) => {
                       e.target.onerror = null;
-                      e.target.src = '/default-avatar.png';
+                      e.target.src = 'https://www.gravatar.com/avatar/default?d=mp';
                     }}
                   />
                   <div className={styles.assigneeInfo}>
