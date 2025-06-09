@@ -166,7 +166,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch('https://emission-mah2.onrender.com/admin/cpus', {
+      const response = await fetch('https://emissionserver.vercel.app/admin/cpus', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -190,7 +190,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch('https://emission-mah2.onrender.com/admin/cpus-mobile', {
+      const response = await fetch('https://emissionserver.vercel.app/admin/cpus-mobile', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -214,7 +214,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch('https://emission-mah2.onrender.com/admin/gpus', {
+      const response = await fetch('https://emissionserver.vercel.app/admin/gpus', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -238,7 +238,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch('https://emission-mah2.onrender.com/admin/gpus-mobile', {
+      const response = await fetch('https://emissionserver.vercel.app/admin/gpus-mobile', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -262,7 +262,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch('https://emission-mah2.onrender.com/admin/rams', {
+      const response = await fetch('https://emissionserver.vercel.app/admin/rams', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -303,7 +303,7 @@ const DeviceMaintenance: React.FC = () => {
 
       let response;
       if (editingCpu) {
-        response = await fetch(`https://emission-mah2.onrender.com/admin/cpus/${editingCpu.id}`, {
+        response = await fetch(`https://emissionserver.vercel.app/admin/cpus/${editingCpu.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -312,7 +312,7 @@ const DeviceMaintenance: React.FC = () => {
           body: JSON.stringify(values),
         });
       } else {
-        response = await fetch('https://emission-mah2.onrender.com/admin/cpus', {
+        response = await fetch('https://emissionserver.vercel.app/admin/cpus', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -355,7 +355,7 @@ const DeviceMaintenance: React.FC = () => {
 
       let response;
       if (editingCpuMobile) {
-        response = await fetch(`https://emission-mah2.onrender.com/admin/cpus-mobile/${editingCpuMobile.id}`, {
+        response = await fetch(`https://emissionserver.vercel.app/admin/cpus-mobile/${editingCpuMobile.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -364,7 +364,7 @@ const DeviceMaintenance: React.FC = () => {
           body: JSON.stringify(values),
         });
       } else {
-        response = await fetch('https://emission-mah2.onrender.com/admin/cpus-mobile', {
+        response = await fetch('https://emissionserver.vercel.app/admin/cpus-mobile', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -407,7 +407,7 @@ const DeviceMaintenance: React.FC = () => {
 
       let response;
       if (editingGpu) {
-        response = await fetch(`https://emission-mah2.onrender.com/admin/gpus/${editingGpu.id}`, {
+        response = await fetch(`https://emissionserver.vercel.app/admin/gpus/${editingGpu.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -416,7 +416,7 @@ const DeviceMaintenance: React.FC = () => {
           body: JSON.stringify(values),
         });
       } else {
-        response = await fetch('https://emission-mah2.onrender.com/admin/gpus', {
+        response = await fetch('https://emissionserver.vercel.app/admin/gpus', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -459,7 +459,7 @@ const DeviceMaintenance: React.FC = () => {
 
       let response;
       if (editingGpuMobile) {
-        response = await fetch(`https://emission-mah2.onrender.com/admin/gpus-mobile/${editingGpuMobile.id}`, {
+        response = await fetch(`https://emissionserver.vercel.app/admin/gpus-mobile/${editingGpuMobile.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -468,7 +468,7 @@ const DeviceMaintenance: React.FC = () => {
           body: JSON.stringify(values),
         });
       } else {
-        response = await fetch('https://emission-mah2.onrender.com/admin/gpus-mobile', {
+        response = await fetch('https://emissionserver.vercel.app/admin/gpus-mobile', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -511,7 +511,7 @@ const DeviceMaintenance: React.FC = () => {
 
       let response;
       if (editingRam) {
-        response = await fetch(`https://emission-mah2.onrender.com/admin/rams/${editingRam.id}`, {
+        response = await fetch(`https://emissionserver.vercel.app/admin/rams/${editingRam.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -520,7 +520,7 @@ const DeviceMaintenance: React.FC = () => {
           body: JSON.stringify(values),
         });
       } else {
-        response = await fetch('https://emission-mah2.onrender.com/admin/rams', {
+        response = await fetch('https://emissionserver.vercel.app/admin/rams', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -562,7 +562,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/cpus/${id}`, {
+      const response = await fetch(`https://emissionserver.vercel.app/admin/cpus/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -597,7 +597,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/cpus-mobile/${id}`, {
+      const response = await fetch(`https://emissionserver.vercel.app/admin/cpus-mobile/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -632,7 +632,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/gpus/${id}`, {
+      const response = await fetch(`https://emissionserver.vercel.app/admin/gpus/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -667,7 +667,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/gpus-mobile/${id}`, {
+      const response = await fetch(`https://emissionserver.vercel.app/admin/gpus-mobile/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -702,7 +702,7 @@ const DeviceMaintenance: React.FC = () => {
         throw new Error('No token found');
       }
 
-      const response = await fetch(`https://emission-mah2.onrender.com/admin/rams/${id}`, {
+      const response = await fetch(`https://emissionserver.vercel.app/admin/rams/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

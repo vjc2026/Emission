@@ -52,7 +52,7 @@ const RegisterPage: React.FC = () => {
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
     try {
-      const response = await fetch('https://emission-mah2.onrender.com/check-email', {
+      const response = await fetch('https://emissionserver.vercel.app/check-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
