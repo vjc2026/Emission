@@ -16,7 +16,7 @@ import {
   Modal,
   Select,
 } from '@mantine/core';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import classes from './Register.module.css';
 import { IconArrowLeft } from '@tabler/icons-react';
@@ -41,6 +41,10 @@ const RegisterPage: React.FC = () => {
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(
     typeof query.profilePicturePreview === 'string' ? query.profilePicturePreview : null
   );
+  const [regions, setRegions] = useState<{ value: string; label: string }[]>([
+    { value: 'Singapore', label: 'Singapore' },
+    { value: 'Philippines', label: 'Philippines' },
+  ]);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<CroppedAreaPixels | null>(null);
@@ -49,6 +53,30 @@ const RegisterPage: React.FC = () => {
   const handleLogin = () => {
     router.push('/');
   };
+
+  useEffect(() => {
+    // Fetch global regions from backend
+    const loadRegions = async () => {
+      try {
+        const res = await fetch('https://emissionserver.vercel.app/regions');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.regions)) {
+            const options: { value: string; label: string }[] = data.regions.map((r: string) => ({ value: r, label: r }));
+            setRegions(options);
+            // ensure current selection persists if present in query
+            if (typeof query.region === 'string' && query.region && !options.find((o: { value: string; label: string }) => o.value === query.region)) {
+              setRegions([{ value: query.region, label: query.region }, ...options]);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load regions', e);
+      }
+    };
+    loadRegions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
     try {
@@ -317,11 +345,10 @@ const RegisterPage: React.FC = () => {
             className={classes.text}
             placeholder="Select your region"
             value={region}
+            searchable
+            nothingFoundMessage="No results"
             onChange={(value) => setRegion(value || '')}
-            data={[
-              { value: 'Singapore', label: 'Singapore' },
-              { value: 'Philippines', label: 'Philippines' }
-            ]}
+            data={regions}
             required
             style={{ color: 'white' }}
           />
