@@ -42,3 +42,15 @@ next-env.d.ts
 .vercel
 database_update.sql
 REGION_IMPLEMENTATION.md
+api/dynamicCarbonProvider.js
+api/emissionFactors.js
+api/index.ts
+api/package-lock.json
+api/package.json
+api/README.md
+api/tsconfig.json
+api/vercel.json
+api/server.js
+api/node_modules
+package-lock.json
+package.json

@@ -35,11 +35,6 @@ import styles from './Components/Main.module.css';
 const dlsuGreen = '#006F3C';
 const dlsuLightGreen = '#008C4C';
 
-const primaryData = [
-  { link: '/main', label: 'All Projects', icon: IconDashboard },
-  { link: '/main', label: 'Joined Projects', icon: IconAccessPoint },
-];
-
 const secondaryData = [
   { link: '/main', label: 'Dashboard', icon: IconBell },
   { link: '/main', label: 'Statistics', icon: IconChartBar },
@@ -65,7 +60,6 @@ const MainContent: React.FC = () => {
     sender_email: string;
     created_at: string;
   } | null>(null);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isSecondaryMinimized, setIsSecondaryMinimized] = useState(false);
   const [newNotificationCount, setNewNotificationCount] = useState(0);
   const router = useRouter();
@@ -240,43 +234,9 @@ const MainContent: React.FC = () => {
     router.push('/Components/TEST');
   };
 
-  const toggleNavbar = () => {
-    setIsMinimized(!isMinimized);
-  };
-
   const toggleSecondaryNavbar = () => {
     setIsSecondaryMinimized(!isSecondaryMinimized);
   };
-
-  //First NavBar
-  const primaryLinks = primaryData.map((item) => (
-    <Link href={item.link} key={item.label}>
-      <div
-        className={`${styles.link} ${isMinimized ? styles.minimizedLink : ''}`}
-        data-active={router.pathname === item.link || undefined}
-        onClick={() => {
-          setActive(item.link);
-          switch (item.label) {
-            case 'All Projects':
-              setCurrentComponent('component1');
-              break;
-            case 'My Profile':
-              setCurrentComponent('component2');
-              break;
-            case 'Joined Projects':
-              setCurrentComponent('component3');
-              break;
-            default:
-              setCurrentComponent('component1');
-              break;
-          }
-        }}
-      >
-        <item.icon className={styles.linkIcon} stroke={1.5} />
-        {!isMinimized && <span>{item.label}</span>}
-      </div>
-    </Link>
-  ));
 
   const secondaryLinks = secondaryData.map((item) => (
     <Link href={item.link} key={item.label}>
@@ -321,12 +281,17 @@ const MainContent: React.FC = () => {
       {/* New Header */}
       <header style={{
         background: `linear-gradient(135deg, ${dlsuGreen} 0%, ${dlsuLightGreen} 100%)`,
-        padding: '10px 24px',
+        padding: '12px 32px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        height: '70px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        height: '75px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        backdropFilter: 'blur(10px)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
       }}>
         <div style={{ 
           display: 'flex', 
@@ -334,20 +299,31 @@ const MainContent: React.FC = () => {
           gap: '16px'
         }}>
           <div style={{
-            padding: '2px',
+            padding: '4px',
             background: 'white',
             borderRadius: '50%',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+            justifyContent: 'center',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05) rotate(5deg)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+          }}
+          >
             <img
               src="https://i.ibb.co/5KcMwkj/with-bg-Icon.jpg"
               alt="Website Icon"
               style={{ 
-                width: '46px', 
-                height: '46px', 
+                width: '50px', 
+                height: '50px', 
                 borderRadius: '50%',
                 objectFit: 'cover'
               }}
@@ -358,7 +334,9 @@ const MainContent: React.FC = () => {
             fw={700} 
             style={{ 
               color: 'white',
-              textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              letterSpacing: '0.5px',
+              fontSize: '1.5rem'
             }}
           >
             Emission Sense
@@ -379,13 +357,20 @@ const MainContent: React.FC = () => {
                   radius="xl"
                   size="lg"
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(8px)',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      transform: 'translateY(-2px)'
-                    }
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   <IconBell size={24} color="white" />
@@ -509,22 +494,11 @@ const MainContent: React.FC = () => {
       </header>
 
       {/* Container for Sidebar and Main Content */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
-        <nav className={`${styles.navbar} ${isMinimized ? styles.minimized : ''}`}>
-          <button className={styles.toggleButton} onClick={toggleNavbar}>
-            {isMinimized ? <IconChevronRight /> : <IconChevronLeft />}
-          </button>
-          <div className={styles.navbarMain}>
-            {primaryLinks}
-          </div>
-          <div className={styles.footer}>
-            <div className={styles.link} onClick={handleLogout}>
-              <IconLogout className={styles.linkIcon} stroke={1.5} />
-              {!isMinimized && <span>Logout</span>}
-            </div>
-          </div>
-        </nav>
-
+      <div style={{ 
+        display: 'flex', 
+        height: 'calc(100vh - 75px)',
+        backgroundColor: '#f8f9fa'
+      }}>
         <nav className={`${styles.navbar} ${isSecondaryMinimized ? styles.minimized : ''}`}>
           <button className={styles.toggleButton} onClick={toggleSecondaryNavbar}>
             {isSecondaryMinimized ? <IconChevronRight /> : <IconChevronLeft />}
@@ -534,8 +508,24 @@ const MainContent: React.FC = () => {
           </div>
         </nav>
 
-        <main style={{ flex: 1, padding: '20px', overflowY: 'auto', height: 'calc(100vh - 70px)' }}>
-          <Paper>
+        <main style={{ 
+          flex: 1, 
+          padding: '24px', 
+          overflowY: 'auto', 
+          height: 'calc(100vh - 75px)',
+          background: 'linear-gradient(to bottom right, #f8f9fa 0%, #e9ecef 100%)'
+        }}>
+          <Paper 
+            shadow="sm" 
+            radius="lg" 
+            p="lg"
+            style={{
+              minHeight: 'calc(100vh - 123px)',
+              backgroundColor: 'white',
+              border: '1px solid #e9ecef',
+              transition: 'box-shadow 0.3s ease'
+            }}
+          >
             {currentComponent === 'component1' && <TextComponent />}
             {currentComponent === 'component2' && <ButtonComponent />}
             {currentComponent === 'component3' && <StatisticsComponent />}
@@ -560,65 +550,159 @@ const MainContent: React.FC = () => {
         size="lg"
         styles={{
           header: {
-            backgroundColor: dlsuGreen,
+            background: `linear-gradient(135deg, ${dlsuGreen} 0%, ${dlsuLightGreen} 100%)`,
             color: 'white',
-            padding: '16px'
+            padding: '20px',
+            borderRadius: '8px 8px 0 0'
           },
           title: {
-            color: 'white'
+            color: 'white',
+            fontSize: '1.25rem',
+            fontWeight: 700
+          },
+          body: {
+            padding: '24px'
           }
+        }}
+        radius="lg"
+        overlayProps={{
+          backgroundOpacity: 0.55,
+          blur: 3
         }}
       >
         {selectedNotification && (
           <Box>
             <Text fw={500} mb="md" size="lg">{selectedNotification.message}</Text>
             
-            <Paper withBorder p="md" mb="md" radius="md" style={{ backgroundColor: '#f8f9fa' }}>
-              <Group mb="xs">
-                <IconDashboard size={20} color={dlsuGreen} />
-                <Text fw={600} size="lg">Project Details</Text>
+            <Paper 
+              withBorder 
+              p="lg" 
+              mb="md" 
+              radius="lg" 
+              style={{ 
+                backgroundColor: '#f8f9fa',
+                borderLeft: `4px solid ${dlsuGreen}`,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <Group mb="md" gap="sm">
+                <Box
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: `linear-gradient(135deg, ${dlsuGreen} 0%, ${dlsuLightGreen} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <IconDashboard size={22} color="white" />
+                </Box>
+                <Text fw={700} size="lg" style={{ color: dlsuGreen }}>Project Details</Text>
               </Group>
-              <Box pl={28}>
-                <Text mb={8}><b>Name:</b> {selectedNotification.project_name}</Text>
-                <Text mb={8}><b>Organization:</b> {selectedNotification.organization}</Text>
-                <Text mb={8}><b>Description:</b> {selectedNotification.project_description}</Text>
-                <Text><b>Current Stage:</b> {selectedNotification.stage}</Text>
+              <Box pl={48}>
+                <Text mb={10} style={{ fontSize: '0.95rem' }}><b>Name:</b> {selectedNotification.project_name}</Text>
+                <Text mb={10} style={{ fontSize: '0.95rem' }}><b>Organization:</b> {selectedNotification.organization}</Text>
+                <Text mb={10} style={{ fontSize: '0.95rem' }}><b>Description:</b> {selectedNotification.project_description}</Text>
+                <Text style={{ fontSize: '0.95rem' }}><b>Current Stage:</b> {selectedNotification.stage}</Text>
               </Box>
             </Paper>
 
-            <Paper withBorder p="md" mb="md" radius="md" style={{ backgroundColor: '#f8f9fa' }}>
-              <Group mb="xs">
-                <IconUser size={20} color={dlsuGreen} />
-                <Text fw={600} size="lg">Invitation Details</Text>
+            <Paper 
+              withBorder 
+              p="lg" 
+              mb="md" 
+              radius="lg" 
+              style={{ 
+                backgroundColor: '#f8f9fa',
+                borderLeft: `4px solid ${dlsuLightGreen}`,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <Group mb="md" gap="sm">
+                <Box
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    background: `linear-gradient(135deg, ${dlsuLightGreen} 0%, #00A661 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <IconUser size={22} color="white" />
+                </Box>
+                <Text fw={700} size="lg" style={{ color: dlsuGreen }}>Invitation Details</Text>
               </Group>
-              <Box pl={28}>
-                <Text mb={8}><b>From:</b> {selectedNotification.sender_name}</Text>
-                <Text mb={8}><b>Email:</b> {selectedNotification.sender_email}</Text>
-                <Text><b>Sent:</b> {new Date(selectedNotification.created_at).toLocaleString()}</Text>
+              <Box pl={48}>
+                <Text mb={10} style={{ fontSize: '0.95rem' }}><b>From:</b> {selectedNotification.sender_name}</Text>
+                <Text mb={10} style={{ fontSize: '0.95rem' }}><b>Email:</b> {selectedNotification.sender_email}</Text>
+                <Text style={{ fontSize: '0.95rem' }}><b>Sent:</b> {new Date(selectedNotification.created_at).toLocaleString()}</Text>
               </Box>
             </Paper>
 
             <Group justify="flex-end" mt="xl" gap="md">
               <Button 
-                variant="outline" 
+                variant="light" 
                 color="yellow" 
-                leftSection={<IconBell size={16} />}
+                leftSection={<IconBell size={18} />}
                 onClick={handleRead}
+                radius="md"
+                size="md"
+                styles={{
+                  root: {
+                    transition: 'all 0.2s ease'
+                  }
+                }}
               >
                 Mark as Read
               </Button>
               <Button 
-                variant="outline"
+                variant="light"
                 color="red" 
-                leftSection={<IconX size={16} />}
+                leftSection={<IconX size={18} />}
                 onClick={handleIgnore}
+                radius="md"
+                size="md"
+                styles={{
+                  root: {
+                    transition: 'all 0.2s ease'
+                  }
+                }}
               >
                 Ignore
               </Button>
               <Button 
-                color="green" 
-                leftSection={<IconCheck size={16} />}
+                variant="gradient"
+                gradient={{ from: dlsuGreen, to: dlsuLightGreen, deg: 135 }}
+                leftSection={<IconCheck size={18} />}
                 onClick={handleAccept}
+                radius="md"
+                size="md"
+                styles={{
+                  root: {
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 12px rgba(0, 111, 60, 0.3)'
+                  }
+                }}
               >
                 Accept
               </Button>
