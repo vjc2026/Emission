@@ -188,7 +188,7 @@ export default function CodeCalculator() {
       if (lat !== null) payload.lat = lat;
       if (lon !== null) payload.lon = lon;
 
-      const response = await axios.post('https://opti-server.vercel.app/measure', payload, {
+      const response = await axios.post('https://opti-server.vercel.app/analyze', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -360,6 +360,126 @@ export default function CodeCalculator() {
     formattedText += `GPU Emissions:  ${formatScientific(calculations.emissions_breakdown.gpu)} kg CO2\n`;
     formattedText += `RAM Emissions:  ${formatScientific(calculations.emissions_breakdown.ram)} kg CO2\n`;
     formattedText += `Total Emissions: ${formatScientific(calculations.emissions_breakdown.total)} kg CO2\n`;
+    
+    return formattedText;
+  };
+
+  const formatStaticAnalysis = (staticAnalysis: any) => {
+    if (!staticAnalysis) return '';
+    
+    let formattedText = '';
+    
+    formattedText += '🔍 STATIC CODE ANALYSIS\n';
+    formattedText += '═══════════════════\n\n';
+    
+    // Complexity Information
+    formattedText += '📊 COMPLEXITY METRICS\n';
+    formattedText += '───\n';
+    formattedText += `Time Complexity:     ${staticAnalysis.time_complexity}\n`;
+    formattedText += `Space Complexity:    ${staticAnalysis.space_complexity}\n`;
+    formattedText += `Cyclomatic Complexity: ${staticAnalysis.cyclomatic_complexity}\n`;
+    formattedText += `Eco Score:           ${staticAnalysis.eco_score.toFixed(1)}/100\n`;
+    formattedText += `Confidence:          ${(staticAnalysis.confidence * 100).toFixed(1)}%\n\n`;
+    
+    // Complexity Explanations
+    formattedText += '📚 COMPLEXITY EXPLANATIONS\n';
+    formattedText += '───\n';
+    formattedText += `Time Complexity (${staticAnalysis.time_complexity}):\n`;
+    formattedText += `  How execution time grows with input size.\n`;
+    formattedText += `  O(1) = constant, O(N) = linear, O(N²) = quadratic\n\n`;
+    
+    formattedText += `Space Complexity (${staticAnalysis.space_complexity}):\n`;
+    formattedText += `  How memory usage grows with input size.\n`;
+    formattedText += `  O(1) = constant memory, O(N) = linear memory\n\n`;
+    
+    formattedText += `Cyclomatic Complexity (${staticAnalysis.cyclomatic_complexity}):\n`;
+    formattedText += `  Number of decision paths in code.\n`;
+    formattedText += `  Lower = simpler, Higher = more complex\n\n`;
+    
+    formattedText += `Eco Score (${staticAnalysis.eco_score.toFixed(1)}/100):\n`;
+    formattedText += `  Energy efficiency rating.\n`;
+    formattedText += `  100 = very efficient, 0 = inefficient\n\n`;
+    
+    formattedText += `Confidence (${(staticAnalysis.confidence * 100).toFixed(1)}%):\n`;
+    formattedText += `  Analysis reliability.\n`;
+    formattedText += `  Higher = more accurate estimate\n\n`;
+    
+    // Suggestions
+    if (staticAnalysis.suggestions && staticAnalysis.suggestions.length > 0) {
+      formattedText += '💡 OPTIMIZATION SUGGESTIONS\n';
+      formattedText += '───\n';
+      staticAnalysis.suggestions.forEach((suggestion: string, index: number) => {
+        formattedText += `${index + 1}. ${suggestion}\n`;
+      });
+    }
+    
+    return formattedText;
+  };
+
+  const formatMeasurementExplanations = (result: any) => {
+    if (!result) return '';
+    
+    const emissions = result.emissions || 0;
+    const energy = result.energy || 0;
+    
+    let formattedText = '';
+    
+    formattedText += '📊 MEASUREMENT EXPLANATIONS\n';
+    formattedText += '═══════════════════\n\n';
+    
+    // Carbon Emissions Section
+    formattedText += '🌱 CARBON EMISSIONS\n';
+    formattedText += '───\n';
+    formattedText += `Your Code Produced: ${emissions.toFixed(6)} kg CO₂\n\n`;
+    
+    formattedText += 'What this means:\n';
+    formattedText += `• Equivalent to driving ${(emissions * 1000 / 120).toFixed(2)} meters by car\n`;
+    formattedText += `• Equal to ${(emissions * 1000 / 22).toFixed(2)} trees absorbing CO₂ for a day\n`;
+    formattedText += `• Same as sending ${(emissions * 1000 / 4).toFixed(0)} emails\n`;
+    formattedText += `• ${emissions < 0.001 ? 'Very low' : emissions < 0.01 ? 'Low' : emissions < 0.1 ? 'Moderate' : 'High'} environmental impact\n\n`;
+    
+    // Energy Consumption Section
+    formattedText += '⚡ ENERGY CONSUMPTION\n';
+    formattedText += '───\n';
+    formattedText += `Your Code Used: ${energy.toFixed(6)} kWh\n\n`;
+    
+    formattedText += 'What this means:\n';
+    formattedText += `• Powers a 60W light bulb for ${(energy * 1000 / 60).toFixed(1)} hours\n`;
+    formattedText += `• Charges a smartphone ${(energy * 1000 / 0.01).toFixed(0)} times\n`;
+    formattedText += `• Runs a laptop for ${(energy * 1000 / 50).toFixed(1)} hours\n`;
+    formattedText += `• ${energy < 0.001 ? 'Very efficient' : energy < 0.01 ? 'Efficient' : energy < 0.1 ? 'Moderate' : 'Energy intensive'} code\n\n`;
+    
+    // Environmental Impact
+    formattedText += '🌍 ENVIRONMENTAL IMPACT\n';
+    formattedText += '───\n';
+    const impactLevel = emissions < 0.001 ? 'Minimal' : 
+                       emissions < 0.01 ? 'Low' : 
+                       emissions < 0.1 ? 'Moderate' : 'Significant';
+    
+    formattedText += `Overall Impact: ${impactLevel}\n\n`;
+    
+    if (emissions < 0.001) {
+      formattedText += '✅ Your code is very environmentally friendly!\n';
+      formattedText += '   Minimal carbon footprint and energy usage.\n\n';
+    } else if (emissions < 0.01) {
+      formattedText += '✅ Good environmental performance.\n';
+      formattedText += '   Low impact with room for minor optimizations.\n\n';
+    } else if (emissions < 0.1) {
+      formattedText += '⚠️  Moderate environmental impact.\n';
+      formattedText += '   Consider optimizing for better efficiency.\n\n';
+    } else {
+      formattedText += '⚠️  High environmental impact.\n';
+      formattedText += '   Significant optimization opportunities exist.\n\n';
+    }
+    
+    // Optimization Tips
+    formattedText += '💡 QUICK OPTIMIZATION TIPS\n';
+    formattedText += '───\n';
+    formattedText += '• Use efficient algorithms (lower time complexity)\n';
+    formattedText += '• Minimize memory usage (lower space complexity)\n';
+    formattedText += '• Avoid unnecessary loops and calculations\n';
+    formattedText += '• Use built-in functions when possible\n';
+    formattedText += '• Consider caching for repeated operations\n';
     
     return formattedText;
   };
@@ -636,7 +756,7 @@ export default function CodeCalculator() {
       </div>
 
       {/* Static Analysis Section */}
-      {result && (
+      {result && result.static_analysis && (
         <div style={{ 
           marginTop: '2rem',
           maxWidth: '1200px',
@@ -670,338 +790,47 @@ export default function CodeCalculator() {
           {showCalculations && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-              gap: '1.5rem',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2rem',
               marginTop: '1rem',
-              maxWidth: '1400px',
+              maxWidth: '1200px',
               width: '100%',
               marginLeft: 'auto',
               marginRight: 'auto'
             }}>
-              {/* Complexity Metrics Card */}
+              {/* Static Analysis Details */}
               <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #e1e8ed',
-                borderRadius: '16px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '12px',
                 padding: '1.5rem',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.3s ease'
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                maxHeight: '500px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
               }}>
-                <h3 style={{
-                  margin: '0 0 1rem 0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontFamily: 'Poppins',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  📊 Complexity Metrics
-                </h3>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                    <span style={{ fontWeight: '500', color: '#34495e' }}>Time Complexity:</span>
-                    <span style={{ fontWeight: '600', color: '#e74c3c' }}>{result.metrics?.time_complexity || 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                    <span style={{ fontWeight: '500', color: '#34495e' }}>Space Complexity:</span>
-                    <span style={{ fontWeight: '600', color: '#e74c3c' }}>{result.metrics?.space_complexity || 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                    <span style={{ fontWeight: '500', color: '#34495e' }}>Cyclomatic Complexity:</span>
-                    <span style={{ fontWeight: '600', color: '#e74c3c' }}>{result.metrics?.cyclomatic_complexity || 'N/A'}</span>
-                  </div>
-                </div>
+                {formatStaticAnalysis(result.static_analysis)}
               </div>
 
-              {/* Eco Score Card */}
+              {/* Measurement Explanations */}
               <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #e1e8ed',
-                borderRadius: '16px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '12px',
                 padding: '1.5rem',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.3s ease'
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                maxHeight: '500px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
               }}>
-                <h3 style={{
-                  margin: '0 0 1rem 0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontFamily: 'Poppins',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  🌱 Eco Score
-                </h3>
-                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                  <div style={{
-                    fontSize: '48px',
-                    fontWeight: '700',
-                    color: result.eco_score > 70 ? '#27ae60' : result.eco_score > 50 ? '#f39c12' : '#e74c3c',
-                    fontFamily: 'Poppins'
-                  }}>
-                    {result.eco_score?.toFixed(1) || 'N/A'}
-                  </div>
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#7f8c8d',
-                    fontFamily: 'Poppins'
-                  }}>
-                    out of 100
-                  </div>
-                </div>
-                <div style={{
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  fontSize: '14px',
-                  color: '#34495e',
-                  fontFamily: 'Poppins'
-                }}>
-                  {result.eco_score > 70 ? '✅ Excellent energy efficiency!' : 
-                   result.eco_score > 50 ? '⚠️ Good efficiency with room for improvement' : 
-                   '❌ Consider optimizing for better energy efficiency'}
-                </div>
+                {formatMeasurementExplanations(result)}
               </div>
-
-              {/* Carbon Emissions Impact Card */}
-              <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #e1e8ed',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.3s ease'
-              }}>
-                <h3 style={{
-                  margin: '0 0 1rem 0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontFamily: 'Poppins',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  🌍 Carbon Impact
-                </h3>
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: '600',
-                    color: '#e74c3c',
-                    fontFamily: 'Poppins',
-                    marginBottom: '0.5rem'
-                  }}>
-                    {formatMetrics(result).emissions.toFixed(6)} g CO₂
-                  </div>
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#7f8c8d',
-                    fontFamily: 'Poppins'
-                  }}>
-                    per execution
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {result.equivalents && (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                        <span style={{ fontSize: '16px' }}>🚗</span>
-                        <span style={{ fontSize: '14px', color: '#34495e' }}>Equivalent to driving {result.equivalents.car_km.toFixed(2)} km by car</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                        <span style={{ fontSize: '16px' }}>🌳</span>
-                        <span style={{ fontSize: '14px', color: '#34495e' }}>Equal to {result.equivalents.trees_offset.toFixed(2)} trees absorbing CO₂ for a day</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                        <span style={{ fontSize: '16px' }}>📧</span>
-                        <span style={{ fontSize: '14px', color: '#34495e' }}>Same as sending {result.equivalents.emails.toFixed(0)} emails</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Energy Consumption Card */}
-              <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #e1e8ed',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.3s ease'
-              }}>
-                <h3 style={{
-                  margin: '0 0 1rem 0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  fontFamily: 'Poppins',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  ⚡ Energy Usage
-                </h3>
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: '600',
-                    color: '#3498db',
-                    fontFamily: 'Poppins',
-                    marginBottom: '0.5rem'
-                  }}>
-                    {formatMetrics(result).energy.toFixed(6)} kWh
-                  </div>
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#7f8c8d',
-                    fontFamily: 'Poppins'
-                  }}>
-                    per execution
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                    <span style={{ fontSize: '16px' }}>💡</span>
-                    <span style={{ fontSize: '14px', color: '#34495e' }}>Powers a 60W light bulb for {(formatMetrics(result).energy * 1000 / 60).toFixed(1)} hours</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                    <span style={{ fontSize: '16px' }}>📱</span>
-                    <span style={{ fontSize: '14px', color: '#34495e' }}>Charges a smartphone {(formatMetrics(result).energy * 1000 / 0.01).toFixed(0)} times</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                    <span style={{ fontSize: '16px' }}>💻</span>
-                    <span style={{ fontSize: '14px', color: '#34495e' }}>Runs a laptop for {(formatMetrics(result).energy * 1000 / 50).toFixed(1)} hours</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Annual Estimates Card */}
-              {result.annual_estimate && (
-                <div style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e1e8ed',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <h3 style={{
-                    margin: '0 0 1rem 0',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    fontFamily: 'Poppins',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    📅 Annual Impact
-                  </h3>
-                  <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                      <span style={{ fontWeight: '500', color: '#34495e' }}>Annual Energy:</span>
-                      <span style={{ fontWeight: '600', color: '#3498db' }}>{result.annual_estimate.kwh.toFixed(3)} kWh</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                      <span style={{ fontWeight: '500', color: '#34495e' }}>Annual Emissions:</span>
-                      <span style={{ fontWeight: '600', color: '#e74c3c' }}>{result.annual_estimate.gco2.toFixed(3)} g CO₂</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Suggestions Card */}
-              {result.suggestions && result.suggestions.length > 0 && (
-                <div style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e1e8ed',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <h3 style={{
-                    margin: '0 0 1rem 0',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    fontFamily: 'Poppins',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    💡 Optimization Suggestions
-                  </h3>
-                  <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    {result.suggestions.map((suggestion: string, index: number) => (
-                      <div key={index} style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '0.5rem',
-                        padding: '0.75rem',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        color: '#34495e',
-                        fontFamily: 'Poppins'
-                      }}>
-                        <span style={{ fontWeight: '600', color: '#3498db' }}>{index + 1}.</span>
-                        <span>{suggestion}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Warnings Card */}
-              {result.warnings && result.warnings.length > 0 && (
-                <div style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e1e8ed',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <h3 style={{
-                    margin: '0 0 1rem 0',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    fontFamily: 'Poppins',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    ⚠️ Warnings
-                  </h3>
-                  <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    {result.warnings.map((warning: string, index: number) => (
-                      <div key={index} style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '0.5rem',
-                        padding: '0.75rem',
-                        backgroundColor: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        color: '#dc2626',
-                        fontFamily: 'Poppins'
-                      }}>
-                        <span style={{ fontWeight: '600' }}>⚠️</span>
-                        <span>{warning}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

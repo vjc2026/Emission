@@ -1,905 +1,601 @@
-import { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Text, 
-  TextInput, 
-  Button, 
-  Group, 
-  Card, 
-  Loader, 
-  Divider, 
-  Stack, 
-  Title, 
-  Modal,
-  Select,
-  Badge,
-  Grid,
-  Paper,
-  Flex
-} from '@mantine/core';
-import styles from './History.module.css';
-import { showNotification } from '@mantine/notifications';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Textarea, Button, Text, Card, Title, Divider } from '@mantine/core';
+import styles from './CodeCalculator.module.css';
+import axios from 'axios';
 
-export function HistoryComponent() {
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
-  const [organization, setOrganization] = useState<string | null>(null);
-  const [error, setError] = useState<string>('');
-  const [projectName, setProjectName] = useState<string>('');
-  const [projectDescription, setProjectDescription] = useState<string>('');
-  const [sessionDuration, setSessionDuration] = useState<number>(0);
-  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
-  const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
-  const [carbonEmit, setcarbonEmit] = useState<number>(0);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
-  const [projectStage, setProjectStage] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+export default function CodeCalculator() {
+  const [code, setCode] = useState('');
+  const [status, setStatus] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [showCalculations, setShowCalculations] = useState(false);
+  const [deviceSpecs, setDeviceSpecs] = useState<any>(null);
+  const [deviceType, setDeviceType] = useState<string | null>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editableProject, setEditableProject] = useState<any | null>(null);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const [isSessionActive, setIsSessionActive] = useState(false);
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteMessage, setInviteMessage] = useState('');
-  const [inviteProjectId, setInviteProjectId] = useState<number | null>(null);
-  const [currentDevice, setCurrentDevice] = useState<string | null>(null);
-  const navigate = useNavigate();
-
-  const formatDuration = (duration: number) => {
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    const seconds = duration % 60;
-    return `${hours}h ${minutes}m ${seconds}s`;
-  };
-
+  // Fetch user's device specifications on component mount
   useEffect(() => {
-    const fetchUserDetails = async () => {
-      const token = localStorage.getItem('token'); 
-
-      if (!token) {
-        setError('No token found, please log in.');
-        setLoading(false);
-        return;
-      }
-
+    const fetchDeviceSpecs = async () => {
       try {
-        const response = await fetch('https://emissionserver.vercel.app/user', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // First, check the device type
+        const deviceTypeResponse = await axios.get('https://emissionserver.vercel.app/checkDeviceType', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user); 
-          setOrganization(data.user.organization);
-          fetchUserProjects(data.user.email); 
-        } else {
-          const result = await response.json();
-          setError(result.error || 'Failed to fetch user details.');
+        const { deviceType } = deviceTypeResponse.data;
+        setDeviceType(deviceType);
+
+        // Based on device type, choose the correct endpoint
+        const endpoint = deviceType === 'Laptop'
+          ? 'https://emissionserver.vercel.app/displayuserM'
+          : 'https://emissionserver.vercel.app/displayuser';
+
+        const response = await axios.get(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.data && response.data.user) {
+          setDeviceSpecs(response.data.user.specifications);
+          console.log('Device specs loaded:', response.data.user.specifications);
+          console.log('Device type:', deviceType);
         }
-      } catch (err) {
-        console.error('Error:', err);
-        setError('An error occurred while fetching user details.');
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching device specifications:', error);
       }
     };
 
-    fetchUserDetails();
+    fetchDeviceSpecs();
   }, []);
 
-  const fetchUserProjects = async (email: string) => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch(`https://emissionserver.vercel.app/user_project_display_combined`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        interface Project {
-          id: number;
-          project_name: string;
-          project_description: string;
-          session_duration: number;
-          carbon_emit: number;
-          stage: string;
-          status: string;
-        }
-
-        interface UserProjectsResponse {
-          projects: Project[];
-          carbon_emit: number;
-        }
-
-        interface Project {
-          id: number;
-          project_name: string;
-          project_description: string;
-          session_duration: number;
-          carbon_emit: number;
-          stage: string;
-          status: string;
-        }
-
-        interface UserProjectsResponse {
-          projects: Project[];
-          carbon_emit: number;
-        }
-
-        const activeProjects: Project[] = (data as UserProjectsResponse).projects.filter(project => project.status !== 'Archived');
-        setProjects(activeProjects);
-        setcarbonEmit(data.carbon_emit);
-      } else {
-        const result = await response.json();
-        setError(result.error || 'Failed to fetch user projects.');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setError('An error occurred while fetching user projects.');
-    }
-  };
-
   useEffect(() => {
-    const fetchCurrentDevice = async () => {
-      const token = localStorage.getItem('token');
-      try {
-        const response = await fetch('https://emissionserver.vercel.app/checkDeviceType', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-  
-        if (response.ok) {
-          const { deviceType } = await response.json();
-          setCurrentDevice(deviceType);
-        } else {
-          const result = await response.json();
-          setError(result.error || 'Failed to fetch current device.');
-        }
-      } catch (err) {
-        console.error('Error:', err);
-        setError('An error occurred while fetching current device.');
-      }
-    };
-  
-    fetchCurrentDevice();
-  }, []);
-
-  const startSession = async () => {
-    if (isTimerRunning) return;
-    // Check for empty inputs
-    if (!projectName || !projectDescription) {
-      setError('Please Select a Project before starting the calculator.');
-      return;
-    }
-    const token = localStorage.getItem('token');
-    console.log("Starting session with:", projectName, projectDescription);
- 
-    try {
-       const response = await fetch(`https://emissionserver.vercel.app/find_project`, {
-          method: 'POST',
-          headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ projectName, projectDescription }),
-       });
- 
-       if (!response.ok) {
-          throw new Error(`Failed to fetch project: ${response.statusText}`);
-       }
- 
-       const existingProject = await response.json();
-       setError(' ');
-       console.log("Existing project found:", existingProject);
-
-       if (existingProject) {
-          setSessionDuration(existingProject.session_duration || 0);
-          setSelectedProjectId(existingProject.project_id);
-       } else {
-          setSessionDuration(0);
-          setSelectedProjectId(null);
-       }
- 
-       const startTime = Date.now();
-       localStorage.setItem('startTime', startTime.toString());
-       setIsTimerRunning(true);
-       const id = setInterval(() => {
-         const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-         setSessionDuration(existingProject.session_duration + elapsedTime);
-       }, 1000);
-       setIntervalId(id);
-    } catch (err) {
-       console.error('Error in startSession:', err);
-       setError('An error occurred while starting the session.');
-    }
-  };
-
-  const endSession = async () => {
-    if (!isTimerRunning) return;
-    clearInterval(intervalId!);
-    setIsTimerRunning(false);
-    localStorage.removeItem('startTime');
-
-    const token = localStorage.getItem('token');
-    const historyData = { 
-      projectName, 
-      projectDescription, 
-      sessionDuration, 
-      organization,
-      projectStage,
-      projectId: selectedProjectId
-    };
-
-    try {
-      const deviceTypeResponse = await fetch('https://emissionserver.vercel.app/checkDeviceType', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!deviceTypeResponse.ok) {
-        throw new Error(`Failed to fetch device type: ${deviceTypeResponse.statusText}`);
-      }
-
-      const { deviceType } = await deviceTypeResponse.json();
-
-      const emissionsEndpoint = deviceType === 'Laptop' 
-        ? 'https://emissionserver.vercel.app/calculate_emissionsM'
-        : 'https://emissionserver.vercel.app/calculate_emissions';
-
-      const emissionsResponse = await fetch(emissionsEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sessionDuration, projectId: selectedProjectId }), 
-      });
-
-      if (!emissionsResponse.ok) {
-        throw new Error(`Failed to calculate emissions: ${emissionsResponse.statusText}`);
-      }
-
-      const { carbonEmissions } = await emissionsResponse.json();
-      console.log(`Calculated Carbon Emissions: ${carbonEmissions} kg CO2`);
-
-        const updateResponse = await fetch('https://emissionserver.vercel.app/user_Update', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ...historyData, carbonEmissions }),
-        });
-
-        if (updateResponse.ok) {
-          setProjectName('');
-          setProjectDescription('');
-          setSessionDuration(0);
-          fetchUserProjects(user?.email!); 
-
-          setSessionHistory(prev => [
-            ...prev.filter(session => session.projectName !== historyData.projectName),
-            { projectName: historyData.projectName, projectDescription: historyData.projectDescription, sessionDuration: historyData.sessionDuration, carbonEmissions, organization: historyData.organization, projectStage: historyData.projectStage },
-          ]);
-        } else {
-          const result = await updateResponse.json();
-          setError(result.error || 'Failed to record session.');
-        }
-    } catch (err) {
-      console.error('Error in endSession:', err);
-      setError('An error occurred while recording the session.');
-    }
-};
-
-useEffect(() => {
-  const startTime = localStorage.getItem('startTime');
-  if (startTime) {
-    const elapsedTime = Math.floor((Date.now() - parseInt(startTime)) / 1000);
-    setSessionDuration(prev => prev + elapsedTime);
-    setIsTimerRunning(true);
-    const id = setInterval(() => {
-      const newElapsedTime = Math.floor((Date.now() - parseInt(startTime)) / 1000);
-      setSessionDuration(prev => prev + newElapsedTime);
-    }, 1000);
-    setIntervalId(id);
-  }
-}, []);
-
-useEffect(() => {
-  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-    if (isTimerRunning) {
-      // Standard way to show confirmation dialog
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    }
-  };
-
-  // Add event listener when timer is running
-  if (isTimerRunning) {
-    window.addEventListener('beforeunload', handleBeforeUnload);
-  }
-
-  // Cleanup function to remove event listener
-  return () => {
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-  };
-}, [isTimerRunning]); // Re-run effect when timer status changes
-
-  const handleSaveChanges = async () => {
-    if (!editableProject) return;
-
-    const token = localStorage.getItem('token');
-    const updatedProject = { projectName, projectDescription, projectStage };
-
-    try {
-      const response = await fetch(`https://emissionserver.vercel.app/update_project/${editableProject.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(updatedProject),
-      });
-
-      if (response.ok) {
-        fetchUserProjects(user?.email!); 
-        setIsModalOpen(false);
-        setEditableProject(null);
-      } else {
-        const result = await response.json();
-        setError(result.error || 'Failed to update project.');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setError('An error occurred while updating the project.');
-    }
-  };
-
-  const handleEditProject = (projectId: number) => {
-    const projectToEdit = projects.find((p) => p.id === projectId);
-    if (projectToEdit) {
-      setProjectName(projectToEdit.project_name);
-      setProjectDescription(projectToEdit.project_description);
-      setProjectStage(projectToEdit.projectStage);
-      setEditableProject(projectToEdit);
-      setSelectedProjectId(projectToEdit.id);
-      setIsModalOpen(true);
-    }
-  };
-
-  const createProject = async () => {
-    if (!projectName || !projectDescription || !projectStage) {
-      setError('All fields are required.');
-      return; // Exit the function if any required field is missing
-    }
-    const token = localStorage.getItem('token');
-    const projectData = {
-      projectName,
-      projectDescription,
-      organization,
-      projectStage,
-      sessionDuration: 0,
-      carbonEmit: 0,
-      status: "In-Progress",
-    };
-    try {
-      // Check if a project with the same name exists
-      const checkResponse = await fetch('https://emissionserver.vercel.app/check_existing_projectname', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ projectName }),
-      });
-  
-      const existingProject = await checkResponse.json();
-  
-      // If project with the same name exists, show error and close modal
-      if (existingProject.exists) {
-        setError('A project with this name already exists.');
-        return; // Exit the function early
-      }
-  
-      // No existing project, create the new one
-      const response = await fetch('https://emissionserver.vercel.app/user_history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(projectData),
-      });
-      
-      if (response.ok) {
-        setProjectName('');
-        setProjectDescription('');
-        setProjectStage('');
-        setSessionDuration(0);
-        fetchUserProjects(user?.email!); // Refresh the project list
-        console.log('Project successfully created in user history.');
-        setIsCreateModalOpen(false); // Close the modal on success
-        setError(' ');
-      } else {
-        const result = await response.json();
-        setError(result.error || 'Failed to create project in user history.');
-      }
-    } catch (err) {
-      console.error('Error in createProject:', err);
-      setError('An error occurred while creating the project.');
-    }
-  };
-
-  const stages = [
-    "Design: Creating the software architecture",
-    "Development: Writing the actual code",
-    "Testing: Ensuring the software works as expected"
-  ];
-  
-  const handleCompleteStage = async (projectId: number) => {
-    if (!projectName || !projectDescription || !projectStage) {
-      setError('Are you sure you want to complete this project? (Click again to confirm)');
-      return;
-    }
-
-    const token = localStorage.getItem('token');
-
-    // Define project stages
-    const projectStages = [
-      'Design: Creating the software architecture',
-      'Development: Writing the actual code', 
-      'Testing: Ensuring the software works as expected'
-    ];
-
-    // Get current stage index
-    const currentStageIndex = projectStages.indexOf(projectStage);
-
-    // Check if current stage is the last stage
-    const isLastStage = currentStageIndex === projectStages.length - 1;
-
-    try {
-      const response = await fetch(`https://emissionserver.vercel.app/complete_project/${projectId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          // Only include nextStage if not in last stage
-          ...(isLastStage ? {} : { nextStage: projectStages[currentStageIndex + 1] })
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to complete project: ${response.statusText}`);
-      }
-
-      if (isLastStage) {
-        setError('Project is now complete! All stages finished.');
-      } else {
-        setError('');
-      }
-
-      // Reset form fields and refresh projects
-      setProjectName('');
-      setProjectDescription('');
-      setProjectStage('');
-      fetchUserProjects(user?.email!);
-
-    } catch (err) {
-      console.error('Error in completing project stage:', err);
-      setError('An error occurred while completing the project stage.');
-    }
-  };
-  
-  interface InviteUserPayload {
-    recipientEmail: string;
-    projectId: number;
-    message: string;
-  }
-
-  const handleInviteUser = async (recipientEmail: string, projectId: number, message: string): Promise<void> => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch('https://emissionserver.vercel.app/send-invitation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ recipientEmail, projectId, message } as InviteUserPayload),
-      });
-
-      if (response.ok) {
-        alert('Invitation sent successfully');
-      } else {
-        const errorData = await response.json();
-        alert(`Failed to send invitation: ${errorData.error}`);
-      }
-    } catch (error) {
-      console.error('Error sending invitation:', error);
-      alert('An error occurred while sending the invitation.');
-    }
-  };
-
-  const handleOpenInviteModal = (projectId: number) => {
-    setInviteProjectId(projectId);
-    setIsInviteModalOpen(true);
-  };
-
-  const handleSendInvite = () => {
-    if (inviteEmail && inviteMessage && inviteProjectId !== null) {
-      handleInviteUser(inviteEmail, inviteProjectId, inviteMessage);
-      setIsInviteModalOpen(false);
-      setInviteEmail('');
-      setInviteMessage('');
-    } else {
-      alert('Please fill in all fields.');
-    }
-  };
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-    if (isSessionActive) {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      let dots = 0;
       interval = setInterval(() => {
-        setTimer((prevTimer) => prevTimer + 1);
-      }, 1000);
+        setStatus(`Measuring emissions${'.'.repeat(dots % 5)}`);
+        dots++;
+      }, 500);
     }
-    return () => clearInterval(interval as NodeJS.Timeout);
-  }, [isSessionActive]);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const handlePaste = () => {
+    navigator.clipboard.readText().then(text => setCode(text));
+  };
+
+  const handleDelete = () => {
+    setCode('');
+    setStatus('');
+    setResult(null);
+    setShowCalculations(false);
+  };
+
+  const handleMeasure = async () => {
+    setLoading(true);
+    try {
+      // Prepare request payload with code and device specifications
+      const payload: any = {
+        code: code
+      };
+
+      // Add device specifications if available
+      if (deviceSpecs) {
+        // Desktop/PC specs
+        if (deviceSpecs.CPU_avg_watt_usage) {
+          payload.cpu_watts = deviceSpecs.CPU_avg_watt_usage;
+        }
+        if (deviceSpecs.GPU_avg_watt_usage) {
+          payload.gpu_watts = deviceSpecs.GPU_avg_watt_usage;
+        }
+        if (deviceSpecs.RAM_avg_watt_usage) {
+          payload.ram_watts = deviceSpecs.RAM_avg_watt_usage;
+        }
+        if (deviceSpecs.PSU_watts) {
+          payload.psu_watts = deviceSpecs.PSU_watts;
+        }
+        
+        // Laptop/Mobile specs
+        if (deviceSpecs.cpu_watts) {
+          payload.cpu_watts = deviceSpecs.cpu_watts;
+        }
+        if (deviceSpecs.gpu_watts) {
+          payload.gpu_watts = deviceSpecs.gpu_watts;
+        }
+        if (deviceSpecs.ram_watts) {
+          payload.ram_watts = deviceSpecs.ram_watts;
+        }
+        if (deviceSpecs.psu_watts) {
+          payload.psu_watts = deviceSpecs.psu_watts;
+        }
+      }
+
+      console.log('Sending payload with device specs:', payload);
+
+      const response = await axios.post('https://opti-server.vercel.app/measure', payload, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      setStatus('Emissions measured successfully');
+      console.log('Full response:', response.data); // Debug log
+      setResult(response.data);
+    } catch (error) {
+      setStatus('Error measuring emissions');
+      console.error(error);
+      
+      // For testing purposes, let's add some sample data when there's an error
+      console.log('Adding sample data for testing...');
+      const sampleData = {
+        metrics: {
+          emissions: 0.0007,
+          energy: 0.0023,
+          execution_time: 1.2345,
+          detailed_data: {
+            cpu_energy: 0.0012,
+            gpu_energy: 0.0008,
+            ram_energy: 0.0003,
+            total_energy: 0.0023,
+            cpu_power: 45.2,
+            gpu_power: 12.8,
+            ram_power: 8.5,
+            total_power: 66.5,
+            cpu_emissions: 0.0004,
+            gpu_emissions: 0.0002,
+            ram_emissions: 0.0001,
+            total_emissions: 0.0007
+          }
+        },
+        hardware_info: {
+          cpu: {
+            model: "Intel Core i7-10700K",
+            cores: 8,
+            threads: 16,
+            frequency: 3600
+          },
+          gpu: {
+            model: "NVIDIA RTX 3070",
+            memory: 8192
+          },
+          memory: {
+            total: 16,
+            available: 12.5,
+            percent: 22.5
+          },
+          platform: "Windows",
+          python_version: "3.9.0"
+        },
+                 calculations: {
+           energy_calculation: {
+             formula: 'Energy (kWh) = Power (W) × Time (hours)',
+             steps: [
+               'Execution time: 1.234500000000000 seconds = 3.430556 × 10^-4 hours',
+               'CPU Energy = 4.520000 × 10^1W × 3.430556 × 10^-4h = 1.200000 × 10^-3 kWh',
+               'GPU Energy = 1.280000 × 10^1W × 3.430556 × 10^-4h = 8.000000 × 10^-4 kWh',
+               'RAM Energy = 8.500000 × 10^0W × 3.430556 × 10^-4h = 3.000000 × 10^-4 kWh'
+             ]
+           },
+           emissions_calculation: {
+             formula: 'Emissions (kg CO2) = Energy (kWh) × Carbon Intensity (kg CO2/kWh)',
+             carbon_intensity: 0.5,
+             steps: [
+               'Using carbon intensity: 0.5 kg CO2/kWh (global average)',
+               'Total Emissions = 2.300000 × 10^-3 kWh × 0.5 kg CO2/kWh = 1.150000 × 10^-3 kg CO2'
+             ]
+           },
+          power_breakdown: {
+            cpu: 45.2,
+            gpu: 12.8,
+            ram: 8.5,
+            total: 66.5
+          },
+          energy_breakdown: {
+            cpu: 0.0012,
+            gpu: 0.0008,
+            ram: 0.0003,
+            total: 0.0023
+          },
+          emissions_breakdown: {
+            cpu: 0.0004,
+            gpu: 0.0002,
+            ram: 0.0001,
+            total: 0.0007
+          }
+        },
+        timing: {
+          duration: 1.2345,
+          start_time: Date.now() - 1234,
+          end_time: Date.now()
+        }
+      };
+      setResult(sampleData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatMetrics = (result: any) => {
+    if (!result) return { emissions: 0, energy: 0 };
+    
+    console.log('Raw result data:', result); // Debug log
+    
+    // Extract emissions and energy from the simplified response
+    const emissions = result.emissions || 0;
+    const energy = result.energy || 0;
+    
+    return { emissions, energy };
+  };
+
+  const formatCalculations = (calculations: any) => {
+    if (!calculations) return '';
+    
+    // Helper function to format numbers in scientific notation
+    const formatScientific = (value: number) => {
+      if (value === 0) return '0';
+      const exp = Math.floor(Math.log10(Math.abs(value)));
+      const mantissa = value / Math.pow(10, exp);
+      return `${mantissa.toFixed(6)} × 10^${exp}`;
+    };
+    
+    let formattedText = '';
+    
+    // Energy Calculation Section
+    formattedText += '⚡ ENERGY CALCULATION\n';
+    formattedText += '═══════════════════\n\n';
+    formattedText += `Formula: ${calculations.energy_calculation.formula}\n\n`;
+    
+    calculations.energy_calculation.steps.forEach((step: string, index: number) => {
+      formattedText += `${index + 1}. ${step}\n`;
+    });
+    
+    formattedText += '\n';
+    
+    // Power Breakdown
+    formattedText += '🔌 POWER BREAKDOWN\n';
+    formattedText += '═══════════════════\n\n';
+    formattedText += `CPU Power:      ${formatScientific(calculations.power_breakdown.cpu)} W\n`;
+    formattedText += `GPU Power:      ${formatScientific(calculations.power_breakdown.gpu)} W\n`;
+    formattedText += `RAM Power:      ${formatScientific(calculations.power_breakdown.ram)} W\n`;
+    formattedText += `Total Power:    ${formatScientific(calculations.power_breakdown.total)} W\n\n`;
+    
+    // Energy Breakdown
+    formattedText += '⚡ ENERGY BREAKDOWN\n';
+    formattedText += '═══════════════════\n\n';
+    formattedText += `CPU Energy:     ${formatScientific(calculations.energy_breakdown.cpu)} kWh\n`;
+    formattedText += `GPU Energy:     ${formatScientific(calculations.energy_breakdown.gpu)} kWh\n`;
+    formattedText += `RAM Energy:     ${formatScientific(calculations.energy_breakdown.ram)} kWh\n`;
+    formattedText += `Total Energy:   ${formatScientific(calculations.energy_breakdown.total)} kWh\n\n`;
+    
+    // Emissions Calculation Section
+    formattedText += '🌱 EMISSIONS CALCULATION\n';
+    formattedText += '═══════════════════\n\n';
+    formattedText += `Formula: ${calculations.emissions_calculation.formula}\n\n`;
+    
+    calculations.emissions_calculation.steps.forEach((step: string, index: number) => {
+      formattedText += `${index + 1}. ${step}\n`;
+    });
+    
+    formattedText += '\n';
+    
+    // Emissions Breakdown
+    formattedText += '🌱 EMISSIONS BREAKDOWN\n';
+    formattedText += '═══════════════════\n\n';
+    formattedText += `CPU Emissions:  ${formatScientific(calculations.emissions_breakdown.cpu)} kg CO2\n`;
+    formattedText += `GPU Emissions:  ${formatScientific(calculations.emissions_breakdown.gpu)} kg CO2\n`;
+    formattedText += `RAM Emissions:  ${formatScientific(calculations.emissions_breakdown.ram)} kg CO2\n`;
+    formattedText += `Total Emissions: ${formatScientific(calculations.emissions_breakdown.total)} kg CO2\n`;
+    
+    return formattedText;
+  };
+
+  const formatStaticAnalysis = (staticAnalysis: any) => {
+    if (!staticAnalysis) return '';
+    
+    let formattedText = '';
+    
+    formattedText += '🔍 STATIC CODE ANALYSIS\n';
+    formattedText += '═══════════════════\n\n';
+    
+    // Complexity Information
+    formattedText += '📊 COMPLEXITY METRICS\n';
+    formattedText += '───\n';
+    formattedText += `Time Complexity:     ${staticAnalysis.time_complexity}\n`;
+    formattedText += `Space Complexity:    ${staticAnalysis.space_complexity}\n`;
+    formattedText += `Cyclomatic Complexity: ${staticAnalysis.cyclomatic_complexity}\n`;
+    formattedText += `Eco Score:           ${staticAnalysis.eco_score.toFixed(1)}/100\n`;
+    formattedText += `Confidence:          ${(staticAnalysis.confidence * 100).toFixed(1)}%\n\n`;
+    
+    // Complexity Explanations
+    formattedText += '📚 COMPLEXITY EXPLANATIONS\n';
+    formattedText += '───\n';
+    formattedText += `Time Complexity (${staticAnalysis.time_complexity}):\n`;
+    formattedText += `  How execution time grows with input size.\n`;
+    formattedText += `  O(1) = constant, O(N) = linear, O(N²) = quadratic\n\n`;
+    
+    formattedText += `Space Complexity (${staticAnalysis.space_complexity}):\n`;
+    formattedText += `  How memory usage grows with input size.\n`;
+    formattedText += `  O(1) = constant memory, O(N) = linear memory\n\n`;
+    
+    formattedText += `Cyclomatic Complexity (${staticAnalysis.cyclomatic_complexity}):\n`;
+    formattedText += `  Number of decision paths in code.\n`;
+    formattedText += `  Lower = simpler, Higher = more complex\n\n`;
+    
+    formattedText += `Eco Score (${staticAnalysis.eco_score.toFixed(1)}/100):\n`;
+    formattedText += `  Energy efficiency rating.\n`;
+    formattedText += `  100 = very efficient, 0 = inefficient\n\n`;
+    
+    formattedText += `Confidence (${(staticAnalysis.confidence * 100).toFixed(1)}%):\n`;
+    formattedText += `  Analysis reliability.\n`;
+    formattedText += `  Higher = more accurate estimate\n\n`;
+    
+    // Suggestions
+    if (staticAnalysis.suggestions && staticAnalysis.suggestions.length > 0) {
+      formattedText += '💡 OPTIMIZATION SUGGESTIONS\n';
+      formattedText += '───\n';
+      staticAnalysis.suggestions.forEach((suggestion: string, index: number) => {
+        formattedText += `${index + 1}. ${suggestion}\n`;
+      });
+    }
+    
+    return formattedText;
+  };
+
+  const formatMeasurementExplanations = (result: any) => {
+    if (!result) return '';
+    
+    const emissions = result.emissions || 0;
+    const energy = result.energy || 0;
+    
+    let formattedText = '';
+    
+    formattedText += '📊 MEASUREMENT EXPLANATIONS\n';
+    formattedText += '═══════════════════\n\n';
+    
+    // Carbon Emissions Section
+    formattedText += '🌱 CARBON EMISSIONS\n';
+    formattedText += '───\n';
+    formattedText += `Your Code Produced: ${emissions.toFixed(6)} kg CO₂\n\n`;
+    
+    formattedText += 'What this means:\n';
+    formattedText += `• Equivalent to driving ${(emissions * 1000 / 120).toFixed(2)} meters by car\n`;
+    formattedText += `• Equal to ${(emissions * 1000 / 22).toFixed(2)} trees absorbing CO₂ for a day\n`;
+    formattedText += `• Same as sending ${(emissions * 1000 / 4).toFixed(0)} emails\n`;
+    formattedText += `• ${emissions < 0.001 ? 'Very low' : emissions < 0.01 ? 'Low' : emissions < 0.1 ? 'Moderate' : 'High'} environmental impact\n\n`;
+    
+    // Energy Consumption Section
+    formattedText += '⚡ ENERGY CONSUMPTION\n';
+    formattedText += '───\n';
+    formattedText += `Your Code Used: ${energy.toFixed(6)} kWh\n\n`;
+    
+    formattedText += 'What this means:\n';
+    formattedText += `• Powers a 60W light bulb for ${(energy * 1000 / 60).toFixed(1)} hours\n`;
+    formattedText += `• Charges a smartphone ${(energy * 1000 / 0.01).toFixed(0)} times\n`;
+    formattedText += `• Runs a laptop for ${(energy * 1000 / 50).toFixed(1)} hours\n`;
+    formattedText += `• ${energy < 0.001 ? 'Very efficient' : energy < 0.01 ? 'Efficient' : energy < 0.1 ? 'Moderate' : 'Energy intensive'} code\n\n`;
+    
+    // Environmental Impact
+    formattedText += '🌍 ENVIRONMENTAL IMPACT\n';
+    formattedText += '───\n';
+    const impactLevel = emissions < 0.001 ? 'Minimal' : 
+                       emissions < 0.01 ? 'Low' : 
+                       emissions < 0.1 ? 'Moderate' : 'Significant';
+    
+    formattedText += `Overall Impact: ${impactLevel}\n\n`;
+    
+    if (emissions < 0.001) {
+      formattedText += '✅ Your code is very environmentally friendly!\n';
+      formattedText += '   Minimal carbon footprint and energy usage.\n\n';
+    } else if (emissions < 0.01) {
+      formattedText += '✅ Good environmental performance.\n';
+      formattedText += '   Low impact with room for minor optimizations.\n\n';
+    } else if (emissions < 0.1) {
+      formattedText += '⚠️  Moderate environmental impact.\n';
+      formattedText += '   Consider optimizing for better efficiency.\n\n';
+    } else {
+      formattedText += '⚠️  High environmental impact.\n';
+      formattedText += '   Significant optimization opportunities exist.\n\n';
+    }
+    
+    // Optimization Tips
+    formattedText += '💡 QUICK OPTIMIZATION TIPS\n';
+    formattedText += '───\n';
+    formattedText += '• Use efficient algorithms (lower time complexity)\n';
+    formattedText += '• Minimize memory usage (lower space complexity)\n';
+    formattedText += '• Avoid unnecessary loops and calculations\n';
+    formattedText += '• Use built-in functions when possible\n';
+    formattedText += '• Consider caching for repeated operations\n';
+    
+    return formattedText;
+  };
 
   return (
-    <Container className={styles.container} size="xl">
-      <Title order={1} className={styles.title}>
-        Session Tracker
-      </Title>
+    <div className={styles.container} style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+      <div className={styles.titleBlock}>
+        <img src="/logo.svg" width="100px" alt="Logo" />
+        <h2>OptiPy</h2>
+      </div>
 
-      {error && (
-        <Text className={styles.errorText} color='red'>
-          {error}
-        </Text>
+      <div style={{ 
+        textAlign: 'center', 
+        marginBottom: '1rem', 
+        padding: '0.75rem', 
+        backgroundColor: 'rgba(255, 193, 7, 0.1)', 
+        border: '1px solid rgba(255, 193, 7, 0.3)', 
+        borderRadius: '8px',
+        maxWidth: '800px',
+        marginLeft: 'auto',
+        marginRight: 'auto'
+      }}>
+        <p style={{ 
+          margin: '0', 
+          fontSize: '14px', 
+          color: '#856404', 
+          fontFamily: 'Poppins',
+          fontWeight: '400'
+        }}>
+          <strong>⚠️ Disclaimer:</strong> This tool is designed to work exclusively with Python code. 
+          Code that requires external modules, dependencies, or file attachments may not function properly 
+          and could result in measurement errors.
+        </p>
+      </div>
+
+      <div className={styles.squarebox}>
+        <div className={styles.sbcontainer}>
+          <div className={styles.sbcontainer2}>
+            <div className={styles.input}>
+              <textarea
+                value={code}
+                onChange={(event) => setCode(event.currentTarget.value)}
+                placeholder="Start by writing or pasting (CTRL + V) your Python code.&#10;&#10;To measure emissions, press (CTRL + Enter)."
+                className={styles.textarea}
+              />
+              <div className={styles.buttonGroup}>
+                <button className={styles.pasteBtn} onClick={handlePaste}>Paste Code</button>
+              </div>
+              <div className={styles.deleteIcon} onClick={handleDelete}>
+                <svg width="22" height="26" viewBox="0 0 27 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path id="Vector" d="M1.83325 8.2288H25.1666M10.5833 14.4576V23.8008M16.4166 14.4576V23.8008M3.29159 8.2288L4.74992 26.9152C4.74992 27.7412 5.05721 28.5334 5.60419 29.1174C6.15117 29.7015 6.89304 30.0296 7.66659 30.0296H19.3333C20.1068 30.0296 20.8487 29.7015 21.3956 29.1174C21.9426 28.5334 22.2499 27.7412 22.2499 26.9152L23.7083 8.2288M9.12492 8.2288V3.5572C9.12492 3.14421 9.27856 2.74812 9.55206 2.45609C9.82555 2.16406 10.1965 2 10.5833 2H16.4166C16.8034 2 17.1743 2.16406 17.4478 2.45609C17.7213 2.74812 17.8749 3.14421 17.8749 3.5572V8.2288" stroke="#3a7f0d" strokeOpacity="0.96" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+
+            <div className={styles.output}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+                padding: '20px',
+                textAlign: 'center'
+              }}>
+                {result ? (
+                  <>
+                    <div style={{
+                      fontSize: '24px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      marginBottom: '20px',
+                      fontFamily: 'Poppins'
+                    }}>
+                      Carbon Emission: {formatMetrics(result).emissions.toFixed(6)} kg CO₂
+                    </div>
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: '500',
+                      color: '#34495e',
+                      fontFamily: 'Poppins'
+                    }}>
+                      Energy Consumption: {formatMetrics(result).energy.toFixed(6)} kWh
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    fontSize: '18px',
+                    color: '#7f8c8d',
+                    fontFamily: 'Poppins'
+                  }}>
+                    Your emissions measurement results will appear here
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button className={styles.btn2} onClick={handleMeasure} disabled={loading}>
+            <svg height="24" width="24" fill="#FFFFFF" viewBox="0 0 24 24" data-name="Layer 1" id="Layer_1" className={styles.sparkle}>
+              <path d="M10,21.236,6.755,14.745.264,11.5,6.755,8.255,10,1.764l3.245,6.491L19.736,11.5l-6.491,3.245ZM18,21l1.5,3L21,21l3-1.5L21,18l-1.5-3L18,18l-3,1.5ZM19.333,4.667,20.5,7l1.167-2.333L24,3.5,21.667,2.333,20.5,0,19.333,2.333,17,3.5Z"></path>
+            </svg>
+            <span className={styles.text1}>{loading ? 'Measuring...' : 'Measure Emissions'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Static Analysis Section */}
+      {result && result.static_analysis && (
+        <div style={{ 
+          marginTop: '2rem',
+          maxWidth: '1200px',
+          marginLeft: 'auto',
+          marginRight: 'auto'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            marginBottom: '1rem'
+          }}>
+            <button
+              onClick={() => setShowCalculations(!showCalculations)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: showCalculations ? '#e74c3c' : '#27ae60',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                fontFamily: 'Poppins',
+                transition: 'background-color 0.3s ease'
+              }}
+            >
+              {showCalculations ? 'Hide Analysis Details' : 'Show Analysis Details'}
+            </button>
+          </div>
+
+          {showCalculations && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2rem',
+              marginTop: '1rem',
+              maxWidth: '1200px',
+              width: '100%',
+              marginLeft: 'auto',
+              marginRight: 'auto'
+            }}>
+              {/* Static Analysis Details */}
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                maxHeight: '500px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
+              }}>
+                {formatStaticAnalysis(result.static_analysis)}
+              </div>
+
+              {/* Measurement Explanations */}
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                maxHeight: '500px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
+              }}>
+                {formatMeasurementExplanations(result)}
+              </div>
+            </div>
+          )}
+        </div>
       )}
-
-      {loading ? (
-        <Loader size="lg" style={{ display: 'block', margin: '0 auto' }} />
-      ) : (
-        <Grid gutter="md">
-          <Grid.Col span={12}>
-            <Paper p="md" shadow="xs" radius="md" withBorder>
-              <Grid>
-                <Grid.Col span={{ base: 12, md: 8 }}>
-                  <Stack gap="xs">
-                    <TextInput
-                      placeholder="Project Name"
-                      label="Project Title"
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      style={{ width: '100%' }}
-                      readOnly
-                    />
-                    
-                    <TextInput
-                      placeholder="Project Description"
-                      label="Project Description"
-                      value={projectDescription}
-                      onChange={(e) => setProjectDescription(e.target.value)}
-                      style={{ width: '100%' }}
-                      readOnly
-                    />
-                    
-                    <Select
-                      label="Project Stage"
-                      placeholder="Select a stage"
-                      data={[
-                        { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
-                        { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
-                        { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
-                      ]}
-                      value={projectStage}
-                      onChange={setProjectStage}
-                      className={styles.projectStageDropdown}
-                      readOnly
-                    />
-                  </Stack>
-                </Grid.Col>
-                
-                <Grid.Col span={{ base: 12, md: 4 }}>
-                  <Stack gap="md" align="center" justify="center" h="100%">
-                    <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-                      Current Duration: {formatDuration(sessionDuration)}
-                    </Text>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-                      Current Device: {currentDevice || 'N/A'}
-                    </Text>
-                    <Button 
-                      onClick={() => setIsCreateModalOpen(true)} 
-                      style={{ backgroundColor: '#006400', color: '#fff', width: '100%' }}
-                    >
-                      Create Project
-                    </Button>
-                    <Group grow style={{ width: '100%' }}>
-                      <Button 
-                        onClick={startSession} 
-                        disabled={isTimerRunning} 
-                        style={{ backgroundColor: '#006400', color: '#fff' }}
-                      >
-                        Start Session
-                      </Button>
-                      <Button 
-                        onClick={endSession} 
-                        disabled={!isTimerRunning} 
-                        color="red"
-                      >
-                        End Session
-                      </Button>
-                    </Group>
-                  </Stack>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-          </Grid.Col>
-          
-          <Grid.Col span={12}>
-            <Divider label="Project History" labelPosition="center" size="md" />
-            
-            <Grid gutter="md">
-              {projects.map((project) => {
-                const totalCarbonEmissions = sessionHistory
-                  .filter(session => session.projectName === project.project_name)
-                  .reduce((acc, session) => acc + session.carbonEmissions, 0);
-
-                return (
-                  <Grid.Col key={project.id} span={{ base: 12, sm: 6, lg: 4 }}>
-                    <Card shadow="sm" radius="md" withBorder className={styles.projectCard}>
-                      <Card.Section p="md" withBorder style={{ backgroundColor: 'rgba(0, 100, 0, 0.05)' }}>
-                        <Group justify="space-between" wrap="nowrap">
-                          <Text fw={700} size="lg" lineClamp={1} style={{ flex: 1 }}>
-                            {project.project_name}
-                          </Text>
-                          <Badge
-                            color={
-                              project.stage.includes('Design') ? 'green' :
-                              project.stage.includes('Development') ? 'blue' : 'violet'
-                            }
-                            variant="light"
-                          >
-                            {project.stage.split(':')[0]}
-                          </Badge>
-                        </Group>
-                      </Card.Section>
-                      
-                      <Stack gap="xs" p="md" pb={0}>
-                        <Text lineClamp={2} size="sm" color="dimmed">
-                          {project.project_description}
-                        </Text>
-                        
-                        <Grid>
-                          <Grid.Col span={6}>
-                            <Text size="xs" color="dimmed">Session Duration</Text>
-                            <Text size="sm" fw={500}>{formatDuration(project.session_duration)}</Text>
-                          </Grid.Col>
-                          <Grid.Col span={6}>
-                            <Text size="xs" color="dimmed">Carbon Emissions</Text>
-                            <Text size="sm" fw={500} color={project.carbon_emit > 10 ? 'red' : 'green'}>
-                              {project.carbon_emit.toFixed(2)} kg CO2
-                            </Text>
-                          </Grid.Col>
-                        </Grid>
-                        
-                        <Text size="xs" color="dimmed" mt={5}>
-                          Project Owner: {project.owner_email || project.owner || 'N/A'}
-                        </Text>
-                      </Stack>
-                      
-                      <Card.Section p="md" mt="md" withBorder style={{ backgroundColor: '#f9f9f9' }}>
-                        <Group grow>
-                          <Button size="xs" onClick={() => {
-                            setProjectName(project.project_name);
-                            setProjectDescription(project.project_description);
-                            setProjectStage(project.stage);
-                          }}>
-                            Select
-                          </Button>
-                          <Button 
-                            size="xs" 
-                            onClick={() => handleEditProject(project.id)} 
-                            style={{ backgroundColor: '#006400', color: '#fff' }}
-                          >
-                            Edit
-                          </Button>
-                        </Group>
-                        <Group grow mt="xs">
-                          <Button 
-                            size="xs" 
-                            color="blue" 
-                            onClick={() => {
-                              setProjectName(project.project_name);
-                              setProjectDescription(project.project_description);
-                              setProjectStage(project.stage);
-                              handleCompleteStage(project.id);
-                            }}
-                          >
-                            Complete Stage
-                          </Button>
-                          <Button 
-                            size="xs" 
-                            onClick={() => handleOpenInviteModal(project.id)} 
-                            variant="outline"
-                          >
-                            Invite
-                          </Button>
-                        </Group>
-                      </Card.Section>
-                    </Card>
-                  </Grid.Col>
-                );
-              })}
-            </Grid>
-          </Grid.Col>
-        </Grid>
-      )}
-      
-      {/* Floating Help Button */}
-      <Button
-        title="Help"
-        onClick={() => setIsHelpOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          borderRadius: '50%',
-          width: '60px',
-          height: '60px',
-          backgroundColor: '#006400',
-          color: 'white',
-          fontSize: '16px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-          zIndex: 1000,
-          transition: 'transform 0.2s',
-          cursor: 'pointer',
-          ':hover': {
-            transform: 'scale(1.1)'
-          }
-        }}
-      >
-        ?
-      </Button>
-
-      {/* Help Modal */}
-      <Modal 
-        opened={isHelpOpen} 
-        onClose={() => setIsHelpOpen(false)} 
-        title="How the System Works" 
-        centered
-        styles={{
-          title: {
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: '#006400',
-            marginBottom: '20px'
-          },
-          body: {
-            padding: '24px'
-          }
-        }}
-      >
-        <Text style={{ lineHeight: 1.6, fontSize: '16px' }}>
-          This system allows you to manage your projects and track carbon emissions during development.
-          <br /><br />
-          1. Create a project by clicking the "Create Project" button which allows you to set a name and a description for your project. It is recommended to start your Project stage in Design.
-          <br /><br />
-          2. Start a session to track time and emissions.
-          <br /><br />
-          3. Complete stages to progress through the project lifecycle.
-          <br /><br />
-          4. Monitor your project history for insights and records.
-        </Text>
-      </Modal>
-
-      {/* Create Project Modal */}
-      <Modal opened={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Project">
-        <TextInput
-          label="Project Name"
-          placeholder="Project Name"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
-          style={{ width: '100%' }}
-          required
-        />
-        <TextInput
-          label="Project Description"
-          placeholder="Project Description"
-          value={projectDescription}
-          onChange={(e) => setProjectDescription(e.target.value)}
-          style={{ width: '100%' }}
-          required
-        />
-        <Select
-          label="Project Stage"
-          placeholder="Select a stage"
-          data={[
-            { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
-            { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
-            { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
-          ]}
-          value={projectStage}
-          onChange={setProjectStage}
-          required
-        />
-        {error && (
-          <Text color="red" style={{ marginTop: '10px', fontSize: '14px' }}>
-            {error}
-          </Text>
-        )}
-        <Group align="right" mt="md">
-          <Button onClick={createProject} style={{ backgroundColor: '#006400', color: '#fff' }}>Create</Button>
-        </Group>
-      </Modal>
-      
-      <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title="Edit Project">
-        <TextInput 
-          label="Project Title"
-          placeholder="Project Name" 
-          value={projectName} 
-          onChange={(e) => setProjectName(e.target.value)} 
-        />
-        <TextInput 
-          label="Project Description"
-          placeholder="Project Description" 
-          value={projectDescription} 
-          onChange={(e) => setProjectDescription(e.target.value)} 
-        />
-        <Select
-          label="Project Stage"
-          placeholder="Select a stage"
-          data={[
-            { value: 'Design: Creating the software architecture', label: 'Design: Creating the software architecture' },
-            { value: 'Development: Writing the actual code', label: 'Development: Writing the actual code' },
-            { value: 'Testing: Ensuring the software works as expected', label: 'Testing: Ensuring the software works as expected' },
-          ]}
-          value={projectStage}
-          onChange={setProjectStage}
-          className={styles.projectStageDropdown}
-        />
-        <Group align="right" mt="md">
-          <Button onClick={handleSaveChanges} style={{ backgroundColor: '#006400', color: '#fff' }}>Save Changes</Button>
-        </Group>
-      </Modal>
-
-      <Modal opened={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} title="Invite User to Project">
-        <TextInput
-          label="Recipient Email"
-          placeholder="Enter the email of the user to invite"
-          value={inviteEmail}
-          onChange={(e) => setInviteEmail(e.target.value)}
-          style={{ width: '100%' }}
-          required
-        />
-        <TextInput
-          label="Invitation Message"
-          placeholder="Enter your invitation message"
-          value={inviteMessage}
-          onChange={(e) => setInviteMessage(e.target.value)}
-          style={{ width: '100%' }}
-          required
-        />
-        <Group align="right" mt="md">
-          <Button onClick={handleSendInvite} style={{ backgroundColor: '#006400', color: '#fff' }}>Send Invitation</Button>
-        </Group>
-      </Modal>
-      
-    </Container>
+    </div>
   );
 }
-
-export default HistoryComponent;
