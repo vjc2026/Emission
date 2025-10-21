@@ -188,7 +188,7 @@ export default function CodeCalculator() {
       if (lat !== null) payload.lat = lat;
       if (lon !== null) payload.lon = lon;
 
-      const response = await axios.post('https://opti-server.vercel.app/analyze', payload, {
+      const response = await axios.post('https://opti-server.vercel.app/measure', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
