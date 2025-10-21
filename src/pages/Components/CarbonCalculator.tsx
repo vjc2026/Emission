@@ -10,6 +10,7 @@ export default function CodeCalculator() {
   const [loading, setLoading] = useState(false);
   const [showCalculations, setShowCalculations] = useState(false);
   const [deviceSpecs, setDeviceSpecs] = useState<any>(null);
+  const [deviceType, setDeviceType] = useState<string | null>(null);
 
   // Fetch user's device specifications on component mount
   useEffect(() => {
@@ -18,7 +19,22 @@ export default function CodeCalculator() {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await axios.get('https://emissionserver.vercel.app/displayuser', {
+        // First, check the device type
+        const deviceTypeResponse = await axios.get('https://emissionserver.vercel.app/checkDeviceType', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const { deviceType } = deviceTypeResponse.data;
+        setDeviceType(deviceType);
+
+        // Based on device type, choose the correct endpoint
+        const endpoint = deviceType === 'Laptop'
+          ? 'https://emissionserver.vercel.app/displayuserM'
+          : 'https://emissionserver.vercel.app/displayuser';
+
+        const response = await axios.get(endpoint, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -26,6 +42,8 @@ export default function CodeCalculator() {
 
         if (response.data && response.data.user) {
           setDeviceSpecs(response.data.user.specifications);
+          console.log('Device specs loaded:', response.data.user.specifications);
+          console.log('Device type:', deviceType);
         }
       } catch (error) {
         console.error('Error fetching device specifications:', error);
@@ -99,7 +117,7 @@ export default function CodeCalculator() {
 
       console.log('Sending payload with device specs:', payload);
 
-      const response = await axios.post('https://optipy-backend.vercel.app/measure', payload, {
+      const response = await axios.post('https://opti-server.vercel.app/measure', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
