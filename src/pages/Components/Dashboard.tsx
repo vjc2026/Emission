@@ -26,7 +26,11 @@ export function DashboardComponent() {
 
         if (response.ok) {
           const data = await response.json();
-          setProjects(data.projects);
+          // Remove duplicates based on project id
+          const uniqueProjects = data.projects.filter((project: any, index: number, self: any[]) => 
+            self.findIndex(p => p.id === project.id) === index
+          );
+          setProjects(uniqueProjects);
         } else {
           const result = await response.json();
           setError(result.error || 'Failed to fetch projects.');

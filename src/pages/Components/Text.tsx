@@ -121,53 +121,23 @@ const History = () => {
         
         // Process each project only once
         for (const project of data.projects) {
-          // Only process if we haven't seen this project ID before
-          if (!projectMap.has(project.id)) {
-            const membersResponse = await fetch(`https://emissionserver.vercel.app/project/${project.id}/members`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            
-            let members = [];
-            let leader = null;
-            let owner = {
-              email: project.owner_email,
-              name: project.owner_name,
-              profileImage: null
-            };
-
-            if (membersResponse.ok) {
-              const { members: projectMembers } = await membersResponse.json();
-              members = projectMembers.map((member: any) => {
-                if (member.role === 'project_leader') {
-                  leader = {
-                    email: member.email,
-                    name: member.name,
-                    profileImage: member.profile_image
-                  };
-                }
-                return {
-                  email: member.email,
-                  name: member.name,
-                  role: member.role,
-                  joinedAt: member.joined_at,
-                  profileImage: member.profile_image,
-                  progressStatus: member.progress_status || 'In Progress',
-                  currentStage: member.current_stage || project.stage
-                };
-              });
-            }
-
+          const id = project.id;
+          if (!projectMap.has(id)) {
             // Add the processed project to our map
-            projectMap.set(project.id, {
+            projectMap.set(id, {
               id: project.id,
               project_id: project.project_id || project.id.toString(),
               title: project.project_name,
               description: project.project_description,
-              status: project.status === 'Archived' ? 'Completed' : 'In Progress',
+              status: project.status === 'Archived' || project.status === 'Complete' ? 'Completed' : 'In Progress',
               type: project.stage,
-              assignees: members,
-              leader: leader,
-              owner: owner,
+              assignees: [],
+              leader: null,
+              owner: {
+                email: project.owner_email,
+                name: project.owner_name,
+                profileImage: null
+              },
               spentTime: project.session_duration || 0,
               carbonEmit: project.carbon_emit || 0,
               isRunning: false,
@@ -180,6 +150,56 @@ const History = () => {
               project_start_date: project.project_start_date || new Date().toISOString().split('T')[0],
               project_due_date: project.project_due_date || ''
             });
+          } else {
+            // If already exists, update progressStatus if this one has 'Stage Complete'
+            const existing = projectMap.get(id);
+            if (project.progress_status === 'Stage Complete') {
+              existing.progressStatus = 'Stage Complete';
+              existing.userCompleted = true;
+            }
+          }
+
+          // Always fetch members and update assignees, leader, owner
+          const membersResponse = await fetch(`https://emissionserver.vercel.app/project/${id}/members`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          
+          let members = [];
+          let leader = null;
+
+          if (membersResponse.ok) {
+            const { members: projectMembers } = await membersResponse.json();
+            members = projectMembers.map((member: any) => {
+              if (member.role === 'project_leader') {
+                leader = {
+                  email: member.email,
+                  name: member.name,
+                  profileImage: member.profile_image
+                };
+              }
+              return {
+                email: member.email,
+                name: member.name,
+                role: member.role,
+                joinedAt: member.joined_at,
+                profileImage: member.profile_image,
+                progressStatus: member.progress_status || 'In Progress',
+                currentStage: member.current_stage || project.stage
+              };
+            });
+          }
+
+          const task = projectMap.get(id);
+          // Merge assignees without duplicates
+          const existingEmails = new Set(task.assignees.map((a: { email: string; name: string; role: string; joinedAt?: string; profileImage: string; progressStatus?: string; currentStage?: string }) => a.email));
+          members.forEach((member: any) => {
+            if (!existingEmails.has(member.email)) {
+              task.assignees.push(member);
+              existingEmails.add(member.email);
+            }
+          });
+          if (leader) {
+            task.leader = leader;
           }
         }
         
