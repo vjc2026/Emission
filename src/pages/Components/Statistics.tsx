@@ -22,10 +22,7 @@ import {
   Progress,
   Center,
   Tooltip,
-  Switch,
-  Collapse,
-  Button,
-  Modal
+  Switch
 } from '@mantine/core';
 import { useState, useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
@@ -43,11 +40,8 @@ import {
   IconCalendar,
   IconChartPie,
   IconChartLine,
-  IconBuildingFactory,
-  IconCode,
-  IconTrash
+  IconBuildingFactory
 } from '@tabler/icons-react';
-import { notifications } from '@mantine/notifications';
 
 export function StatisticsComponent() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -63,11 +57,6 @@ export function StatisticsComponent() {
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [organizationFilter, setOrganizationFilter] = useState<string | null>(null);
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false);
-
-  // Code analysis states
-  const [expandedProject, setExpandedProject] = useState<number | null>(null);
-  const [codeAnalyses, setCodeAnalyses] = useState<{ [key: string]: any[] }>({});
-  const [loadingAnalyses, setLoadingAnalyses] = useState<{ [key: string]: boolean }>({});
 
   // Use media query to check for mobile screens
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -124,31 +113,6 @@ export function StatisticsComponent() {
     fetchProjects();
   }, []);
 
-  // Listen for code analysis additions
-  useEffect(() => {
-    const handleCodeAnalysisAdded = () => {
-      // Refresh projects data
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      fetch('https://emissionserver.vercel.app/user_project_display_combined', {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      .then(response => response.json())
-      .then(data => {
-        const uniqueProjects = data.projects.filter((project: any, index: number, self: any[]) => 
-          self.findIndex((p: any) => p.id === project.id) === index
-        );
-        setProjects(uniqueProjects);
-      })
-      .catch(err => console.error('Error refreshing projects:', err));
-    };
-
-    window.addEventListener('code-analysis-added', handleCodeAnalysisAdded);
-    return () => window.removeEventListener('code-analysis-added', handleCodeAnalysisAdded);
-  }, []);
-
   // Apply filters whenever the filters or projects change
   useEffect(() => {
     let result = [...projects];
@@ -177,95 +141,6 @@ export function StatisticsComponent() {
     
     setFilteredProjects(result);
   }, [projects, statusFilter, stageFilter, organizationFilter, showActiveOnly]);
-
-  // Fetch code analyses for a project
-  const fetchCodeAnalyses = async (projectId: number, stage: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const key = `${projectId}-${stage}`;
-    setLoadingAnalyses(prev => ({ ...prev, [key]: true }));
-
-    try {
-      const response = await fetch(`https://emissionserver.vercel.app/code_analyses/${projectId}/${encodeURIComponent(stage)}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCodeAnalyses(prev => ({ ...prev, [key]: data.analyses }));
-      }
-    } catch (error) {
-      console.error('Error fetching code analyses:', error);
-    } finally {
-      setLoadingAnalyses(prev => ({ ...prev, [key]: false }));
-    }
-  };
-
-  // Delete a code analysis
-  const deleteCodeAnalysis = async (analysisId: number, projectId: number, stage: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const response = await fetch(`https://emissionserver.vercel.app/code_analysis/${analysisId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        notifications.show({
-          title: 'Success',
-          message: 'Code analysis deleted successfully',
-          color: 'green',
-        });
-
-        // Refresh the analyses list
-        fetchCodeAnalyses(projectId, stage);
-
-        // Refresh projects to update totals
-        const projectsResponse = await fetch('https://emissionserver.vercel.app/user_project_display_combined', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (projectsResponse.ok) {
-          const data = await projectsResponse.json();
-          const uniqueProjects = data.projects.filter((project: any, index: number, self: any[]) => 
-            self.findIndex((p: any) => p.id === project.id) === index
-          );
-          setProjects(uniqueProjects);
-        }
-      } else {
-        notifications.show({
-          title: 'Error',
-          message: 'Failed to delete code analysis',
-          color: 'red',
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting code analysis:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to delete code analysis',
-        color: 'red',
-      });
-    }
-  };
-
-  const toggleProjectExpansion = (projectId: number, stage: string) => {
-    if (expandedProject === projectId) {
-      setExpandedProject(null);
-    } else {
-      setExpandedProject(projectId);
-      const key = `${projectId}-${stage}`;
-      if (!codeAnalyses[key]) {
-        fetchCodeAnalyses(projectId, stage);
-      }
-    }
-  };
-  
   const calculateTotalEmissions = () => {
     return filteredProjects.reduce((total, project) => total + project.carbon_emit, 0).toFixed(4);
   };
@@ -627,21 +502,8 @@ export function StatisticsComponent() {
                             <ThemeIcon size="sm" color="green" variant="light" radius="xl">
                               <IconLeaf size={14} />
                             </ThemeIcon>
-                            <Tooltip label="Device emissions from time tracking">
-                              <Text size="xs">{project.carbon_emit.toFixed(4)} kg CO₂</Text>
-                            </Tooltip>
+                            <Text size="xs">{project.carbon_emit.toFixed(2)} kg CO₂</Text>
                           </Group>
-                          
-                          {project.code_analysis_emit > 0 && (
-                            <Group gap="xs">
-                              <ThemeIcon size="sm" color="cyan" variant="light" radius="xl">
-                                <IconCode size={14} />
-                              </ThemeIcon>
-                              <Tooltip label="Code analysis emissions">
-                                <Text size="xs">{(project.code_analysis_emit / 1000).toFixed(4)} kg CO₂</Text>
-                              </Tooltip>
-                            </Group>
-                          )}
                           
                           <Group gap="xs">
                             <ThemeIcon size="sm" color="orange" variant="light" radius="xl">
@@ -650,88 +512,6 @@ export function StatisticsComponent() {
                             <Text size="xs">{project.stage}</Text>
                           </Group>
                         </SimpleGrid>
-
-                        {/* Total Emissions */}
-                        <Divider my="md" />
-                        <Group align="apart">
-                          <Text size="sm" fw={600}>Total Emissions:</Text>
-                          <Text size="sm" fw={700} c="green">
-                            {(project.carbon_emit + (project.code_analysis_emit || 0) / 1000).toFixed(4)} kg CO₂
-                          </Text>
-                        </Group>
-
-                        {/* Expandable Code Analysis Section */}
-                        {project.code_analysis_emit > 0 && (
-                          <>
-                            <Button
-                              variant="subtle"
-                              size="xs"
-                              mt="sm"
-                              fullWidth
-                              onClick={() => toggleProjectExpansion(project.id, project.stage)}
-                              rightSection={
-                                expandedProject === project.id ? 
-                                <IconChevronUp size={16} /> : 
-                                <IconChevronDown size={16} />
-                              }
-                            >
-                              {expandedProject === project.id ? 'Hide' : 'View'} Code Analyses
-                            </Button>
-
-                            <Collapse in={expandedProject === project.id}>
-                              <Paper p="sm" mt="sm" withBorder bg="gray.0">
-                                {loadingAnalyses[`${project.id}-${project.stage}`] ? (
-                                  <Center p="md">
-                                    <Loader size="sm" />
-                                  </Center>
-                                ) : (
-                                  <Stack gap="xs">
-                                    {codeAnalyses[`${project.id}-${project.stage}`]?.length > 0 ? (
-                                      codeAnalyses[`${project.id}-${project.stage}`].map((analysis: any) => (
-                                        <Paper key={analysis.id} p="xs" withBorder bg="white">
-                                          <Group align="apart">
-                                            <div style={{ flex: 1 }}>
-                                              <Group gap="xs" mb={4}>
-                                                <Text size="xs" fw={600}>{analysis.user_name}</Text>
-                                                <Text size="xs" c="dimmed">
-                                                  {new Date(analysis.analysis_date).toLocaleDateString()}
-                                                </Text>
-                                              </Group>
-                                              <Text size="xs" c="dimmed">
-                                                🌱 {analysis.emissions_gco2.toFixed(6)} g CO₂
-                                                {' • '}
-                                                ⚡ {analysis.energy_kwh.toFixed(6)} kWh
-                                                {analysis.eco_score && ` • 🎯 ${analysis.eco_score.toFixed(1)}/100`}
-                                              </Text>
-                                              {analysis.time_complexity && (
-                                                <Text size="xs" c="dimmed">
-                                                  Time: {analysis.time_complexity}
-                                                  {analysis.space_complexity && ` | Space: ${analysis.space_complexity}`}
-                                                </Text>
-                                              )}
-                                            </div>
-                                            <ActionIcon
-                                              color="red"
-                                              variant="subtle"
-                                              size="sm"
-                                              onClick={() => deleteCodeAnalysis(analysis.id, project.id, project.stage)}
-                                            >
-                                              <IconTrash size={16} />
-                                            </ActionIcon>
-                                          </Group>
-                                        </Paper>
-                                      ))
-                                    ) : (
-                                      <Text size="xs" c="dimmed" ta="center">
-                                        No code analyses found
-                                      </Text>
-                                    )}
-                                  </Stack>
-                                )}
-                              </Paper>
-                            </Collapse>
-                          </>
-                        )}
                       </Box>
                     </Card>
                   </Grid.Col>
