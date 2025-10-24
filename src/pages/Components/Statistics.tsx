@@ -88,8 +88,12 @@ export function StatisticsComponent() {
             headers: { 'Authorization': `Bearer ${token}` },
           });          if (projectsResponse.ok) {
             const projectsData = await projectsResponse.json();
-            setProjects(projectsData.projects);
-            setFilteredProjects(projectsData.projects); // Initialize filtered projects with all projects
+            // Remove duplicates based on project id
+            const uniqueProjects = projectsData.projects.filter((project: any, index: number, self: any[]) => 
+              self.findIndex(p => p.id === project.id) === index
+            );
+            setProjects(uniqueProjects);
+            setFilteredProjects(uniqueProjects); // Initialize filtered projects with all projects
           } else {
             const result = await projectsResponse.json();
             setError(result.error || 'Failed to fetch projects.');
