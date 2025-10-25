@@ -56,6 +56,7 @@ export function StatisticsComponent() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [organizationFilter, setOrganizationFilter] = useState<string | null>(null);
+  const [emissionSourceFilter, setEmissionSourceFilter] = useState<string | null>(null);
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false);
 
   // Use media query to check for mobile screens
@@ -129,6 +130,12 @@ export function StatisticsComponent() {
       result = result.filter(project => project.organization === organizationFilter);
     }
     
+    if (emissionSourceFilter === 'Device-Based') {
+      result = result.filter(project => project.emission_source === 'device');
+    } else if (emissionSourceFilter === 'Code-Based') {
+      result = result.filter(project => project.emission_source === 'code');
+    }
+    
     // Filter for active or completed projects only
     if (showActiveOnly) {
       result = result.filter(project => 
@@ -140,7 +147,7 @@ export function StatisticsComponent() {
     }
     
     setFilteredProjects(result);
-  }, [projects, statusFilter, stageFilter, organizationFilter, showActiveOnly]);
+  }, [projects, statusFilter, stageFilter, organizationFilter, emissionSourceFilter, showActiveOnly]);
   const calculateTotalEmissions = () => {
     return filteredProjects.reduce((total, project) => total + project.carbon_emit, 0).toFixed(4);
   };
@@ -308,7 +315,7 @@ export function StatisticsComponent() {
             <Paper shadow="xs" p="md" radius="md" withBorder mb="md">
               <Stack gap="xs">
                 <Title order={4}>Filters</Title>
-                <SimpleGrid cols={isMobile ? 1 : 3}>
+                <SimpleGrid cols={isMobile ? 1 : 4}>
                   <Select
                     label="Status"
                     placeholder="All Statuses"
@@ -336,6 +343,18 @@ export function StatisticsComponent() {
                     clearable
                     leftSection={<IconFilter size={14} />}
                   />
+                  <Select
+                    label="Emission Source"
+                    placeholder="All Sources"
+                    data={[
+                      { value: 'Device-Based', label: 'Device-Based' },
+                      { value: 'Code-Based', label: 'Code-Based' }
+                    ]}
+                    value={emissionSourceFilter}
+                    onChange={setEmissionSourceFilter}
+                    clearable
+                    leftSection={<IconFilter size={14} />}
+                  />
                 </SimpleGrid>
                   <Group align="apart">
                   <Group>
@@ -357,6 +376,7 @@ export function StatisticsComponent() {
                       setStatusFilter(null);
                       setStageFilter(null);
                       setOrganizationFilter(null);
+                      setEmissionSourceFilter(null);
                       setShowActiveOnly(false);
                     }}
                     aria-label="Clear filters"

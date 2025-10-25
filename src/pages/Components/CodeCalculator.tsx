@@ -19,6 +19,12 @@ export default function CodeCalculator() {
   }>({ cpu_watts: null, gpu_watts: null, ram_watts: null, psu_watts: null });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Project saving state
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedStage, setSelectedStage] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
@@ -82,6 +88,30 @@ export default function CodeCalculator() {
     };
 
     fetchHardwareWattage();
+  }, []);
+
+  // Fetch user's projects for saving emissions
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch('https://emissionserver.vercel.app/user_project_display_combined', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProjects(data.projects || []);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    };
+
+    fetchProjects();
   }, []);
 
   const handlePaste = () => {
@@ -241,6 +271,44 @@ export default function CodeCalculator() {
     const energy = result.estimated?.energy_kwh || 0;
     
     return { emissions, energy };
+  };
+
+  const handleSaveEmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProject || !selectedStage || !result) return;
+
+    setSaveLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://emissionserver.vercel.app/save_code_emission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          project_id: selectedProject,
+          stage: selectedStage,
+          emissions_gco2: formatMetrics(result).emissions,
+          energy_kwh: formatMetrics(result).energy,
+          eco_score: result.eco_score || 0,
+        }),
+      });
+
+      if (response.ok) {
+        alert('Code emission saved successfully!');
+        setSelectedProject('');
+        setSelectedStage('');
+      } else {
+        const error = await response.json();
+        alert(`Error saving emission: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving emission:', error);
+      alert('Failed to save emission. Please try again.');
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
 
@@ -862,6 +930,108 @@ export default function CodeCalculator() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Save Emission to Project Section */}
+      {result && projects.length > 0 && (
+        <div style={{
+          marginTop: '2rem',
+          maxWidth: '800px',
+          marginLeft: 'auto',
+          marginRight: 'auto'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            border: '1px solid #e1e8ed',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              fontFamily: 'Poppins'
+            }}>Save Emission to Project Stage</h3>
+            <form onSubmit={handleSaveEmission}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#34495e',
+                  fontFamily: 'Poppins'
+                }}>Select Project:</label>
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'Poppins'
+                  }}
+                  required
+                >
+                  <option value="">Choose a project</option>
+                  {projects.map((proj) => (
+                    <option key={proj.id} value={proj.id}>{proj.project_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#34495e',
+                  fontFamily: 'Poppins'
+                }}>Select Stage:</label>
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'Poppins'
+                  }}
+                  required
+                >
+                  <option value="">Choose a stage</option>
+                  <option value="Design: Creating the software architecture">Design: Creating the software architecture</option>
+                  <option value="Development: Writing the actual code">Development: Writing the actual code</option>
+                  <option value="Testing: Ensuring the software works as expected">Testing: Ensuring the software works as expected</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={saveLoading || !selectedProject || !selectedStage}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: saveLoading ? '#95a5a6' : '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: saveLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  fontFamily: 'Poppins'
+                }}
+              >
+                {saveLoading ? 'Saving...' : 'Save Emission'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
