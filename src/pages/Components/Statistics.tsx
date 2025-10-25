@@ -63,6 +63,8 @@ export function StatisticsComponent() {
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [organizationFilter, setOrganizationFilter] = useState<string | null>(null);
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false);
+  const [showCodeOnly, setShowCodeOnly] = useState<boolean>(false);
+  const [includeCodeInTotals, setIncludeCodeInTotals] = useState<boolean>(false);
 
   // Code analysis states
   const [expandedProject, setExpandedProject] = useState<number | null>(null);
@@ -174,9 +176,14 @@ export function StatisticsComponent() {
         project.status === 'In-Progress'
       );
     }
+
+    // Filter to projects that have code analyses (based on backend aggregate)
+    if (showCodeOnly) {
+      result = result.filter(project => (project.code_analyses_count || 0) > 0);
+    }
     
     setFilteredProjects(result);
-  }, [projects, statusFilter, stageFilter, organizationFilter, showActiveOnly]);
+  }, [projects, statusFilter, stageFilter, organizationFilter, showActiveOnly, showCodeOnly]);
 
   // Fetch code analyses for a project
   const fetchCodeAnalyses = async (projectId: number, stage: string) => {
@@ -267,7 +274,12 @@ export function StatisticsComponent() {
   };
   
   const calculateTotalEmissions = () => {
-    return filteredProjects.reduce((total, project) => total + project.carbon_emit, 0).toFixed(4);
+    const sum = filteredProjects.reduce((total, project) => {
+      const base = project.carbon_emit || 0; // assumed kg
+      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      return total + base + codeKg;
+    }, 0);
+    return sum.toFixed(4);
   };
 
   // Calculate stats for visualization
@@ -275,7 +287,9 @@ export function StatisticsComponent() {
     const statusMap: Record<string, number> = {};
     filteredProjects.forEach(project => {
       const status = project.status || 'Unknown';
-      statusMap[status] = (statusMap[status] || 0) + project.carbon_emit;
+      const base = project.carbon_emit || 0;
+      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      statusMap[status] = (statusMap[status] || 0) + base + codeKg;
     });
     return statusMap;
   };
@@ -284,7 +298,9 @@ export function StatisticsComponent() {
     const stageMap: Record<string, number> = {};
     filteredProjects.forEach(project => {
       const stage = project.stage || 'Unknown';
-      stageMap[stage] = (stageMap[stage] || 0) + project.carbon_emit;
+      const base = project.carbon_emit || 0;
+      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      stageMap[stage] = (stageMap[stage] || 0) + base + codeKg;
     });
     return stageMap;
   };
@@ -474,6 +490,20 @@ export function StatisticsComponent() {
                       color="green"
                       size="sm"
                     />
+                    <Switch
+                      label="Show projects with code analyses only"
+                      checked={showCodeOnly}
+                      onChange={(event) => setShowCodeOnly(event.currentTarget.checked)}
+                      color="cyan"
+                      size="sm"
+                    />
+                    <Switch
+                      label="Include code emissions in totals"
+                      checked={includeCodeInTotals}
+                      onChange={(event) => setIncludeCodeInTotals(event.currentTarget.checked)}
+                      color="teal"
+                      size="sm"
+                    />
                   </Group>
                   <ActionIcon 
                     variant="subtle" 
@@ -483,6 +513,8 @@ export function StatisticsComponent() {
                       setStageFilter(null);
                       setOrganizationFilter(null);
                       setShowActiveOnly(false);
+                      setShowCodeOnly(false);
+                      setIncludeCodeInTotals(false);
                     }}
                     aria-label="Clear filters"
                   >
@@ -632,13 +664,13 @@ export function StatisticsComponent() {
                             </Tooltip>
                           </Group>
                           
-                          {project.code_analysis_emit > 0 && (
+                          {(project.code_analyses_count || 0) > 0 && (
                             <Group gap="xs">
                               <ThemeIcon size="sm" color="cyan" variant="light" radius="xl">
                                 <IconCode size={14} />
                               </ThemeIcon>
-                              <Tooltip label="Code analysis emissions">
-                                <Text size="xs">{(project.code_analysis_emit / 1000).toFixed(4)} kg CO₂</Text>
+                              <Tooltip label={`Code analyses: ${project.code_analyses_count}`}>
+                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂</Text>
                               </Tooltip>
                             </Group>
                           )}
@@ -654,14 +686,14 @@ export function StatisticsComponent() {
                         {/* Total Emissions */}
                         <Divider my="md" />
                         <Group align="apart">
-                          <Text size="sm" fw={600}>Total Emissions:</Text>
+                          <Text size="sm" fw={600}>Total Emissions{includeCodeInTotals ? ' (with code)' : ''}:</Text>
                           <Text size="sm" fw={700} c="green">
-                            {(project.carbon_emit + (project.code_analysis_emit || 0) / 1000).toFixed(4)} kg CO₂
+                            {( (project.carbon_emit || 0) + (includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0) ).toFixed(4)} kg CO₂
                           </Text>
                         </Group>
 
                         {/* Expandable Code Analysis Section */}
-                        {project.code_analysis_emit > 0 && (
+                        {(project.code_analyses_count || 0) > 0 && (
                           <>
                             <Button
                               variant="subtle"
@@ -675,7 +707,7 @@ export function StatisticsComponent() {
                                 <IconChevronDown size={16} />
                               }
                             >
-                              {expandedProject === project.id ? 'Hide' : 'View'} Code Analyses
+                                {expandedProject === project.id ? 'Hide' : 'View'} Code Analyses ({project.code_analyses_count})
                             </Button>
 
                             <Collapse in={expandedProject === project.id}>
@@ -692,10 +724,12 @@ export function StatisticsComponent() {
                                           <Group align="apart">
                                             <div style={{ flex: 1 }}>
                                               <Group gap="xs" mb={4}>
-                                                <Text size="xs" fw={600}>{analysis.user_name}</Text>
-                                                <Text size="xs" c="dimmed">
-                                                  {new Date(analysis.analysis_date).toLocaleDateString()}
-                                                </Text>
+                                                {analysis.user_name && <Text size="xs" fw={600}>{analysis.user_name}</Text>}
+                                                {analysis.analysis_date && (
+                                                  <Text size="xs" c="dimmed">
+                                                    {new Date(analysis.analysis_date).toLocaleString()}
+                                                  </Text>
+                                                )}
                                               </Group>
                                               <Text size="xs" c="dimmed">
                                                 🌱 {analysis.emissions_gco2.toFixed(6)} g CO₂

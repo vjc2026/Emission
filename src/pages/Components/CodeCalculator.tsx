@@ -26,6 +26,13 @@ export default function CodeCalculator() {
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [showSaveModal, setShowSaveModal] = useState(false);
 
+  // Canonical stage list must match backend gating
+  const CANONICAL_STAGES = [
+    'Design: Creating the software architecture',
+    'Development: Writing the actual code',
+    'Testing: Ensuring the software works as expected'
+  ];
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
@@ -1101,9 +1108,18 @@ export default function CodeCalculator() {
                 }}
               >
                 <option value="">-- Choose a stage --</option>
-                <option value="Design: Creating the software architecture">Design</option>
-                <option value="Development: Writing the actual code">Development</option>
-                <option value="Testing: Ensuring the software works as expected">Testing</option>
+                {CANONICAL_STAGES.map((stage) => {
+                  const proj = projects.find(p => p.id.toString() === selectedProject);
+                  const currentIdx = proj ? CANONICAL_STAGES.indexOf(proj.stage) : -1;
+                  const optionIdx = CANONICAL_STAGES.indexOf(stage);
+                  const disabled = currentIdx >= 0 && optionIdx > currentIdx; // future stage disabled
+                  const label = stage.includes(':') ? stage.split(':')[0] : stage;
+                  return (
+                    <option key={stage} value={stage} disabled={disabled}>
+                      {label}{disabled ? ' (not reached)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
