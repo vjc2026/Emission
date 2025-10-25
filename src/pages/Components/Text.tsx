@@ -16,6 +16,7 @@ type Task = {
   isRunning: boolean;
   startTime: number | null;
   carbonEmit: number;
+  codeAnalysisEmit: number;
   leader: { email: string; name: string; profileImage: string } | null;
   stage_duration: number;
   stage_start_date: string;
@@ -140,6 +141,7 @@ const History = () => {
               },
               spentTime: project.session_duration || 0,
               carbonEmit: project.carbon_emit || 0,
+              codeAnalysisEmit: project.code_analysis_emit || 0,
               isRunning: false,
               startTime: null,
               userCompleted: project.progress_status === 'Stage Complete',

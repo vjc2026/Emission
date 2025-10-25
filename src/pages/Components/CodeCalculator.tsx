@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './CodeCalculator.module.css';
 import axios from 'axios';
+import { notifications } from '@mantine/notifications';
 
 export default function CodeCalculator() {
   const [code, setCode] = useState('');
@@ -18,12 +19,12 @@ export default function CodeCalculator() {
     psu_watts: number | null;
   }>({ cpu_watts: null, gpu_watts: null, ram_watts: null, psu_watts: null });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Project saving state
+  
+  // New state for project selection
   const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState('');
-  const [selectedStage, setSelectedStage] = useState('');
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedStage, setSelectedStage] = useState<string>('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -90,7 +91,7 @@ export default function CodeCalculator() {
     fetchHardwareWattage();
   }, []);
 
-  // Fetch user's projects for saving emissions
+  // Fetch user's active projects
   useEffect(() => {
     const fetchProjects = async () => {
       const token = localStorage.getItem('token');
@@ -104,7 +105,11 @@ export default function CodeCalculator() {
 
         if (response.ok) {
           const data = await response.json();
-          setProjects(data.projects || []);
+          // Filter for active projects only (not completed or archived)
+          const activeProjects = data.projects.filter((p: any) => 
+            p.status === 'In Progress' || p.status === 'In-Progress'
+          );
+          setProjects(activeProjects);
         }
       } catch (error) {
         console.error('Error fetching projects:', error);
@@ -273,14 +278,30 @@ export default function CodeCalculator() {
     return { emissions, energy };
   };
 
-  const handleSaveEmission = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProject || !selectedStage || !result) return;
+  const handleSaveToProject = async () => {
+    if (!selectedProject || !selectedStage) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select both a project and stage',
+        color: 'red',
+      });
+      return;
+    }
 
-    setSaveLoading(true);
+    if (!result) {
+      notifications.show({
+        title: 'Error',
+        message: 'No analysis results to save',
+        color: 'red',
+      });
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://emissionserver.vercel.app/save_code_emission', {
+      const response = await fetch('https://emissionserver.vercel.app/add_code_analysis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -289,25 +310,42 @@ export default function CodeCalculator() {
         body: JSON.stringify({
           project_id: selectedProject,
           stage: selectedStage,
-          emissions_gco2: formatMetrics(result).emissions,
-          energy_kwh: formatMetrics(result).energy,
-          eco_score: result.eco_score || 0,
+          emissions_gco2: result.emissions_gco2,
+          energy_kwh: result.estimated?.energy_kwh || 0,
+          eco_score: result.eco_score || null,
+          time_complexity: result.metrics?.time_complexity || null,
+          space_complexity: result.metrics?.space_complexity || null,
         }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        alert('Code emission saved successfully!');
+        notifications.show({
+          title: 'Success',
+          message: `Code analysis saved! Total emissions for this stage: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
+          color: 'green',
+        });
+        setShowSaveModal(false);
         setSelectedProject('');
         setSelectedStage('');
+        
+        // Trigger refresh for Statistics page if it's open
+        window.dispatchEvent(new CustomEvent('code-analysis-added'));
       } else {
-        const error = await response.json();
-        alert(`Error saving emission: ${error.error}`);
+        notifications.show({
+          title: 'Error',
+          message: data.error || 'Failed to save code analysis',
+          color: 'red',
+        });
       }
     } catch (error) {
-      console.error('Error saving emission:', error);
-      alert('Failed to save emission. Please try again.');
-    } finally {
-      setSaveLoading(false);
+      console.error('Error saving code analysis:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to save code analysis',
+        color: 'red',
+      });
     }
   };
 
@@ -533,11 +571,42 @@ export default function CodeCalculator() {
                         fontSize: '18px',
                         fontWeight: '500',
                         color: result.eco_score > 70 ? '#27ae60' : result.eco_score > 50 ? '#f39c12' : '#e74c3c',
-                        fontFamily: 'Poppins'
+                        fontFamily: 'Poppins',
+                        marginBottom: '20px'
                       }}>
                         Eco Score: {result.eco_score.toFixed(1)}/100
                       </div>
                     )}
+                    
+                    <button 
+                      onClick={() => setShowSaveModal(true)}
+                      style={{
+                        marginTop: '15px',
+                        padding: '12px 24px',
+                        backgroundColor: '#3a7f0d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        fontFamily: 'Poppins',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2d6209';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#3a7f0d';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                      }}
+                    >
+                      💾 Save to Project
+                    </button>
                   </>
                 ) : (
                   <div style={{
@@ -933,104 +1002,192 @@ export default function CodeCalculator() {
         </div>
       )}
 
-      {/* Save Emission to Project Section */}
-      {result && projects.length > 0 && (
+      {/* Save to Project Modal */}
+      {showSaveModal && (
         <div style={{
-          marginTop: '2rem',
-          maxWidth: '800px',
-          marginLeft: 'auto',
-          marginRight: 'auto'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
         }}>
           <div style={{
             backgroundColor: 'white',
-            border: '1px solid #e1e8ed',
             borderRadius: '16px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
           }}>
-            <h3 style={{
-              margin: '0 0 1rem 0',
-              fontSize: '18px',
+            <h2 style={{
+              margin: '0 0 1.5rem 0',
+              fontSize: '24px',
               fontWeight: '600',
               color: '#2c3e50',
               fontFamily: 'Poppins'
-            }}>Save Emission to Project Stage</h3>
-            <form onSubmit={handleSaveEmission}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#34495e',
-                  fontFamily: 'Poppins'
-                }}>Select Project:</label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontFamily: 'Poppins'
-                  }}
-                  required
-                >
-                  <option value="">Choose a project</option>
-                  {projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>{proj.project_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#34495e',
-                  fontFamily: 'Poppins'
-                }}>Select Stage:</label>
-                <select
-                  value={selectedStage}
-                  onChange={(e) => setSelectedStage(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontFamily: 'Poppins'
-                  }}
-                  required
-                >
-                  <option value="">Choose a stage</option>
-                  <option value="Design: Creating the software architecture">Design: Creating the software architecture</option>
-                  <option value="Development: Writing the actual code">Development: Writing the actual code</option>
-                  <option value="Testing: Ensuring the software works as expected">Testing: Ensuring the software works as expected</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                disabled={saveLoading || !selectedProject || !selectedStage}
+            }}>
+              Save Code Analysis to Project
+            </h2>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#34495e',
+                fontFamily: 'Poppins'
+              }}>
+                Select Project *
+              </label>
+              <select
+                value={selectedProject}
+                onChange={(e) => {
+                  setSelectedProject(e.target.value);
+                  // Auto-select stage based on project's current stage
+                  const project = projects.find(p => p.id.toString() === e.target.value);
+                  if (project) {
+                    setSelectedStage(project.stage);
+                  }
+                }}
                 style={{
                   width: '100%',
-                  padding: '0.75rem 1.5rem',
-                  backgroundColor: saveLoading ? '#95a5a6' : '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: saveLoading ? 'not-allowed' : 'pointer',
+                  padding: '0.75rem',
                   fontSize: '14px',
-                  fontWeight: '500',
-                  fontFamily: 'Poppins'
+                  fontFamily: 'Poppins',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
                 }}
               >
-                {saveLoading ? 'Saving...' : 'Save Emission'}
+                <option value="">-- Choose a project --</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.project_name} ({project.stage})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#34495e',
+                fontFamily: 'Poppins'
+              }}>
+                Select Stage *
+              </label>
+              <select
+                value={selectedStage}
+                onChange={(e) => setSelectedStage(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '14px',
+                  fontFamily: 'Poppins',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">-- Choose a stage --</option>
+                <option value="Design: Creating the software architecture">Design</option>
+                <option value="Development: Writing the actual code">Development</option>
+                <option value="Testing: Ensuring the software works as expected">Testing</option>
+              </select>
+            </div>
+
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                color: '#34495e',
+                fontFamily: 'Poppins',
+                marginBottom: '0.5rem'
+              }}>
+                <strong>Analysis Summary:</strong>
+              </div>
+              <div style={{
+                fontSize: '13px',
+                color: '#7f8c8d',
+                fontFamily: 'Poppins'
+              }}>
+                • Emissions: {result?.emissions_gco2?.toFixed(6)} g CO₂<br />
+                • Energy: {result?.estimated?.energy_kwh?.toFixed(6)} kWh<br />
+                {result?.eco_score && `• Eco Score: ${result.eco_score.toFixed(1)}/100`}
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setSelectedProject('');
+                  setSelectedStage('');
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  fontFamily: 'Poppins',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  color: '#34495e',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                }}
+              >
+                Cancel
               </button>
-            </form>
+              <button
+                onClick={handleSaveToProject}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  fontFamily: 'Poppins',
+                  border: 'none',
+                  borderRadius: '8px',
+                  backgroundColor: '#3a7f0d',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2d6209';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3a7f0d';
+                }}
+              >
+                Save Analysis
+              </button>
+            </div>
           </div>
         </div>
       )}
