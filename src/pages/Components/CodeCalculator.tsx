@@ -308,24 +308,56 @@ export default function CodeCalculator() {
     if (!token) return;
 
     try {
+      // Ensure stage is the full canonical stage string
+      const projectObj = projects.find(p => p.id.toString() === selectedProject);
+      console.log('Selected project object:', projectObj);
+      console.log('Current selectedProject:', selectedProject);
+      console.log('Current selectedStage:', selectedStage);
+      console.log('All canonical stages:', CANONICAL_STAGES);
+
+      // Verify the stage value is one of the canonical stages
+      if (!CANONICAL_STAGES.includes(selectedStage)) {
+        console.error('Invalid stage selected:', selectedStage);
+        notifications.show({
+          title: 'Error',
+          message: `Invalid stage: "${selectedStage}". Must be one of: ${CANONICAL_STAGES.join(', ')}`,
+          color: 'red',
+        });
+        return;
+      }
+
+      // Debug logging to verify the values being sent
+      console.log('Saving code analysis with values:', {
+        project_id: parseInt(selectedProject, 10),
+        stage: selectedStage,
+        emissions_gco2: result.emissions_gco2,
+        energy_kwh: result.estimated?.energy_kwh,
+        eco_score: result.eco_score
+      });
+
+      const requestBody = {
+        project_id: parseInt(selectedProject, 10),
+        stage: selectedStage,
+        emissions_gco2: result.emissions_gco2,
+        energy_kwh: result.estimated?.energy_kwh || 0,
+        eco_score: result.eco_score || null,
+        time_complexity: result.metrics?.time_complexity || null,
+        space_complexity: result.metrics?.space_complexity || null,
+      };
+
+      console.log('Final request body:', requestBody);
+
       const response = await fetch('https://emissionserver.vercel.app/add_code_calculated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          project_id: selectedProject,
-          stage: selectedStage,
-          emissions_gco2: result.emissions_gco2,
-          energy_kwh: result.estimated?.energy_kwh || 0,
-          eco_score: result.eco_score || null,
-          time_complexity: result.metrics?.time_complexity || null,
-          space_complexity: result.metrics?.space_complexity || null,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
+      console.log('Response from server:', data);
 
       if (response.ok) {
         notifications.show({
@@ -586,7 +618,11 @@ export default function CodeCalculator() {
                     )}
                     
                     <button 
-                      onClick={() => setShowSaveModal(true)}
+                      onClick={() => {
+                        setShowSaveModal(true);
+                        // Reset stage selection when opening modal for fresh selection
+                        setSelectedStage('');
+                      }}
                       style={{
                         marginTop: '15px',
                         padding: '12px 24px',
@@ -1056,10 +1092,12 @@ export default function CodeCalculator() {
                 value={selectedProject}
                 onChange={(e) => {
                   setSelectedProject(e.target.value);
-                  // Auto-select stage based on project's current stage
-                  const project = projects.find(p => p.id.toString() === e.target.value);
-                  if (project) {
-                    setSelectedStage(project.stage);
+                  // Only auto-select stage if no stage is currently selected
+                  if (!selectedStage) {
+                    const project = projects.find(p => p.id.toString() === e.target.value);
+                    if (project) {
+                      setSelectedStage(project.stage);
+                    }
                   }
                 }}
                 style={{
@@ -1094,6 +1132,7 @@ export default function CodeCalculator() {
                 Select Stage *
               </label>
               <select
+                key={`stage-select-${selectedProject}`}
                 value={selectedStage}
                 onChange={(e) => setSelectedStage(e.target.value)}
                 style={{
