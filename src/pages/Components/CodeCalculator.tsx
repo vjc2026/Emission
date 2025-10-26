@@ -286,7 +286,12 @@ export default function CodeCalculator() {
   };
 
   const handleSaveToProject = async () => {
+    console.log('=== handleSaveToProject called ===');
+    console.log('selectedProject:', selectedProject);
+    console.log('selectedStage:', selectedStage);
+    
     if (!selectedProject || !selectedStage) {
+      console.error('Missing project or stage:', { selectedProject, selectedStage });
       notifications.show({
         title: 'Error',
         message: 'Please select both a project and stage',
@@ -311,8 +316,8 @@ export default function CodeCalculator() {
       // Ensure stage is the full canonical stage string
       const projectObj = projects.find(p => p.id.toString() === selectedProject);
       console.log('Selected project object:', projectObj);
-      console.log('Current selectedProject:', selectedProject);
-      console.log('Current selectedStage:', selectedStage);
+      console.log('Current selectedProject (string):', selectedProject);
+      console.log('Current selectedStage (string):', selectedStage);
       console.log('All canonical stages:', CANONICAL_STAGES);
 
       // Verify the stage value is one of the canonical stages
@@ -325,6 +330,12 @@ export default function CodeCalculator() {
         });
         return;
       }
+
+      // Confirm before saving
+      console.log('=== Confirmation ===');
+      console.log('Project:', projectObj?.project_name);
+      console.log('Stage to save to:', selectedStage);
+      console.log('Emissions:', result.emissions_gco2, 'g CO₂');
 
       // Debug logging to verify the values being sent
       console.log('Saving code analysis with values:', {
@@ -345,7 +356,8 @@ export default function CodeCalculator() {
         space_complexity: result.metrics?.space_complexity || null,
       };
 
-      console.log('Final request body:', requestBody);
+      console.log('=== Final request body to be sent ===');
+      console.log(JSON.stringify(requestBody, null, 2));
 
       const response = await fetch('https://emissionserver.vercel.app/add_code_calculated', {
         method: 'POST',
@@ -358,11 +370,12 @@ export default function CodeCalculator() {
 
       const data = await response.json();
       console.log('Response from server:', data);
+      console.log('Response status:', response.status);
 
       if (response.ok) {
         notifications.show({
           title: 'Success',
-          message: `Code analysis saved! Total emissions for this stage: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
+          message: `Code analysis saved to ${selectedStage.split(':')[0]}! Total emissions: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
           color: 'green',
         });
         setShowSaveModal(false);
@@ -372,6 +385,7 @@ export default function CodeCalculator() {
         // Trigger refresh for Statistics page if it's open
         window.dispatchEvent(new CustomEvent('code-analysis-added'));
       } else {
+        console.error('Backend returned error:', data);
         notifications.show({
           title: 'Error',
           message: data.error || 'Failed to save code analysis',
@@ -1091,14 +1105,12 @@ export default function CodeCalculator() {
               <select
                 value={selectedProject}
                 onChange={(e) => {
-                  setSelectedProject(e.target.value);
-                  // Only auto-select stage if no stage is currently selected
-                  if (!selectedStage) {
-                    const project = projects.find(p => p.id.toString() === e.target.value);
-                    if (project) {
-                      setSelectedStage(project.stage);
-                    }
-                  }
+                  const newProjectId = e.target.value;
+                  console.log('Project selection changed to:', newProjectId);
+                  setSelectedProject(newProjectId);
+                  // Reset stage when project changes to force user to select explicitly
+                  console.log('Resetting stage selection');
+                  setSelectedStage('');
                 }}
                 style={{
                   width: '100%',
@@ -1134,7 +1146,10 @@ export default function CodeCalculator() {
               <select
                 key={`stage-select-${selectedProject}`}
                 value={selectedStage}
-                onChange={(e) => setSelectedStage(e.target.value)}
+                onChange={(e) => {
+                  console.log('Stage changed from:', selectedStage, 'to:', e.target.value);
+                  setSelectedStage(e.target.value);
+                }}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -1160,6 +1175,15 @@ export default function CodeCalculator() {
                   );
                 })}
               </select>
+              <small style={{
+                display: 'block',
+                marginTop: '0.5rem',
+                fontSize: '12px',
+                color: '#7f8c8d',
+                fontFamily: 'Poppins'
+              }}>
+                Currently selected: {selectedStage ? (selectedStage.includes(':') ? selectedStage.split(':')[0] : selectedStage) : 'None'}
+              </small>
             </div>
 
             <div style={{
