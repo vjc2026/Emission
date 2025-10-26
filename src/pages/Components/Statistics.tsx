@@ -57,6 +57,12 @@ export function StatisticsComponent() {
   const [organization, setOrganization] = useState<string>('');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('list');
+  // Canonical stages (must match backend and CodeCalculator)
+  const CANONICAL_STAGES = [
+    'Design: Creating the software architecture',
+    'Development: Writing the actual code',
+    'Testing: Ensuring the software works as expected'
+  ];
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -70,6 +76,8 @@ export function StatisticsComponent() {
   const [expandedProject, setExpandedProject] = useState<number | null>(null);
   const [codeAnalyses, setCodeAnalyses] = useState<{ [key: string]: any[] }>({});
   const [loadingAnalyses, setLoadingAnalyses] = useState<{ [key: string]: boolean }>({});
+  // Per-project selected stage for viewing analyses
+  const [stageByProject, setStageByProject] = useState<{ [key: number]: string }>({});
 
   // Use media query to check for mobile screens
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -210,6 +218,16 @@ export function StatisticsComponent() {
     }
   };
 
+  // Handle stage change for a project (fetch on demand)
+  const handleProjectStageChange = (projectId: number, newStage: string) => {
+    setStageByProject(prev => ({ ...prev, [projectId]: newStage }));
+    const key = `${projectId}-${newStage}`;
+    // Fetch if not already loaded
+    if (!codeAnalyses[key]) {
+      fetchCodeAnalyses(projectId, newStage);
+    }
+  };
+
   // Delete a code analysis
   const deleteCodeAnalysis = async (analysisId: number, projectId: number, stage: string) => {
     const token = localStorage.getItem('token');
@@ -266,9 +284,12 @@ export function StatisticsComponent() {
       setExpandedProject(null);
     } else {
       setExpandedProject(projectId);
-      const key = `${projectId}-${stage}`;
+      // Initialize selected stage for this project if not set
+      const initialStage = stageByProject[projectId] || stage;
+      setStageByProject(prev => ({ ...prev, [projectId]: initialStage }));
+      const key = `${projectId}-${initialStage}`;
       if (!codeAnalyses[key]) {
-        fetchCodeAnalyses(projectId, stage);
+        fetchCodeAnalyses(projectId, initialStage);
       }
     }
   };
@@ -669,8 +690,8 @@ export function StatisticsComponent() {
                               <ThemeIcon size="sm" color="cyan" variant="light" radius="xl">
                                 <IconCode size={14} />
                               </ThemeIcon>
-                              <Tooltip label={`Code analyses: ${project.code_analyses_count}`}>
-                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂</Text>
+                              <Tooltip label={`Code analyses (all stages): ${project.code_analyses_count}`}>
+                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂ (all stages)</Text>
                               </Tooltip>
                             </Group>
                           )}
@@ -712,14 +733,31 @@ export function StatisticsComponent() {
 
                             <Collapse in={expandedProject === project.id}>
                               <Paper p="sm" mt="sm" withBorder bg="gray.0">
-                                {loadingAnalyses[`${project.id}-${project.stage}`] ? (
+                                {/* Stage picker for analyses view */}
+                                <Group justify="space-between" mb="sm">
+                                  <Text size="sm" c="dimmed">View stage analyses:</Text>
+                                  <Select
+                                    size="xs"
+                                    style={{ maxWidth: 340 }}
+                                    value={stageByProject[project.id] || project.stage}
+                                    onChange={(val) => val && handleProjectStageChange(project.id, val)}
+                                    data={(() => {
+                                      const currentIdx = CANONICAL_STAGES.indexOf(project.stage);
+                                      // Allow viewing any reached stage (<= current)
+                                      const allowed = currentIdx >= 0 ? CANONICAL_STAGES.slice(0, currentIdx + 1) : CANONICAL_STAGES;
+                                      return allowed.map(s => ({ value: s, label: s.split(':')[0] }));
+                                    })()}
+                                  />
+                                </Group>
+
+                                {loadingAnalyses[`${project.id}-${(stageByProject[project.id] || project.stage)}`] ? (
                                   <Center p="md">
                                     <Loader size="sm" />
                                   </Center>
                                 ) : (
                                   <Stack gap="xs">
-                                    {codeAnalyses[`${project.id}-${project.stage}`]?.length > 0 ? (
-                                      codeAnalyses[`${project.id}-${project.stage}`].map((analysis: any) => (
+                                    {codeAnalyses[`${project.id}-${(stageByProject[project.id] || project.stage)}`]?.length > 0 ? (
+                                      codeAnalyses[`${project.id}-${(stageByProject[project.id] || project.stage)}`].map((analysis: any) => (
                                         <Paper key={analysis.id} p="xs" withBorder bg="white">
                                           <Group align="apart">
                                             <div style={{ flex: 1 }}>
@@ -748,7 +786,7 @@ export function StatisticsComponent() {
                                               color="red"
                                               variant="subtle"
                                               size="sm"
-                                              onClick={() => deleteCodeAnalysis(analysis.id, project.id, project.stage)}
+                                              onClick={() => deleteCodeAnalysis(analysis.id, project.id, (stageByProject[project.id] || project.stage))}
                                             >
                                               <IconTrash size={16} />
                                             </ActionIcon>
