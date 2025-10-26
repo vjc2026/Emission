@@ -67,6 +67,18 @@ interface ThProps {
   onSort: () => void;
 }
 
+// Utility function to normalize carbon emissions
+// Code entries are in grams, device entries are in kg
+// This converts everything to kg for consistent display
+function normalizeCarbonEmission(carbonEmit: number, entryType?: string): number {
+  if (entryType === 'code') {
+    // Convert grams to kg
+    return carbonEmit / 1000;
+  }
+  // Already in kg
+  return carbonEmit;
+}
+
 function Th({ children, reversed, sorted, onSort }: ThProps) {
   const Icon = sorted ? (reversed ? IconChevronUp : IconChevronDown) : IconSelector;
   return (
