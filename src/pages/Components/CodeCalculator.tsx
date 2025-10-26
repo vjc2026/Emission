@@ -325,24 +325,12 @@ export default function CodeCalculator() {
         }),
       });
 
-      // Be defensive: 404/HTML responses will throw on response.json(); handle content-type first
-      let data: any = null;
-      const ct = response.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        if (!response.ok) {
-          throw new Error(`Request failed (${response.status}): ${text.slice(0, 200)}`);
-        }
-        // If OK but not JSON (unexpected), synthesize minimal payload
-        data = { message: text };
-      }
+      const data = await response.json();
 
       if (response.ok) {
         notifications.show({
           title: 'Success',
-          message: `Code analysis saved! Total emissions for this stage: ${Number(data.accumulated_emissions || 0).toFixed(6)} g CO₂`,
+          message: `Code analysis saved! Total emissions for this stage: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
           color: 'green',
         });
         setShowSaveModal(false);
@@ -354,7 +342,7 @@ export default function CodeCalculator() {
       } else {
         notifications.show({
           title: 'Error',
-          message: (data && data.error) || 'Failed to save code analysis',
+          message: data.error || 'Failed to save code analysis',
           color: 'red',
         });
       }
@@ -362,7 +350,7 @@ export default function CodeCalculator() {
       console.error('Error saving code analysis:', error);
       notifications.show({
         title: 'Error',
-        message: error instanceof Error ? error.message : 'Failed to save code analysis',
+        message: 'Failed to save code analysis',
         color: 'red',
       });
     }
