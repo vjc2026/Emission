@@ -38,7 +38,7 @@ const dlsuLightGreen = '#008C4C';
 const secondaryData = [
   { link: '/main', label: 'Dashboard', icon: IconBell },
   { link: '/main', label: 'Statistics', icon: IconChartBar },
-  { link: '/main', label: 'Code Optimizer', icon: Icon3dCubeSphere },
+  { link: '/main', label: 'Code Calculator', icon: Icon3dCubeSphere },
   { link: '/main', label: 'Compare Devices', icon: IconAccessPoint },
 ];
 
@@ -258,7 +258,7 @@ const MainContent: React.FC = () => {
             case 'Projects Session Tracker':
               setCurrentComponent('component5');
               break;
-            case 'Code Optimizer':
+            case 'Code Calculator':
               setCurrentComponent('component6');
               break;
             case 'Compare Devices':
