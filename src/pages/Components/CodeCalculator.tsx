@@ -313,19 +313,20 @@ export default function CodeCalculator() {
     if (!token) return;
 
     try {
-      // Ensure stage is the full canonical stage string
+      // Ensure stage is locked to the project's current stage
       const projectObj = projects.find(p => p.id.toString() === selectedProject);
+      const stageLocked = projectObj?.stage;
       console.log('Selected project object:', projectObj);
       console.log('Current selectedProject (string):', selectedProject);
-      console.log('Current selectedStage (string):', selectedStage);
+      console.log('Locked stage (from project):', stageLocked);
       console.log('All canonical stages:', CANONICAL_STAGES);
 
-      // Verify the stage value is one of the canonical stages
-      if (!CANONICAL_STAGES.includes(selectedStage)) {
-        console.error('Invalid stage selected:', selectedStage);
+      // Verify the locked stage value is one of the canonical stages
+      if (!stageLocked || !CANONICAL_STAGES.includes(stageLocked)) {
+        console.error('Invalid or missing locked stage:', stageLocked);
         notifications.show({
           title: 'Error',
-          message: `Invalid stage: "${selectedStage}". Must be one of: ${CANONICAL_STAGES.join(', ')}`,
+          message: `Invalid stage for project. Must be one of: ${CANONICAL_STAGES.join(', ')}`,
           color: 'red',
         });
         return;
@@ -334,13 +335,13 @@ export default function CodeCalculator() {
       // Confirm before saving
       console.log('=== Confirmation ===');
       console.log('Project:', projectObj?.project_name);
-      console.log('Stage to save to:', selectedStage);
+      console.log('Stage to save to (locked):', stageLocked);
       console.log('Emissions:', result.emissions_gco2, 'g CO₂');
 
       // Debug logging to verify the values being sent
       console.log('Saving code analysis with values:', {
         project_id: parseInt(selectedProject, 10),
-        stage: selectedStage,
+        stage: stageLocked,
         emissions_gco2: result.emissions_gco2,
         energy_kwh: result.estimated?.energy_kwh,
         eco_score: result.eco_score
@@ -348,7 +349,7 @@ export default function CodeCalculator() {
 
       const requestBody = {
         project_id: parseInt(selectedProject, 10),
-        stage: selectedStage,
+        stage: stageLocked,
         emissions_gco2: result.emissions_gco2,
         energy_kwh: result.estimated?.energy_kwh || 0,
         eco_score: result.eco_score || null,
@@ -375,7 +376,7 @@ export default function CodeCalculator() {
       if (response.ok) {
         notifications.show({
           title: 'Success',
-          message: `Code analysis saved to ${selectedStage.split(':')[0]}! Total emissions: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
+          message: `Code analysis saved to ${stageLocked.split(':')[0]}! Total emissions: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
           color: 'green',
         });
         setShowSaveModal(false);
@@ -634,8 +635,9 @@ export default function CodeCalculator() {
                     <button 
                       onClick={() => {
                         setShowSaveModal(true);
-                        // Reset stage selection when opening modal for fresh selection
-                        setSelectedStage('');
+                        // Lock stage to the current project's stage when opening modal
+                        const proj = projects.find(p => p.id.toString() === selectedProject);
+                        setSelectedStage(proj?.stage || '');
                       }}
                       style={{
                         marginTop: '15px',
@@ -1108,9 +1110,10 @@ export default function CodeCalculator() {
                   const newProjectId = e.target.value;
                   console.log('Project selection changed to:', newProjectId);
                   setSelectedProject(newProjectId);
-                  // Reset stage when project changes to force user to select explicitly
-                  console.log('Resetting stage selection');
-                  setSelectedStage('');
+                  // Lock stage to the selected project's current stage
+                  const proj = projects.find(p => p.id.toString() === newProjectId);
+                  console.log('Locking stage to project stage:', proj?.stage);
+                  setSelectedStage(proj?.stage || '');
                 }}
                 style={{
                   width: '100%',
@@ -1141,15 +1144,12 @@ export default function CodeCalculator() {
                 color: '#34495e',
                 fontFamily: 'Poppins'
               }}>
-                Select Stage *
+                Stage (locked to current project) *
               </label>
               <select
                 key={`stage-select-${selectedProject}`}
                 value={selectedStage}
-                onChange={(e) => {
-                  console.log('Stage changed from:', selectedStage, 'to:', e.target.value);
-                  setSelectedStage(e.target.value);
-                }}
+                disabled
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -1157,23 +1157,17 @@ export default function CodeCalculator() {
                   fontFamily: 'Poppins',
                   border: '1px solid #e0e0e0',
                   borderRadius: '8px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer'
+                  backgroundColor: '#f8f9fa',
+                  color: '#6b7280',
+                  cursor: 'not-allowed'
                 }}
               >
-                <option value="">-- Choose a stage --</option>
-                {CANONICAL_STAGES.map((stage) => {
-                  const proj = projects.find(p => p.id.toString() === selectedProject);
-                  const currentIdx = proj ? CANONICAL_STAGES.indexOf(proj.stage) : -1;
-                  const optionIdx = CANONICAL_STAGES.indexOf(stage);
-                  const disabled = currentIdx >= 0 && optionIdx > currentIdx; // future stage disabled
-                  const label = stage.includes(':') ? stage.split(':')[0] : stage;
-                  return (
-                    <option key={stage} value={stage} disabled={disabled}>
-                      {label}{disabled ? ' (not reached)' : ''}
-                    </option>
-                  );
-                })}
+                {!selectedProject && <option value="">-- Choose a project first --</option>}
+                {selectedProject && (
+                  <option value={selectedStage}>
+                    {selectedStage ? (selectedStage.includes(':') ? selectedStage.split(':')[0] : selectedStage) : 'Unknown stage'}
+                  </option>
+                )}
               </select>
               <small style={{
                 display: 'block',
@@ -1182,7 +1176,7 @@ export default function CodeCalculator() {
                 color: '#7f8c8d',
                 fontFamily: 'Poppins'
               }}>
-                Currently selected: {selectedStage ? (selectedStage.includes(':') ? selectedStage.split(':')[0] : selectedStage) : 'None'}
+                Currently selected: {selectedStage ? (selectedStage.includes(':') ? selectedStage.split(':')[0] : selectedStage) : 'None'} (locked)
               </small>
             </div>
 
