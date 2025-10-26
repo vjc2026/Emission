@@ -609,7 +609,7 @@ export default function CodeCalculator() {
                       marginBottom: '20px',
                       fontFamily: 'Poppins'
                     }}>
-                      Carbon Emission: {formatMetrics(result).emissions.toFixed(6)} g CO₂
+                      Carbon Emission: {formatMetrics(result).emissions.toFixed(6)} kg CO₂
                     </div>
                     <div style={{
                       fontSize: '20px',
