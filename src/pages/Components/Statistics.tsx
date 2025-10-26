@@ -57,12 +57,6 @@ export function StatisticsComponent() {
   const [organization, setOrganization] = useState<string>('');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('list');
-  // Canonical stages (must match backend and CodeCalculator)
-  const CANONICAL_STAGES = [
-    'Design: Creating the software architecture',
-    'Development: Writing the actual code',
-    'Testing: Ensuring the software works as expected'
-  ];
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -272,15 +266,10 @@ export function StatisticsComponent() {
       setExpandedProject(null);
     } else {
       setExpandedProject(projectId);
-      // Fetch analyses for all reached stages (<= current stage)
-      const currentIdx = CANONICAL_STAGES.indexOf(stage);
-      const reachedStages = currentIdx >= 0 ? CANONICAL_STAGES.slice(0, currentIdx + 1) : [];
-      reachedStages.forEach(s => {
-        const key = `${projectId}-${s}`;
-        if (!codeAnalyses[key]) {
-          fetchCodeAnalyses(projectId, s);
-        }
-      });
+      const key = `${projectId}-${stage}`;
+      if (!codeAnalyses[key]) {
+        fetchCodeAnalyses(projectId, stage);
+      }
     }
   };
   
@@ -680,8 +669,8 @@ export function StatisticsComponent() {
                               <ThemeIcon size="sm" color="cyan" variant="light" radius="xl">
                                 <IconCode size={14} />
                               </ThemeIcon>
-                              <Tooltip label={`Code analyses (all stages): ${project.code_analyses_count}`}>
-                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂ (all stages)</Text>
+                              <Tooltip label={`Code analyses: ${project.code_analyses_count}`}>
+                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂</Text>
                               </Tooltip>
                             </Group>
                           )}
@@ -723,78 +712,56 @@ export function StatisticsComponent() {
 
                             <Collapse in={expandedProject === project.id}>
                               <Paper p="sm" mt="sm" withBorder bg="gray.0">
-                                {(() => {
-                                  const currentIdx = CANONICAL_STAGES.indexOf(project.stage);
-                                  const reachedStages = currentIdx >= 0 ? CANONICAL_STAGES.slice(0, currentIdx + 1) : [];
-                                  return (
-                                    <Stack gap="md">
-                                      {reachedStages.map((stageLabel) => {
-                                        const key = `${project.id}-${stageLabel}`;
-                                        const pretty = stageLabel.split(':')[0];
-                                        const analyses = codeAnalyses[key] || [];
-                                        const isLoading = !!loadingAnalyses[key];
-                                        return (
-                                          <Paper key={stageLabel} p="sm" withBorder bg="white">
-                                            <Group align="center" justify="space-between" mb="xs">
-                                              <Group gap="xs">
-                                                <ThemeIcon size="sm" color="blue" variant="light" radius="xl">
-                                                  <IconChartLine size={14} />
-                                                </ThemeIcon>
-                                                <Text fw={600} size="sm">{pretty} stage</Text>
-                                              </Group>
-                                            </Group>
-                                            {isLoading ? (
-                                              <Center p="md"><Loader size="sm" /></Center>
-                                            ) : (
-                                              <Stack gap="xs">
-                                                {analyses.length > 0 ? (
-                                                  analyses.map((analysis: any) => (
-                                                    <Paper key={analysis.id} p="xs" withBorder>
-                                                      <Group align="apart">
-                                                        <div style={{ flex: 1 }}>
-                                                          <Group gap="xs" mb={4}>
-                                                            {analysis.user_name && <Text size="xs" fw={600}>{analysis.user_name}</Text>}
-                                                            {analysis.analysis_date && (
-                                                              <Text size="xs" c="dimmed">
-                                                                {new Date(analysis.analysis_date).toLocaleString()}
-                                                              </Text>
-                                                            )}
-                                                          </Group>
-                                                          <Text size="xs" c="dimmed">
-                                                            🌱 {analysis.emissions_gco2.toFixed(6)} g CO₂
-                                                            {' • '}
-                                                            ⚡ {analysis.energy_kwh.toFixed(6)} kWh
-                                                            {analysis.eco_score && ` • 🎯 ${analysis.eco_score.toFixed(1)}/100`}
-                                                          </Text>
-                                                          {analysis.time_complexity && (
-                                                            <Text size="xs" c="dimmed">
-                                                              Time: {analysis.time_complexity}
-                                                              {analysis.space_complexity && ` | Space: ${analysis.space_complexity}`}
-                                                            </Text>
-                                                          )}
-                                                        </div>
-                                                        <ActionIcon
-                                                          color="red"
-                                                          variant="subtle"
-                                                          size="sm"
-                                                          onClick={() => deleteCodeAnalysis(analysis.id, project.id, stageLabel)}
-                                                        >
-                                                          <IconTrash size={16} />
-                                                        </ActionIcon>
-                                                      </Group>
-                                                    </Paper>
-                                                  ))
-                                                ) : (
-                                                  <Text size="xs" c="dimmed" ta="center">No code analyses found</Text>
+                                {loadingAnalyses[`${project.id}-${project.stage}`] ? (
+                                  <Center p="md">
+                                    <Loader size="sm" />
+                                  </Center>
+                                ) : (
+                                  <Stack gap="xs">
+                                    {codeAnalyses[`${project.id}-${project.stage}`]?.length > 0 ? (
+                                      codeAnalyses[`${project.id}-${project.stage}`].map((analysis: any) => (
+                                        <Paper key={analysis.id} p="xs" withBorder bg="white">
+                                          <Group align="apart">
+                                            <div style={{ flex: 1 }}>
+                                              <Group gap="xs" mb={4}>
+                                                {analysis.user_name && <Text size="xs" fw={600}>{analysis.user_name}</Text>}
+                                                {analysis.analysis_date && (
+                                                  <Text size="xs" c="dimmed">
+                                                    {new Date(analysis.analysis_date).toLocaleString()}
+                                                  </Text>
                                                 )}
-                                              </Stack>
-                                            )}
-                                          </Paper>
-                                        );
-                                      })}
-                                    </Stack>
-                                  );
-                                })()}
+                                              </Group>
+                                              <Text size="xs" c="dimmed">
+                                                🌱 {analysis.emissions_gco2.toFixed(6)} g CO₂
+                                                {' • '}
+                                                ⚡ {analysis.energy_kwh.toFixed(6)} kWh
+                                                {analysis.eco_score && ` • 🎯 ${analysis.eco_score.toFixed(1)}/100`}
+                                              </Text>
+                                              {analysis.time_complexity && (
+                                                <Text size="xs" c="dimmed">
+                                                  Time: {analysis.time_complexity}
+                                                  {analysis.space_complexity && ` | Space: ${analysis.space_complexity}`}
+                                                </Text>
+                                              )}
+                                            </div>
+                                            <ActionIcon
+                                              color="red"
+                                              variant="subtle"
+                                              size="sm"
+                                              onClick={() => deleteCodeAnalysis(analysis.id, project.id, project.stage)}
+                                            >
+                                              <IconTrash size={16} />
+                                            </ActionIcon>
+                                          </Group>
+                                        </Paper>
+                                      ))
+                                    ) : (
+                                      <Text size="xs" c="dimmed" ta="center">
+                                        No code analyses found
+                                      </Text>
+                                    )}
+                                  </Stack>
+                                )}
                               </Paper>
                             </Collapse>
                           </>
