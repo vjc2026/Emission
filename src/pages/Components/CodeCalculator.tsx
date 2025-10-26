@@ -308,7 +308,7 @@ export default function CodeCalculator() {
     if (!token) return;
 
     try {
-      const response = await fetch('https://emissionserver.vercel.app/add_code_analysis', {
+      const response = await fetch('https://emissionserver.vercel.app/add_code_calculated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
