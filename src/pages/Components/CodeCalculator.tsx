@@ -1176,7 +1176,6 @@ export default function CodeCalculator() {
                 color: '#7f8c8d',
                 fontFamily: 'Poppins'
               }}>
-                Currently selected: {selectedStage ? (selectedStage.includes(':') ? selectedStage.split(':')[0] : selectedStage) : 'None'} (locked)
               </small>
             </div>
 
