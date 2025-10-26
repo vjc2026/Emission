@@ -24,7 +24,6 @@ interface EmissionData {
   organization: string;
   user: string;
   total_carbon_emit: number;
-  entry_type?: string; // 'device' or 'code'
 }
 
 interface ThProps {
@@ -52,24 +51,10 @@ function Th({ children, reversed, sorted, onSort }: ThProps) {
   );
 }
 
-// Utility function to normalize carbon emissions
-// Code entries are in grams, device entries are in kg
-// This converts everything to kg for consistent display
-function normalizeCarbonEmission(carbonEmit: number, entryType?: string): number {
-  if (entryType === 'code') {
-    // Convert grams to kg
-    return carbonEmit / 1000;
-  }
-  // Already in kg
-  return carbonEmit;
-}
-
 function filterData(data: EmissionData[], search: string) {
   const query = search.toLowerCase().trim();
-  if (data.length === 0) return [];
-
   return data.filter((item) =>
-    keys(item).some((key) => String((item as any)[key]).toLowerCase().includes(query))
+    keys(data[0]).some((key) => item[key].toString().toLowerCase().includes(query))
   );
 }
 
@@ -85,22 +70,11 @@ function sortData(
 
   return filterData(
     [...data].sort((a, b) => {
-      // Numeric sort for the carbon value to keep numerical ordering correct
-      if (sortBy === 'total_carbon_emit') {
-        const av = (a.total_carbon_emit ?? 0);
-        const bv = (b.total_carbon_emit ?? 0);
-        return payload.reversed ? bv - av : av - bv;
-      }
-
-      // Safe string conversion for possibly-undefined properties
-      const aval = String((a as any)[sortBy] ?? '');
-      const bval = String((b as any)[sortBy] ?? '');
-
       if (payload.reversed) {
-        return bval.localeCompare(aval);
+        return b[sortBy].toString().localeCompare(a[sortBy].toString());
       }
 
-      return aval.localeCompare(bval);
+      return a[sortBy].toString().localeCompare(b[sortBy].toString());
     }),
     payload.search
   );
@@ -204,7 +178,7 @@ const AdminEmissionView: React.FC = () => {
                 <Text fw={500}>{organization}</Text>
               </Group>
             </Table.Td>
-            <Table.Td className={classes.carbonValue}>{totalCarbonEmit.toFixed(3)} kg</Table.Td>
+            <Table.Td className={classes.carbonValue}>{totalCarbonEmit.toFixed(3)}</Table.Td>
           </Table.Tr>
           <Table.Tr>
             <Table.Td colSpan={2} style={{ padding: 0 }}>
@@ -214,9 +188,7 @@ const AdminEmissionView: React.FC = () => {
                     {organizationData.map((user) => (
                       <Table.Tr key={user.user} className={classes.userRow}>
                         <Table.Td pl={40}>{user.user}</Table.Td>
-                        <Table.Td className={classes.carbonValue}>
-                          {normalizeCarbonEmission(user.total_carbon_emit, user.entry_type).toFixed(3)} kg
-                        </Table.Td>
+                        <Table.Td className={classes.carbonValue}>{user.total_carbon_emit.toFixed(3)}</Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
@@ -232,9 +204,7 @@ const AdminEmissionView: React.FC = () => {
       <Table.Tr key={data.user}>
         <Table.Td>{data.organization}</Table.Td>
         <Table.Td>{data.user}</Table.Td>
-        <Table.Td className={classes.carbonValue}>
-          {normalizeCarbonEmission(data.total_carbon_emit, data.entry_type).toFixed(3)} kg
-        </Table.Td>
+        <Table.Td className={classes.carbonValue}>{data.total_carbon_emit.toFixed(3)}</Table.Td>
       </Table.Tr>
     ))
   );
