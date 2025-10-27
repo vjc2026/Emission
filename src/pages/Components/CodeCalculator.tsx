@@ -376,7 +376,7 @@ export default function CodeCalculator() {
       if (response.ok) {
         notifications.show({
           title: 'Success',
-          message: `Code analysis saved to ${stageLocked.split(':')[0]}! Total emissions: ${data.accumulated_emissions.toFixed(6)} g CO₂`,
+          message: `Code analysis saved to ${stageLocked.split(':')[0]}! Total emissions: ${data.accumulated_emissions.toFixed(6)} kg CO₂`,
           color: 'green',
         });
         setShowSaveModal(false);

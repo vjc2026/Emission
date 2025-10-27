@@ -275,8 +275,8 @@ export function StatisticsComponent() {
   
   const calculateTotalEmissions = () => {
     const sum = filteredProjects.reduce((total, project) => {
-      const base = project.carbon_emit || 0; // assumed kg
-      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      const base = project.carbon_emit || 0; // kg
+      const codeKg = includeCodeInTotals ? (project.code_emissions_sum_gco2 || 0) : 0; // already in kg
       return total + base + codeKg;
     }, 0);
     return sum.toFixed(4);
@@ -288,7 +288,7 @@ export function StatisticsComponent() {
     filteredProjects.forEach(project => {
       const status = project.status || 'Unknown';
       const base = project.carbon_emit || 0;
-      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      const codeKg = includeCodeInTotals ? (project.code_emissions_sum_gco2 || 0) : 0; // already in kg
       statusMap[status] = (statusMap[status] || 0) + base + codeKg;
     });
     return statusMap;
@@ -299,7 +299,7 @@ export function StatisticsComponent() {
     filteredProjects.forEach(project => {
       const stage = project.stage || 'Unknown';
       const base = project.carbon_emit || 0;
-      const codeKg = includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0;
+      const codeKg = includeCodeInTotals ? (project.code_emissions_sum_gco2 || 0) : 0; // already in kg
       stageMap[stage] = (stageMap[stage] || 0) + base + codeKg;
     });
     return stageMap;
@@ -670,7 +670,7 @@ export function StatisticsComponent() {
                                 <IconCode size={14} />
                               </ThemeIcon>
                               <Tooltip label={`Code analyses: ${project.code_analyses_count}`}>
-                                <Text size="xs">{((project.code_emissions_sum_gco2 || 0) / 1000).toFixed(4)} kg CO₂</Text>
+                                <Text size="xs">{(project.code_emissions_sum_gco2 || 0).toFixed(4)} kg CO₂</Text>
                               </Tooltip>
                             </Group>
                           )}
@@ -688,7 +688,7 @@ export function StatisticsComponent() {
                         <Group align="apart">
                           <Text size="sm" fw={600}>Total Emissions{includeCodeInTotals ? ' (with code)' : ''}:</Text>
                           <Text size="sm" fw={700} c="green">
-                            {( (project.carbon_emit || 0) + (includeCodeInTotals ? ((project.code_emissions_sum_gco2 || 0) / 1000) : 0) ).toFixed(4)} kg CO₂
+                            {( (project.carbon_emit || 0) + (includeCodeInTotals ? (project.code_emissions_sum_gco2 || 0) : 0) ).toFixed(4)} kg CO₂
                           </Text>
                         </Group>
 
@@ -732,7 +732,7 @@ export function StatisticsComponent() {
                                                 )}
                                               </Group>
                                               <Text size="xs" c="dimmed">
-                                                🌱 {analysis.emissions_gco2.toFixed(6)} g CO₂
+                                                🌱 {analysis.emissions_gco2.toFixed(6)} kg CO₂
                                                 {' • '}
                                                 ⚡ {analysis.energy_kwh.toFixed(6)} kWh
                                                 {analysis.eco_score && ` • 🎯 ${analysis.eco_score.toFixed(1)}/100`}
