@@ -1230,7 +1230,7 @@ const AdminDashboard: React.FC = () => {
               <tr>
                 <Th sorted={sortBy === 'project_name'} reversed={reverseSortDirection} onSort={() => setSorting('project_name')}>Project</Th>
                 <Th sorted={sortBy === 'status'} reversed={reverseSortDirection} onSort={() => setSorting('status')}>Status</Th>
-                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage & Progress</Th>
+                <Th sorted={sortBy === 'stage'} reversed={reverseSortDirection} onSort={() => setSorting('stage')}>Stage</Th>
                 <Th sorted={sortBy === 'carbon_emit'} reversed={reverseSortDirection} onSort={() => setSorting('carbon_emit')}>Carbon</Th>
                 <Th sorted={sortBy === 'owner'} reversed={reverseSortDirection} onSort={() => setSorting('owner')}>Owner</Th>
                 <Th sorted={sortBy === 'stage_due_date'} reversed={reverseSortDirection} onSort={() => setSorting('stage_due_date')}>Timeline</Th>
