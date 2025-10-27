@@ -1054,28 +1054,16 @@ const AdminDashboard: React.FC = () => {
           </Badge>
         </td>
         <td style={{ maxWidth: '200px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: project.stage.includes('Design') ? '#22c55e' :
-                          project.stage.includes('Development') ? '#3b82f6' :
-                          '#a855f7'
-              }} />
-              {project.stage.split(':')[0]}
-            </div>
-            <div className={classes.progressBar}>
-              <div 
-                className={classes.progressFill} 
-                style={{ 
-                  width: `${calculateProgress(project)}%`,
-                  backgroundColor: project.status === 'Complete' ? '#3b82f6' : '#22c55e'
-                }} 
-              />
-              <span>{Math.round(calculateProgress(project))}%</span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: project.stage.includes('Design') ? '#22c55e' :
+                        project.stage.includes('Development') ? '#3b82f6' :
+                        '#a855f7'
+            }} />
+            {project.stage.split(':')[0]}
           </div>
         </td>
         <td>

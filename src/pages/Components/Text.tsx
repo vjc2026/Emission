@@ -992,7 +992,6 @@ const History = () => {
                   <th>Leader</th>
                   <th>Assignees</th>
                   <th>Timeline</th>
-                  <th>Progress</th>
                   <th>Spent Time</th>
                   <th>Carbon Emissions</th>
                 </tr>
@@ -1051,18 +1050,6 @@ const History = () => {
                           <div>Start: {new Date(task.stage_start_date).toLocaleDateString()}</div>
                           <div>Due: {new Date(task.stage_due_date).toLocaleDateString()}</div>
                           <div>{daysRemaining} days remaining</div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.progressBar}>
-                          <div 
-                            className={styles.progressFill} 
-                            style={{ 
-                              width: `${progress}%`,
-                              backgroundColor: progressColor 
-                            }} 
-                          />
-                          <span>{Math.round(progress)}%</span>
                         </div>
                       </td>
                       <td>{formatTime(currentSeconds)}</td>
