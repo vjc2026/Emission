@@ -1368,6 +1368,20 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                 </Paper>
+
+                <Paper p="md" radius="md" withBorder mt="md">
+                  <Text size="sm" fw={500} c="dimmed" mb="xs">Progress</Text>
+                  <div className={classes.progressBar}>
+                    <div 
+                      className={classes.progressFill} 
+                      style={{ 
+                        width: `${calculateProgress(selectedProject)}%`,
+                        backgroundColor: selectedProject.status === 'Complete' ? '#3b82f6' : '#22c55e'
+                      }} 
+                    />
+                    <span>{Math.round(calculateProgress(selectedProject))}%</span>
+                  </div>
+                </Paper>
               </div>
 
               <Paper p="md" radius="md" withBorder mt="md">

@@ -1138,6 +1138,18 @@ const History = () => {
 
                       return (
                         <>
+                          <div className={styles.progressBar}>
+                            <div 
+                              className={styles.progressFill} 
+                              style={{ 
+                                width: `${progress}%`,
+                                backgroundColor: status === 'Delayed' ? '#ff4d4f' : 
+                                               status === 'At Risk' ? '#faad14' : 
+                                               '#52c41a'
+                              }} 
+                            />
+                            <span>{Math.round(progress)}%</span>
+                          </div>
                           <div className={styles.progressInfo}>
                             <Badge 
                               color={status === 'Delayed' ? 'red' : 
