@@ -4,7 +4,7 @@ Short guide to install, configure, and run the EmissionSense project locally or 
 
 ## Overview
 - Frontend: Next.js app in the project root.
-- Backend / API: Express server in `api/server.js`.
+- Backend / API: External Express server (removed from this repository). See the dedicated backend repo: https://github.com/JCV0827/emissionserver
 
 ## Prerequisites
 - Node.js >= 18
@@ -19,13 +19,10 @@ Short guide to install, configure, and run the EmissionSense project locally or 
 npm install
 ```
 
-3. Install API dependencies:
+3. Backend (separate repository):
 
-```
-cd api
-npm install
-cd ..
-```
+- This repository no longer contains a runnable `api/server.js`. The backend is maintained in a separate repository: https://github.com/JCV0827/emissionserver
+- To run the backend locally, clone the backend repo and follow its README (install dependencies and set the backend `.env`).
 
 ## Environment variables
 Create a `.env` in the project root (or supply environment variables via your deployment). Use `.env.example` as a template. Required variables used by the API include:
@@ -35,24 +32,23 @@ Create a `.env` in the project root (or supply environment variables via your de
 - `EMAIL_USER`, `EMAIL_PASS` — SMTP credentials used by Nodemailer
 - `ELECTRICITYMAPS_API_KEY` — optional live carbon factor provider
 - `NODE_ENV` — `development` or `production`
-- `PORT` — port for `api/server.js` (defaults to `5000`)
+-- `PORT` — port used by the backend (defaults vary; see the backend README)
 
-See `api/server.js` and `api/dynamicCarbonProvider.js` for usage details.
+See the backend repository for API implementation details and `api/dynamicCarbonProvider.js` in this repo for optional live carbon factor support.
 
 ## Running locally
 
-- Start the API (in a dedicated terminal):
+
+- To run the backend locally, clone and run the external backend repository:
 
 ```
-cd api
+git clone https://github.com/JCV0827/emissionserver.git
+cd emissionserver
+npm install
 npm run start
 ```
 
-Or from project root:
-
-```
-npm --prefix api run start
-```
+Or follow the backend repo's instructions for development and production.
 
 - Start the frontend (Next.js):
 
@@ -82,18 +78,19 @@ npm start
 This project expects certain tables (users, user_devices, user_history, cpus, gpus, project_members, notifications). Provide a MySQL instance with the expected schema before running the API. If you prefer, deliver a SQL dump to the client with the schema and seed data.
 
 ## File locations of interest
-- API server: [api/server.js](api/server.js#L1)
-- Dynamic carbon provider: [api/dynamicCarbonProvider.js](api/dynamicCarbonProvider.js#L1)
+- Backend repository: https://github.com/JCV0827/emissionserver
+- Dynamic carbon provider (this repo): [api/dynamicCarbonProvider.js](api/dynamicCarbonProvider.js#L1)
 - Frontend entry: `src/pages/index.tsx`
 
 ## Static uploads
-- Local uploads folder: `api/uploads` during development. In production, files are served from `/data/uploads` (see `api/server.js`). Ensure filesystem permissions allow writes.
+- Uploads are handled by the backend. The original local path was `api/uploads` during development and `/data/uploads` in production; since `api/server.js` is no longer part of this repo, ensure the backend repo you deploy exposes the uploads endpoint and storage location. Update frontend image URLs to point to the backend host.
 
 ## Delivering to a client
 - Provide the following to the client:
   - Project source (repository zip).
   - `.env.example` with instructions to fill values.
   - MySQL schema SQL dump and migration instructions.
+  - Backend repository and deployment instructions: https://github.com/JCV0827/emissionserver
   - Node version recommendation (>=18) and `npm install` / `npm run build` steps.
   - Optionally include a Dockerfile or Docker image for simpler deployment.
 
